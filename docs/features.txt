@@ -1,0 +1,80 @@
+DigiMSK Chatbot — Feature Implementation List
+================================================
+
+1. Rate limiting
+   FastAPI middleware tracking requests per session/IP, returning
+   429 when exceeded. slowapi.
+
+2. Explicit failure modes
+   Wrap each pipeline stage (LLM call, RAG retrieval, policy gate) in
+   try/except or timeout logic. Return a safe fallback message
+   directing to emergency services.
+
+3. Logging (latency, error rates, escalation rates, retrieval quality)
+   Structured logging at each orchestrator node for latency, errors,
+   escalations, and retrieval scores. structlog, JSON formatter.
+
+4. Deterministic safety overrides and human handoff
+   Hard-coded rules preempting model output for critical safety
+   pathways (e.g., suicidal ideation triggers immediate crisis
+   resources). Mandatory human handoff triggers.
+
+5. Conversation history
+   Session-keyed store appending each user and bot message. Retrieved
+   at the start of each turn.
+
+6. Multi-turn chain-of-thought with preserved reasoning history
+   XML-tagged <thinking> and <answer> sections. Only <answer>
+   returned to user; <thinking> saved in backend and re-injected
+   on subsequent turns.
+
+7. Multi-turn conversation and state saving
+   Persistent state across turns: risk flags, accumulated metadata,
+   and turn counter. Serialised/deserialised per turn.
+
+8. Context window management (truncation of prior turns?)
+   Keep prompts within the model's token budget. Must
+   preserve safety-critical context (e.g., stated allergies).
+
+9. Query reformulation before RAG
+    Rewrite user messages to be self-contained using conversation
+    context (e.g., "its side effects" -> "ibuprofen side effects")
+    before retrieval. Query expansion to broaden RAG search.
+
+10. Factuality and groundedness verification
+    Verification step between generation and final output checking
+    whether every claim is supported by retrieved RAG passages.
+
+11. RAG versioning and update strategy
+    Versioned ingestion (timestamps, hashes, semantic version tags)
+    on each chunk, with audit trail linking responses to source
+    versions. CI/CD for the knowledge base with rollback capability.
+
+12. Contradiction detection across guideline sources
+    Detect conflicting recommendations across retrieved passages
+    Semantic comparison of passage pairs with resolution policy (flag, defer to most
+    recent, escalate).
+
+13. Red-team and adversarial testing framework
+    End-to-end adversarial testing of the bot's conversational
+    interface. Multi-turn prompt injection, jailbreak attempts, and efforts
+    to extract system prompts or PHI. Microsoft PyRIT, NVIDIA Garak.
+
+14. Clinical NER and encoder-based risk signal extraction
+    ClinicalBERT or PubMedBERT for medical NER, composite red-flag
+    signal detection, and sentiment cues. Fine-tuned on clinical NER
+    datasets (i2b2) with calibrated high sensitivity for red flags.
+
+15. Semantic risk assessment (across turns)
+    Model evaluating full conversation trajectory for escalating
+    distress, self-harm ideation, or adversarial manipulation.
+    LLM-as-judge over full conversation history.
+
+16. DPO / preference optimization of the generative model
+    Fine-tuning Llama-3-8B-Instruct with DPO using paired preference
+    data (~500+ pairs) for clinically conservative, terminology-precise
+    responses. HuggingFace TRL with PEFT/LoRA.
+
+17. Cross-modal attention-based signal fusion (Synthesizer)
+    Custom neural architecture fusing Encoder, RAG, and Generator
+    representations via multi-head attention. 

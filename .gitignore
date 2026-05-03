@@ -1,0 +1,13 @@
+.env
+.venv
+.chroma_pytest/
+data/chroma/
+data/langgraph_checkpoints.sqlite
+data/langgraph_checkpoints.sqlite-*
+data/sessions/*.egg-info/
+__pycache__/
+.pytest_cache/
+*.pyc
+# Slurm batch logs (scripts/sockeye)
+slurm-*.out
+slurm-*.err

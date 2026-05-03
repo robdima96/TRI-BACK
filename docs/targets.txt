@@ -1,0 +1,98 @@
+DigiMSK Chatbot — Evaluation Targets and Metrics
+==================================================
+
+
+A. LLM OUTPUT QUALITY METRICS
+------------------------------
+Generic
+
+1. BLEU (Bilingual Evaluation Understudy)
+   Precision between generated text and one or more
+   reference answers. Higher scores indicate
+   greater lexical overlap with reference outputs.
+
+2. BERTScore
+   Computes semantic similarity between generated and reference text
+   using contextual embeddings from a pretrained transformer.
+
+3. Perplexity
+   Measures how surprised the model is by its own output.
+   Lower perplexity suggests the model produces more fluent,
+   predictable text.
+
+4. Hallucination Rate
+   Proportion of generated statements that are fabricated or
+   unsupported by the source material.
+
+5. Readability / Health Literacy Alignment
+    Reading level of generated text relative to the target
+    population, measured via SMOG- target is 8th grade or less
+
+
+
+
+B. ACCEPTABILITY
+------------------------------
+Patient-important targets for appropriateness, tone, and trust
+Opportunity for patient panel?
+
+6. Answer Relevance 
+   Measures whether the response addresses the user's query, scored on
+   Likert scale by human raters or by an LLM evaluator.
+
+7. Empathy and Tone
+    Rated assessment of whether the chatbot responds with
+    appropriate empathy, sensitivity, and bedside manner, especially
+    for distressing symptoms.
+
+8. System Usability Scale (SUS)
+    Validated 10-item questionnaire yielding a 0–100 composite
+    score for perceived usability; reported means range from 65 to 80.
+
+9. Bias and Fairness Auditing
+    Assessment of model outputs across demographic
+    subgroups (age, sex, ethnicity, language) to detect disparities
+    in accuracy, tone, or recommendation quality.
+
+
+
+C. SAFETY, THREATS
+------------------------------
+Predict and prevent system vulnerability
+
+10. Safety of Recommendations
+    Whether the chatbot avoids suggesting harmful, contraindicated,
+    or dangerous actions. Evaluated through red-teaming scenarios.
+
+11. Escalation / Handoff Rate
+    Proportion of conversations that trigger a transfer to a human
+    clinician.
+
+
+A. DOMAIN-SPECIFIC METRICS
+------------------------------
+Specific to MSK symptom interpretation and recommendations
+
+12. Triage Appropriateness
+    Accuracy of urgency classification when the chatbot must decide
+    whether to advise self-care, schedule a visit, or recommend
+    emergency attendance. Measured against clinician-assigned gold
+    standards.
+
+
+C. SOFTWARE QUALITY AND RELIABILITY TARGETS
+---------------------------------------------
+
+13. Response Latency
+    Time from user message to first chatbot reply token.
+
+14. End-to-End Latency 
+    Time from receipt of the user's
+    message to delivery of the complete response.
+
+15. Error Rate (target: < 0.5 % of requests)
+    Proportion of requests that result in an unhandled exception,
+    timeout, or uninformative fallback. 
+
+
+
