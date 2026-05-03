@@ -1,5 +1,7 @@
 .env
 .venv
+.tmp_*/
+*.egg-info/
 .chroma_pytest/
 data/chroma/
 data/langgraph_checkpoints.sqlite
