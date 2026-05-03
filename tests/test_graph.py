@@ -29,7 +29,7 @@ def test_graph_generates_citations(monkeypatch: pytest.MonkeyPatch):
             "session_id": "s-003",
             "messages": [
                 HumanMessage(
-                    content="What is conservative management for knee osteoarthritis?"
+                    content="What is conservative management for back pain?"
                 )
             ],
         },

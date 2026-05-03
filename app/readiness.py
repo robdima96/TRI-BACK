@@ -40,7 +40,7 @@ def probe_generator() -> tuple[bool, str]:
 def probe_encoder() -> tuple[bool, str]:
     if encoder_is_available():
         return True, "ok"
-    return False, f"no encoder config.json under {settings.encoder_model_dir}"
+    return False, f"no HF config.json, gliner_config.json, or encoder/ backbone under {settings.encoder_model_dir}"
 
 
 def readiness_payload() -> dict:

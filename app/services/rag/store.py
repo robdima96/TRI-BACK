@@ -67,16 +67,26 @@ _DEFAULT_CHUNKS: list[tuple[str, str, dict[str, Any]]] = [
     ),
 ]
 
-'''
+
 def _stable_unit_embedding(text: str, dim: int) -> list[float]:
-    """Reproducible 768-d unit vector (for dev seed only, not a clinical encoder)."""
+    """Reproducible dim-d unit vector (dev seed only when encoder is unavailable)."""
     seed = int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:8], 16) % (2**31)
     rng = np.random.default_rng(seed)
     v = rng.standard_normal(dim, dtype=np.float64)
     n = float(np.linalg.norm(v)) + 1e-9
     v = (v / n).astype(np.float32)
     return v.tolist()
-'''
+
+
+def _chunk_embedding_for_seed(text: str, dim: int) -> list[float]:
+    """Use the same encoder as live queries when possible; else stable random unit vector."""
+    from app.services.rag.embeddings import compute_query_embedding
+
+    vec = compute_query_embedding(text)
+    if len(vec) == dim:
+        return vec
+    return _stable_unit_embedding(text, dim)
+
 
 # get persistent client for Chroma and set local path
 def get_chroma_client() -> chromadb.PersistentClient:
@@ -115,7 +125,7 @@ def _seed_default_chunks(collection: Collection) -> None:
         ids.append(chunk_id)
         documents.append(text)
         metadatas.append({**meta, "chunk_id": chunk_id})
-        embeddings.append(_stable_unit_embedding(text, dim))
+        embeddings.append(_chunk_embedding_for_seed(text, dim))
     # add the chunks to the collection
     # add and not upsert, only runs when collection is empty
     collection.add(

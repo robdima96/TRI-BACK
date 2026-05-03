@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -16,9 +17,49 @@ _mdl_enc: Any = None
 _device_enc: Any = None
 
 
+def _subdir_with_hf_config(root: Path) -> Path | None:
+    for name in ("encoder", "backbone", "baseline", "deberta"):
+        p = root / name
+        if p.is_dir() and (p / "config.json").is_file():
+            return p
+    return None
+
+
 def _encoder_path_looks_valid(encoder_dir: str) -> bool:
     root = Path(encoder_dir)
-    return root.is_dir() and (root / "config.json").is_file()
+    if not root.is_dir():
+        return False
+    if (root / "config.json").is_file():
+        return True
+    if _subdir_with_hf_config(root) is not None:
+        return True
+    return (root / "gliner_config.json").is_file()
+
+
+def _resolved_encoder_sources(encoder_dir: str) -> list[tuple[str, bool]]:
+    """(HF ``pretrained`` id/path, ``local_files_only``) in try order."""
+    root = Path(encoder_dir)
+    if not root.is_dir():
+        return []
+    if (root / "config.json").is_file():
+        return [(str(root.resolve()), True)]
+    nested = _subdir_with_hf_config(root)
+    if nested is not None:
+        return [(str(nested.resolve()), True)]
+    gl = root / "gliner_config.json"
+    if not gl.is_file():
+        return []
+    try:
+        with gl.open(encoding="utf-8") as f:
+            gc = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        _log.warning("could not read %s: %s", gl, e)
+        return []
+    raw = gc.get("model_name") or gc.get("encoder_model_name")
+    if not (isinstance(raw, str) and raw.strip()):
+        return []
+    mid = raw.strip()
+    return [(mid, True), (mid, False)]
 
 
 def rag_embedding_model_configured() -> bool:
@@ -41,21 +82,40 @@ def _ensure_encoder(encoder_dir: str) -> bool:
     # if encoder is already loaded, return True
     if _mdl_enc is not None and _tok_enc is not None:
         return True
-    root = Path(encoder_dir)
-    if not root.is_dir() or not (root / "config.json").is_file():
+    sources = _resolved_encoder_sources(encoder_dir)
+    if not sources:
         return False
     # lazy imports for heavy dependencies
     from transformers import AutoModel, AutoTokenizer
     import torch
 
-    p = str(root.resolve())
-    _tok_enc = AutoTokenizer.from_pretrained(p, local_files_only=True)  # local model
-    _mdl_enc = AutoModel.from_pretrained(p, local_files_only=True)  # local model
-    # switch to inference mode- disables training behaviours like dropout and batch normalization
-    _mdl_enc.eval()
-    _device_enc = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    _mdl_enc.to(_device_enc)
-    return True
+    last_err: Exception | None = None
+    for pretrained, local_only in sources:
+        try:
+            tok = AutoTokenizer.from_pretrained(pretrained, local_files_only=local_only)
+            mdl = AutoModel.from_pretrained(pretrained, local_files_only=local_only)
+            mdl.eval()
+            _tok_enc = tok
+            _mdl_enc = mdl
+            _device_enc = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            _mdl_enc.to(_device_enc)
+            _log.info(
+                "RAG encoder backbone loaded from %r (local_files_only=%s)",
+                pretrained,
+                local_only,
+            )
+            return True
+        except Exception as e:
+            last_err = e
+            _log.debug(
+                "encoder load failed for %r local_files_only=%s: %s",
+                pretrained,
+                local_only,
+                e,
+            )
+    if last_err is not None:
+        _log.warning("all encoder load attempts failed: %s", last_err)
+    return False
 
 
 # runs sentence encoder (tokenizer + AutoModel), mean-pools token hidden states (respecting the attention mask),
