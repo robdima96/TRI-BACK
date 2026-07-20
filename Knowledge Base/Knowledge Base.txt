@@ -1,0 +1,84 @@
+Knowledge Base- Vector DB and Knowledge Graphs for RAG in LBP triage
+--------------------------------------------------------------------
+
+Organize vector DB into sub-collections
+Allows us to apply different metadata filters, search thresholds, and LLM behavior prompts depending on the stage of the conversation.
+Screening --> Discrimination --> Disposition
+
+Subcollections
+--------------
+
+Chroma collection slugs (use with ``--sub-collection`` on ingest): ``red_flags``,
+``clinical_guidelines``, ``clinical_vignettes``, ``conversation_templates``,
+``diagnostic_confounders``. Human labels below map to those slugs.
+
+Red Flags (linking symptoms and traits to red-flag diagnoses)  [Chroma: red_flags]
+	e.g. "osteoporosis increases the risk of vertebral fracture"
+
+Conversation Templates (translates colloquial patient descriptions of symptoms and medications into clinical information)  [Chroma: conversation_templates]
+	e.g. "My legs feel like heavy jelly after walking 100 meters." maps semantically to neurogenic claudication
+
+Clinical Vignettes (brief example cases with known diagnosis / triage disposition, representative across acuities)  [Chroma: clinical_vignettes]
+	e.g. "A 35-year-old man presents with sudden onset of thoracic pain after lifting a heavy bag of concrete. The 
+	man has no previous history of fracture and is generally in good health. He smokes 5 cigarettes a day and has done 
+	so for 10 years. He is locally tender to palpation at T8 and T9 unilaterally on both sides" - green flag
+	
+Diagnostic Confounders (special considerations for: medications, pre-existing conditions, etc. that affect triage)  [Chroma: diagnostic_confounders]
+	e.g. "Patients with Ehler-Danlos syndrome wake up at night with pain unrelated to having an inflammatory condition"
+	relies on patient input matching the special condition
+	pregnancy
+	active cancer
+
+Clinical Guidelines (maps data extracted from user to validated decision rules including triage priority)  [Chroma: clinical_guidelines]
+	stub implementation: only two 
+	--> refer urgently to care provider (red-flag diagnosis likely)
+	--> manage conservatively (non-specific likely)
+	Can also contain heuristic rules like the classic spinal infection triad- back pain, fever, neurological dysfunction
+
+Chunking for relational vector database compatible with Entity and Relation Extraction (ERE) for GraphRAG
+---------------------------------------------------------------------------------------------------------
+
+Screening Phase
+----------------
+Keep query chunks nuanced and explanatory but short (300-500 tokens)
+User input is first checked by safety policy (catches obvious known red flags, medical emergency (chest pain, dyspnea) and off-topic inputs)
+Following signal extraction via the encoder, conversation Hx is matched against vector store sub-collections 
+Each sub-collection receives a similarity score, and top-k results are pulled from each sub-collection exceeding the score threshold
+Recurse standard screening questions until checklist is filled
+
+Discrimination Phase
+--------------------
+When multiple parent_ids are matched, pull discriminator variables from each triggered parent
+Orchestrate LLM to ask eliminating questions (highly specific red flags), e.g.:
+"Do you also experience numbness around your groin [Discriminator A], or a history of recent unexplained weight loss [Discriminator B]?"
+Pass back to screening phase
+
+Disposition Phase
+-----------------
+Establish criteria for when a specific triage disposition can be reached
+This will essentially be a process of "ruling out" all parent_id red-flag diagnoses once checklist is filled
+Use standardized checklist as input to bespoke classification model
+System checks disposition and requests matching chunk from Clinical Guidelines
+Orchestrate LLM to read corresponding guideline text and generate the final output response 
+
+Meta-data tags for all chunks
+-----------------------------
+
+not all fields are relevant to all chunks: "-"
+
+chunk_id
+loc (body location- all current chunks are lbp)
+parent_id (points to red-flag diagnoses- for hierarchical indexing and node in GraphRAG)
+evidence (source information, citation, etc.)
+evidence_level (1 SRMA, 2 RCT, 3 OBS)
+source_nodes (specific symptoms or traits given- for GraphRAG e.g. "numbness", "osteoporosis", "age over 50")
+edges (links between source and target- for GraphRAG e.g. RISK_FACTOR_FOR, HIGHLY_SPECIFIC_FOR, MIMIC_OF)
+is_specific (to mark chunks used in discriminatory questions when multiple parent_id retrieved)
+is_guideline (used for entity-specific screening questions during discrimination)
+
+Knowledge Graphs
+----------------
+
+https://neo4j.com/labs/genai-ecosystem/llm-graph-builder/
+
+

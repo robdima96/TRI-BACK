@@ -3,92 +3,64 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 from app.config import settings
 from app.schemas import Evidence
+from app.services.rag.chunk_retrieval import (
+    chunk_matches_to_evidence,
+    retrieve_chunk_matches,
+)
 from app.services.rag.embeddings import compute_query_embedding
-from app.services.rag.store import get_evidence_collection
+from app.services.rag.store import (
+    get_sub_collection,
+    list_sub_collections,
+    validate_sub_collection,
+)
 
 _log = logging.getLogger(__name__)
-
-# convert cosine distance to similarity score [0,1]
-def _distance_to_score(d: float) -> float:
-    return max(0.0, min(1.0, 1.0 / (1.0 + max(0.0, d))))
 
 
 def retrieve_evidence(
     query: str,
-    query_embedding: list[float],
+    query_embedding: list[float] | None = None,
     top_k: int | None = None,
+    *,
+    sub_collections: list[str] | None = None,
 ) -> list[Evidence]:
-
+    """Query Chroma with one embedding of the full user query (normalized text)."""
     if not settings.rag_load:
         return []
     k = top_k if top_k is not None else settings.rag_top_k
-    coll = get_evidence_collection()
-
-    dim_ok = (
-        len(query_embedding) == settings.encoder_embedding_dim
-        if query_embedding
-        else False
+    targets = sub_collections or list_sub_collections()
+    matches = retrieve_chunk_matches(
+        query,
+        query_embedding,
+        top_k=k,
+        sub_collections=targets,
     )
-    if query_embedding and not dim_ok:
-        _log.warning(
-            "query embedding dim %s != encoder_embedding_dim %s; no Chroma query",
-            len(query_embedding),
-            settings.encoder_embedding_dim,
-        )
-    if dim_ok:
-        n_results = min(k, max(1, coll.count()))
-        if n_results == 0:
-            return []
-        res = coll.query(
-            query_embeddings=[query_embedding],
-            n_results=n_results,
-            include=["distances", "documents", "metadatas"],
-        )
-        out: list[Evidence] = []
-        ids0 = res["ids"][0] if res["ids"] else []
-        dists0 = res["distances"][0] if res.get("distances") else [0.0] * len(ids0)
-        docs0 = res["documents"][0] if res.get("documents") else [""] * len(ids0)
-        metas0 = res["metadatas"][0] if res.get("metadatas") else [{}] * len(ids0)
-        for cid, d, doc, m in zip(ids0, dists0, docs0, metas0):
-            src = (m or {}).get("source", cid)
-            if doc is None:
-                doc = ""
-            out.append(
-                Evidence(
-                    source=str(src),
-                    snippet=str(doc)[:2000],
-                    score=_distance_to_score(float(d)),
-                )
-            )
-        return out
+    return chunk_matches_to_evidence(matches)
 
-    if not query_embedding:
-        _log.debug("no query embedding; skipping Chroma query")
-    return []
 
-# Upsert one chunk into the evidence collection
 def ingest_evidence_chunk(
     chunk_id: str,
     text: str,
-    embedding: list[float] | None = None, # optional
+    embedding: list[float] | None = None,
     *,
+    sub_collection: str,
     source: str,
     metadatas: dict[str, Any] | None = None,
 ) -> None:
     """
+    Upsert one chunk into the named evidence sub-collection.
+
     If ``embedding`` is omitted or its length mismatches ``encoder_embedding_dim``,
-    the vector is computed with ~app.services.rag.embeddings.compute_query_embedding
-    (same path as queries: mean-pooled HF encoder in ``encoder_model_dir``).
+    the vector is computed with ``compute_query_embedding`` (same path as queries).
     """
+    canonical = validate_sub_collection(sub_collection)
     vec: list[float]
-    if (
-        embedding is not None
-        and len(embedding) == settings.encoder_embedding_dim
-    ):
+    if embedding is not None and len(embedding) == settings.encoder_embedding_dim:
         vec = embedding
     else:
         if embedding is not None:
@@ -106,8 +78,12 @@ def ingest_evidence_chunk(
                 f"{settings.encoder_embedding_dim}); check encoder_model_dir "
                 "and chunk text."
             )
-    coll = get_evidence_collection()
-    meta: dict[str, Any] = {"source": source, "chunk_id": chunk_id}
+    coll = get_sub_collection(canonical)
+    meta: dict[str, Any] = {
+        "source": source,
+        "chunk_id": chunk_id,
+        "sub_collection": canonical,
+    }
     if metadatas:
         for key, val in metadatas.items():
             if isinstance(val, (str, int, float, bool)):
@@ -120,4 +96,25 @@ def ingest_evidence_chunk(
         metadatas=[meta],
         embeddings=[vec],
     )
-    _log.info("ingested Chroma chunk %s (source=%s)", chunk_id, source)
+    _log.info(
+        "ingested Chroma chunk %s into %r (source=%s)",
+        chunk_id,
+        canonical,
+        source,
+    )
+
+
+def ingest_evidence_chunk_csv(
+    *,
+    sub_collection: str,
+    csv_path: Path | str,
+    registry_format: str = "auto",
+) -> int:
+    from app.services.rag.chunk_and_ingest import ingest_chunks_from_csv
+
+    fmt = registry_format if registry_format in ("auto", "extracted", "manual") else "auto"
+    return ingest_chunks_from_csv(
+        sub_collection=sub_collection,
+        chunks_csv=Path(csv_path),
+        registry_format=fmt,  # type: ignore[arg-type]
+    )

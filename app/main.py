@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from langchain_core.messages import HumanMessage
 
 from app.config import settings
+from app.config import validate_retrieval_paths
 from app.readiness import readiness_payload
 from app.orchestrator.checkpointing import close_checkpointer, get_checkpointer
 from app.orchestrator.graph import build_chat_graph
@@ -15,10 +16,14 @@ from app.session_store import save_session
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # nothing happens on startup
+    validate_retrieval_paths()
+    # Pay GliNER / optional embedding / Vertex handshake cost at process start
+    # so the first real chat turn is not a 20–40s cold start.
+    from app.services.warmup import warmup_runtime
+
+    warmup_runtime()
     yield
-    # this runs on shutdown
-    close_checkpointer() # close the checkpoint database
+    close_checkpointer()
 
 # Create FastAPI instance
 # build the chat graph and get the SQLite checkpointer
@@ -59,16 +64,32 @@ def chat(req: ChatRequest) -> ChatResponse:
     )
 
     # JSON snapshot for logging / auditing (in addition to LangGraph checkpoints).
+    extraction_history = list(state.get("extraction_history") or [])
+    turn_extraction = extraction_history[-1] if extraction_history else None
+    transcript = transcript_from_messages(state["messages"])
     save_session(
         sid,
         clinical_checklist=state["clinical_checklist"],
-        messages=transcript_from_messages(state["messages"]),
+        messages=transcript,
+        extraction_history=extraction_history,
     )
 
+    coverage = state.get("coverage") or {}
+    graph_trace = state.get("graph_traversal")
     return ChatResponse(
         session_id=state["session_id"],
-        response=state["final_response"], 
-        citations=state["evidence"], # from RAG search
-        escalated=state["escalated"], # from policy
-        safety_reason=state["safety_reason"], # from policy
+        response=state["final_response"],
+        citations=state.get("evidence") or [],
+        escalated=state["escalated"],
+        safety_reason=state["safety_reason"],
+        question_mode=bool(state.get("question_mode")),
+        questions_asked=int(state.get("questions_asked", 0)),
+        coverage_ready=bool(coverage.get("ready_for_disposition")),
+        graph_traversal=graph_trace,
+        matched_factors=list(state.get("matched_factors") or []),
+        candidate_conditions=list(state.get("candidate_conditions") or []),
+        traversed_chunk_ids=list(state.get("traversed_chunk_ids") or []),
+        clinical_checklist=list(state.get("clinical_checklist") or []),
+        extraction_history=extraction_history,
+        turn_extraction=turn_extraction,
     )

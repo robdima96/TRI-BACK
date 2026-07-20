@@ -19,6 +19,7 @@ RISK_CATALOG: dict[str, frozenset[str]] = {
             "self-harm",
             "self harm",
             "kill myself",
+            "end it all"
         }
     ),
     "chest_pain": frozenset({"chest pain"}),
@@ -34,15 +35,6 @@ RISK_CATALOG: dict[str, frozenset[str]] = {
             "panting",
         }
     ),
-    "neurologic_urgent": frozenset(
-        {
-            "numbness",
-            "weakness",
-            "tingling",
-            "pins and needles",
-        }
-    ),
-    "spine_control_loss": frozenset({"loss of bladder control"}),
 }
 
 
@@ -53,7 +45,7 @@ def _norm(s: str) -> str:
     s = _WS.sub(" ", s)
     return s
 
-# red flag detection in message_normalized AND checklist.items
+# risk detection in message_normalized AND checklist.items
 def hits_for_clinical_path(
     checklist: ClinicalChecklist, message_normalized: str
 ) -> list[str]:
@@ -75,12 +67,12 @@ def hits_for_clinical_path(
 # state["final_response"] = final_response
 def apply_policy(
     draft_response: str,
-    red_flag_hits: list[str],
+    risk_hits: list[str],
 ) -> tuple[bool, str | None, str]:
-    # red flag escalation- overrides draft LLM response
-    if red_flag_hits:
+    # risk escalation- overrides draft LLM response
+    if risk_hits:
         reason = (
-            f"Red-flag pattern matched: {', '.join(red_flag_hits)}; "
+            f"Risk pattern matched: {', '.join(risk_hits)}; "
             "escalate to human or emergency care per protocol."
         )
         response = (

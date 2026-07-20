@@ -12,8 +12,14 @@ os.environ["DIGIMSK_LOAD_RAG"] = "1"
 
 # Prevent pytest from probing real Windows model paths if .env overrides.
 os.environ["DIGIMSK_ENCODER_DIR"] = "__pytest_no_encoder__"
+os.environ["DIGIMSK_GLINER_MODEL_DIR"] = "__pytest_no_gliner__"
+
+os.environ["DIGIMSK_LOAD_NER"] = "0"
+os.environ["DIGIMSK_LOAD_GLINER"] = "0"
 
 os.environ["DIGIMSK_GENERATOR_DIR"] = "__pytest_no_generator__"
+os.environ["DIGIMSK_GENERATOR_BACKEND"] = "local"
+os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
 
 
 @pytest.fixture(autouse=True)

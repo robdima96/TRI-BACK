@@ -78,3 +78,12 @@ DigiMSK Chatbot — Feature Implementation List
 17. Cross-modal attention-based signal fusion (Synthesizer)
     Custom neural architecture fusing Encoder, RAG, and Generator
     representations via multi-head attention. 
+
+18. Install A Brake Pedal For Rabbit Holes 
+Emergency physician Graham Walker, MD described a compelling case illustrating 
+this challenge. A patient with a classic nerve compression was properly worked up 
+and reassured in the ED. However, she returned the next day, convinced by ChatGPT 
+that she was at risk of "kidney failure" and coached on what to say. Dr. Walker 
+highlighted that the issue was the patient's competing trust in the persistent, 
+emotionally attuned, and always-available AI tool, which led to an "anxiety loop" 
+and undermined professional medical advice.

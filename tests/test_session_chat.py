@@ -35,6 +35,10 @@ def test_session_json_accumulates_transcript():
     assert data["messages"][0]["role"] == "user"
     assert data["messages"][1]["role"] == "assistant"
     assert "clinical_checklist" in data
+    assert "extraction_history" in data
+    assert len(data["extraction_history"]) >= 2
+    assert "by_source" in data["extraction_history"][-1]
+    assert "engagement" in data
 
 
 def test_merge_checklist_dedupes():

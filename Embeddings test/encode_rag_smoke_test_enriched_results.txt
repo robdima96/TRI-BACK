@@ -1,0 +1,448 @@
+encode_rag_smoke_test_real
+retrieval: full-query only (entire normalized message embedded once)
+corpus: red_flags_manual.csv (66 chunks)
+query_source: test_chunks.csv Excel B2
+user_query: 'My back has been hurting for decades, but now I can feel numbness and tingling around my groin.'
+normalized: 'my back has been hurting for decades, but now i can feel numbness and tingling around my groin.'
+models_run: 3
+
+========================================================================
+EMBEDDING MODEL: GliNER-BioMed DeBERTa (production)
+========================================================================
+
+FULL-QUERY RETRIEVAL — GliNER-BioMed DeBERTa (production)
+--------------------------------
+Model source: E:\DigiMSKbot\GliNER-BioMed
+Mechanism: Mean-pooled Hugging Face DeBERTa backbone from the GliNER-BioMed bundle (same as production ``DIGIMSK_ENCODER_DIR`` / RAG ingest).
+Embedding dimension: 768
+
+1. The user message is normalized (lowercase, whitespace cleanup).
+2. The **entire** normalized string is embedded **once** with this model.
+3. That vector is compared to every indexed chunk in a dedicated Chroma collection
+   (cosine space; one temp DB per model because dimensions differ).
+4. Chroma returns closest chunks; cosine_sim = 1 - distance.
+
+For the noise corpus (r_1 clean -> r_20 noisiest), a fair monotonicity check plots
+cosine_sim vs noise step n. Expect scores to fall as noise increases if extra text
+dilutes similarity to the clean query — especially for semantic encoders.
+
+top_k (ranked list below): 20
+
+Ranked full-query retrieval:
+  1. chunk_id=r_36 cosine_sim=0.7827 distance=0.2173 norm_score=0.8215
+     Clinical concept: immunosuppression from comorbidity or medication (e (Immunosuppression; RISK_FACTOR_FOR;Infection)
+Synonyms and patient phrases: immunosuppressed, immunosuppression, weak immune syst...
+  2. chunk_id=r_22 cosine_sim=0.7752 distance=0.2248 norm_score=0.8164
+     Clinical concept: lack of improvement in back pain despite appropriate conservative treatment (e (Refractory pain; SUGGESTIVE_OF;Malignancy)
+Synonyms and patient phrases: pain not improving, refractor...
+  3. chunk_id=r_3 cosine_sim=0.7726 distance=0.2274 norm_score=0.8148
+     Clinical concept: local bruising or abrasion can indicate recent trauma (Bruising; SUGGESTIVE_OF;Fracture)
+Synonyms and patient phrases: bruise, bruising, ecchymosis, abrasion, contusion, skin abrasio...
+  4. chunk_id=r_33 cosine_sim=0.7643 distance=0.2357 norm_score=0.8093
+     Clinical concept: night sweats since the onset of back pain are a spinal infection red flag, screened alongside fever (Night sweats; SUGGESTIVE_OF;Infection)
+Synonyms and patient phrases: night sweats...
+  5. chunk_id=r_24 cosine_sim=0.7577 distance=0.2423 norm_score=0.8049
+     Clinical concept: immunosuppression from comorbidity or medication (e (Immunosuppression; RISK_FACTOR_FOR;Malignancy)
+Synonyms and patient phrases: immunosuppressed, immunosuppression, weak immune sys...
+  6. chunk_id=r_32 cosine_sim=0.7543 distance=0.2457 norm_score=0.8028
+     Clinical concept: chills since the onset of back pain are a spinal infection red flag, screened alongside fever (Chills; SUGGESTIVE_OF;Infection)
+Synonyms and patient phrases: chills, rigors, shiverin...
+  7. chunk_id=r_6 cosine_sim=0.7488 distance=0.2512 norm_score=0.7992
+     Clinical concept: prolonged corticosteroid therapy (greater than 5 or 7 (Corticosteroids; ASSOCIATED_WITH;Fracture)
+Synonyms and patient phrases: corticosteroids, steroids, corticosteroid, prednisone,...
+  8. chunk_id=r_10 cosine_sim=0.7404 distance=0.2596 norm_score=0.7939
+     Clinical concept: vitamin D deficiency predisposes to vertebral fracture by weakening bone (Vitamin Deficiency; RISK_FACTOR_FOR;Fracture)
+Synonyms and patient phrases: vitamin D deficiency, vitamin D,...
+  9. chunk_id=r_17 cosine_sim=0.7343 distance=0.2657 norm_score=0.7900
+     Clinical concept: pain that is worse with weight-bearing is a common feature of vertebral fracture (Pain weight-bearing; SUGGESTIVE_OF;Fracture)
+Synonyms and patient phrases: pain weight-bearing, pain...
+  10. chunk_id=r_35 cosine_sim=0.7284 distance=0.2716 norm_score=0.7864
+     Clinical concept: intravenous (IV) drug use is associated with an increased risk of spinal infection (IV drug user; RISK_FACTOR_FOR;Infection)
+Synonyms and patient phrases: iv drug user, IV drug use, ...
+  11. chunk_id=r_30 cosine_sim=0.7224 distance=0.2776 norm_score=0.7827
+     Clinical concept: unexplained weight loss is a red-flag symptom that raises suspicion for spinal infection (Unexplained weight loss; SUGGESTIVE_OF;Infection)
+Synonyms and patient phrases: unexplained ...
+  12. chunk_id=r_57 cosine_sim=0.7163 distance=0.2837 norm_score=0.7790
+     Clinical concept: endothelial injury to vein walls (e (Endothelial injury; RISK_FACTOR_FOR;DVT)
+Synonyms and patient phrases: endothelial injury, venous injury, surgery trauma to vein, central line, r...
+  13. chunk_id=r_12 cosine_sim=0.7153 distance=0.2847 norm_score=0.7784
+     Clinical concept: rheumatoid arthritis is a risk factor for vertebral (osteoporotic) fracture (Rheumatoid arthritis; RISK_FACTOR_FOR;Fracture)
+Synonyms and patient phrases: rheumatoid arthritis, RA, i...
+  14. chunk_id=r_58 cosine_sim=0.7064 distance=0.2936 norm_score=0.7731
+     Clinical concept: a previous deep vein thrombosis or pulmonary embolism strongly increases the risk of recurrent clot (Previous DVT; RISK_FACTOR_FOR;DVT)
+Synonyms and patient phrases: previous dvt, pr...
+  15. chunk_id=r_8 cosine_sim=0.7064 distance=0.2936 norm_score=0.7730
+     Clinical concept: heavy or excessive alcohol use predisposes to vertebral insufficiency fracture by harming bone health and increasing falls (Alcohol; RISK_FACTOR_FOR;Fracture)
+Synonyms and patient ph...
+  16. chunk_id=r_34 cosine_sim=0.6977 distance=0.3023 norm_score=0.7679
+     Clinical concept: age over 50 years is an independent predisposing risk factor that increases susceptibility to spinal infection (Age over 50; RISK_FACTOR_FOR;Infection)
+Synonyms and patient phrases: ...
+  17. chunk_id=r_53 cosine_sim=0.6960 distance=0.3040 norm_score=0.7669
+     Clinical concept: diabetes, especially when poorly controlled, is a risk factor for abdominal aortic aneurysm (Diabetes; RISK_FACTOR_FOR;AAA)
+Synonyms and patient phrases: diabetes, type 2 diabetes, t...
+  18. chunk_id=r_20 cosine_sim=0.6942 distance=0.3058 norm_score=0.7658
+     Clinical concept: age over 50 years is an independent predisposing risk factor that increases susceptibility to malignancy (Age over 50; RISK_FACTOR_FOR;Malignancy)
+Synonyms and patient phrases: age o...
+  19. chunk_id=r_16 cosine_sim=0.6939 distance=0.3061 norm_score=0.7657
+     Clinical concept: low back point tenderness raises concern for vertebral fracture, especially when combined with concurrent bruising/abrasion and history of trauma (Point tenderness; SUGGESTIVE_OF;Fra...
+  20. chunk_id=r_21 cosine_sim=0.6877 distance=0.3123 norm_score=0.7620
+     Clinical concept: unexplained weight loss is a worrying red-flag symptom that raises suspicion for malignancy (Unexplained weight loss; SUGGESTIVE_OF;Malignancy)
+Synonyms and patient phrases: unexplai...
+
+Cosine similarity vs corpus index (all indexed chunks, CSV order):
+  corpus_idx | chunk_id | cosine_sim
+           0 | r_1      | 0.6768
+           1 | r_2      | 0.6542
+           2 | r_3      | 0.7726
+           3 | r_4      | 0.6198
+           4 | r_5      | 0.6624
+           5 | r_6      | 0.7488
+           6 | r_7      | 0.6491
+           7 | r_8      | 0.7064
+           8 | r_9      | 0.6651
+           9 | r_10     | 0.7404
+          10 | r_11     | 0.6715
+          11 | r_12     | 0.7153
+          12 | r_13     | 0.6175
+          13 | r_14     | 0.5913
+          14 | r_15     | 0.4990
+          15 | r_16     | 0.6939
+          16 | r_17     | 0.7343
+          17 | r_18     | 0.4920
+          18 | r_19     | 0.6751
+          19 | r_20     | 0.6942
+          20 | r_21     | 0.6877
+          21 | r_22     | 0.7752
+          22 | r_23     | 0.6509
+          23 | r_24     | 0.7577
+          24 | r_25     | 0.6598
+          25 | r_26     | 0.5801
+          26 | r_27     | 0.5996
+          27 | r_28     | 0.5284
+          28 | r_29     | 0.5286
+          29 | r_30     | 0.7224
+          30 | r_31     | 0.6067
+          31 | r_32     | 0.7543
+          32 | r_33     | 0.7643
+          33 | r_34     | 0.6977
+          34 | r_35     | 0.7284
+          35 | r_36     | 0.7827
+          36 | r_37     | 0.6655
+          37 | r_38     | 0.5273
+          38 | r_39     | 0.6722
+          39 | r_40     | 0.5059
+          40 | r_41     | 0.5034
+          41 | r_42     | 0.4314
+          42 | r_43     | 0.4250
+          43 | r_44     | 0.5210
+          44 | r_45     | 0.4987
+          45 | r_46     | 0.5502
+          46 | r_47     | 0.6387
+          47 | r_48     | 0.5881
+          48 | r_49     | 0.6692
+          49 | r_50     | 0.6070
+          50 | r_51     | 0.6811
+          51 | r_52     | 0.6793
+          52 | r_53     | 0.6960
+          53 | r_54     | 0.5349
+          54 | r_55     | 0.5671
+          55 | r_56     | 0.6730
+          56 | r_57     | 0.7163
+          57 | r_58     | 0.7064
+          58 | r_59     | 0.6613
+          59 | r_60     | 0.6581
+          60 | r_61     | 0.6434
+          61 | r_62     | 0.5401
+          62 | r_63     | 0.6228
+          63 | r_64     | 0.6277
+          64 | r_65     | 0.4841
+          65 | r_66     | 0.4289
+
+========================================================================
+EMBEDDING MODEL: Sentence-BERT all-MiniLM-L6-v2
+========================================================================
+
+FULL-QUERY RETRIEVAL — Sentence-BERT all-MiniLM-L6-v2
+--------------------------------
+Model source: E:\DigiMSKbot\all-MiniLM-L6-v2
+Mechanism: ``sentence_transformers`` encode() on the full sentence; 384-d embedding (see https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
+Embedding dimension: 384
+
+1. The user message is normalized (lowercase, whitespace cleanup).
+2. The **entire** normalized string is embedded **once** with this model.
+3. That vector is compared to every indexed chunk in a dedicated Chroma collection
+   (cosine space; one temp DB per model because dimensions differ).
+4. Chroma returns closest chunks; cosine_sim = 1 - distance.
+
+For the noise corpus (r_1 clean -> r_20 noisiest), a fair monotonicity check plots
+cosine_sim vs noise step n. Expect scores to fall as noise increases if extra text
+dilutes similarity to the clean query — especially for semantic encoders.
+
+top_k (ranked list below): 20
+
+Ranked full-query retrieval:
+  1. chunk_id=r_41 cosine_sim=0.4853 distance=0.5147 norm_score=0.6602
+     Clinical concept: new or worsening neurologic sensory symptoms (electric shock-like pain, tingling, numbness, loss of proprioception) alongside spinal pain raises concern for spinal cord compression b...
+  2. chunk_id=r_18 cosine_sim=0.4634 distance=0.5366 norm_score=0.6508
+     Clinical concept: new or worsening neurologic sensory symptoms (electric shock-like pain, tingling, numbness, loss of proprioception) alongside spinal pain raises concern for spinal cord compression a...
+  3. chunk_id=r_38 cosine_sim=0.4616 distance=0.5384 norm_score=0.6500
+     Clinical concept: back pain that wakes you at night and prevents you from settling back to sleep is a red-flag symptom to consider in spinal infection, especially when pain becomes constant, more inte...
+  4. chunk_id=r_39 cosine_sim=0.4547 distance=0.5453 norm_score=0.6471
+     Clinical concept: pain severity greater than 7/10 (on a 0–10 scale) has been reported in association with spinal infection (Severe pain; SUGGESTIVE_OF;Infection)
+Synonyms and patient phrases: severe p...
+  5. chunk_id=r_32 cosine_sim=0.4538 distance=0.5462 norm_score=0.6467
+     Clinical concept: chills since the onset of back pain are a spinal infection red flag, screened alongside fever (Chills; SUGGESTIVE_OF;Infection)
+Synonyms and patient phrases: chills, rigors, shiverin...
+  6. chunk_id=r_29 cosine_sim=0.4504 distance=0.5496 norm_score=0.6453
+     Clinical concept: new or worsening neurologic sensory symptoms (electric shock-like pain, tingling, numbness, loss of proprioception) alongside spinal pain raises concern for spinal cord compression b...
+  7. chunk_id=r_22 cosine_sim=0.4436 distance=0.5564 norm_score=0.6425
+     Clinical concept: lack of improvement in back pain despite appropriate conservative treatment (e (Refractory pain; SUGGESTIVE_OF;Malignancy)
+Synonyms and patient phrases: pain not improving, refractor...
+  8. chunk_id=r_37 cosine_sim=0.4335 distance=0.5665 norm_score=0.6384
+     Clinical concept: constant or steadily worsening pain that does not improve with position or activity is a red-flag pain profile for spinal infection (Constant pain; SUGGESTIVE_OF;Infection)
+Synonyms ...
+  9. chunk_id=r_26 cosine_sim=0.4331 distance=0.5669 norm_score=0.6382
+     Clinical concept: back pain that wakes you at night and prevents you from settling back to sleep is a red-flag symptom to consider in spinal malignancy, especially when pain is progressive, unfamiliar...
+  10. chunk_id=r_33 cosine_sim=0.4331 distance=0.5669 norm_score=0.6382
+     Clinical concept: night sweats since the onset of back pain are a spinal infection red flag, screened alongside fever (Night sweats; SUGGESTIVE_OF;Infection)
+Synonyms and patient phrases: night sweats...
+  11. chunk_id=r_47 cosine_sim=0.4311 distance=0.5689 norm_score=0.6374
+     Clinical concept: in patients presenting with low back pain, abdominal pain that radiates or extends toward the groin raises concern for abdominal aortic aneurysm,  a vascular emergency (Abdominal pai...
+  12. chunk_id=r_31 cosine_sim=0.4184 distance=0.5816 norm_score=0.6323
+     Clinical concept: fever since the onset of spinal pain is a red-flag symptom for spinal infection and forms part of the classic triad with back pain and potential neurological dysfunction (Fever; SUGG...
+  13. chunk_id=r_59 cosine_sim=0.3962 distance=0.6038 norm_score=0.6235
+     Clinical concept: calf redness with pain or swelling (especially if unilateral) suggests possible deep vein thrombosis in low back pain (Calf redness; RISK_FACTOR_FOR;DTV)
+Synonyms and patient phrases...
+  14. chunk_id=r_43 cosine_sim=0.3936 distance=0.6064 norm_score=0.6225
+     Clinical concept: new or worsening neurologic sensory symptoms (electric shock-like pain, tingling, numbness, loss of proprioception) in both limbs alongside spinal pain is worrying for cauda equina s...
+  15. chunk_id=r_25 cosine_sim=0.3925 distance=0.6075 norm_score=0.6221
+     Clinical concept: pain severity greater than 7/10 (on a 0–10 scale) has been reported in association with vertebral malignancy (Severe pain; ASSOCIATED_WITH;Malignancy)
+Synonyms and patient phrases: s...
+  16. chunk_id=r_40 cosine_sim=0.3908 distance=0.6092 norm_score=0.6214
+     Clinical concept: new or worsening neurologic motor symptoms (leg weakness, poor balance when walking, foot drop) alongside spinal pain raises concern for spinal cord compression by abscess following ...
+  17. chunk_id=r_58 cosine_sim=0.3819 distance=0.6181 norm_score=0.6180
+     Clinical concept: a previous deep vein thrombosis or pulmonary embolism strongly increases the risk of recurrent clot (Previous DVT; RISK_FACTOR_FOR;DVT)
+Synonyms and patient phrases: previous dvt, pr...
+  18. chunk_id=r_60 cosine_sim=0.3800 distance=0.6200 norm_score=0.6173
+     Clinical concept: calf pain with redness or swelling (especially if unilateral) suggests possible deep vein thrombosis in low back pain (Calf pain; RISK_FACTOR_FOR;DVT)
+Synonyms and patient phrases: c...
+  19. chunk_id=r_61 cosine_sim=0.3666 distance=0.6334 norm_score=0.6122
+     Clinical concept: calf swelling with pain or redness (especially if unilateral) suggests possible deep vein thrombosis in low back pain (Calf swelling; RISK_FACTOR_FOR;DVT)
+Synonyms and patient phrase...
+  20. chunk_id=r_23 cosine_sim=0.3655 distance=0.6345 norm_score=0.6118
+     Clinical concept: constant or steadily worsening pain that does not improve with position or activity is a red-flag pain profile for malignancy (Constant pain; SUGGESTIVE_OF;Malignancy)
+Synonyms and p...
+
+Cosine similarity vs corpus index (all indexed chunks, CSV order):
+  corpus_idx | chunk_id | cosine_sim
+           0 | r_1      | 0.1567
+           1 | r_2      | 0.2560
+           2 | r_3      | 0.2846
+           3 | r_4      | 0.2146
+           4 | r_5      | 0.3570
+           5 | r_6      | 0.2675
+           6 | r_7      | 0.1955
+           7 | r_8      | 0.1213
+           8 | r_9      | 0.1647
+           9 | r_10     | 0.1799
+          10 | r_11     | 0.1800
+          11 | r_12     | 0.1653
+          12 | r_13     | 0.1561
+          13 | r_14     | 0.2094
+          14 | r_15     | 0.3408
+          15 | r_16     | 0.3252
+          16 | r_17     | 0.3125
+          17 | r_18     | 0.4634
+          18 | r_19     | 0.2772
+          19 | r_20     | 0.1924
+          20 | r_21     | 0.2307
+          21 | r_22     | 0.4436
+          22 | r_23     | 0.3655
+          23 | r_24     | 0.2687
+          24 | r_25     | 0.3925
+          25 | r_26     | 0.4331
+          26 | r_27     | 0.1584
+          27 | r_28     | 0.3409
+          28 | r_29     | 0.4504
+          29 | r_30     | 0.3432
+          30 | r_31     | 0.4184
+          31 | r_32     | 0.4538
+          32 | r_33     | 0.4331
+          33 | r_34     | 0.2849
+          34 | r_35     | 0.3091
+          35 | r_36     | 0.3363
+          36 | r_37     | 0.4335
+          37 | r_38     | 0.4616
+          38 | r_39     | 0.4547
+          39 | r_40     | 0.3908
+          40 | r_41     | 0.4853
+          41 | r_42     | 0.3117
+          42 | r_43     | 0.3936
+          43 | r_44     | 0.1820
+          44 | r_45     | 0.2208
+          45 | r_46     | 0.3521
+          46 | r_47     | 0.4311
+          47 | r_48     | 0.1617
+          48 | r_49     | 0.1280
+          49 | r_50     | 0.1418
+          50 | r_51     | 0.2185
+          51 | r_52     | 0.1676
+          52 | r_53     | 0.1294
+          53 | r_54     | 0.2615
+          54 | r_55     | 0.2731
+          55 | r_56     | 0.3460
+          56 | r_57     | 0.3082
+          57 | r_58     | 0.3819
+          58 | r_59     | 0.3962
+          59 | r_60     | 0.3800
+          60 | r_61     | 0.3666
+          61 | r_62     | 0.3021
+          62 | r_63     | 0.3609
+          63 | r_64     | 0.1822
+          64 | r_65     | 0.3192
+          65 | r_66     | 0.2864
+
+========================================================================
+EMBEDDING MODEL: Word2Vec Google News 300d (control)
+========================================================================
+
+FULL-QUERY RETRIEVAL — Word2Vec Google News 300d (control)
+--------------------------------
+Model source: E:\DigiMSKbot\Google_word2vec\GoogleNews-vectors-negative300.bin
+Mechanism: Tokenize on word regex, average pretrained Word2Vec vectors for known tokens (gensim KeyedVectors). OOV tokens skipped. Control baseline per Kaggle Word2Vec tutorials (e.g. bavalpreet26/word2vec-pretrained); not semantic sentence encoders.
+Embedding dimension: 300
+
+1. The user message is normalized (lowercase, whitespace cleanup).
+2. The **entire** normalized string is embedded **once** with this model.
+3. That vector is compared to every indexed chunk in a dedicated Chroma collection
+   (cosine space; one temp DB per model because dimensions differ).
+4. Chroma returns closest chunks; cosine_sim = 1 - distance.
+
+For the noise corpus (r_1 clean -> r_20 noisiest), a fair monotonicity check plots
+cosine_sim vs noise step n. Expect scores to fall as noise increases if extra text
+dilutes similarity to the clean query — especially for semantic encoders.
+
+top_k (ranked list below): 20
+
+Ranked full-query retrieval:
+  1. chunk_id=r_38 cosine_sim=0.7490 distance=0.2510 norm_score=0.7993
+     Clinical concept: back pain that wakes you at night and prevents you from settling back to sleep is a red-flag symptom to consider in spinal infection, especially when pain becomes constant, more inte...
+  2. chunk_id=r_26 cosine_sim=0.7245 distance=0.2755 norm_score=0.7840
+     Clinical concept: back pain that wakes you at night and prevents you from settling back to sleep is a red-flag symptom to consider in spinal malignancy, especially when pain is progressive, unfamiliar...
+  3. chunk_id=r_37 cosine_sim=0.6998 distance=0.3002 norm_score=0.7691
+     Clinical concept: constant or steadily worsening pain that does not improve with position or activity is a red-flag pain profile for spinal infection (Constant pain; SUGGESTIVE_OF;Infection)
+Synonyms ...
+  4. chunk_id=r_39 cosine_sim=0.6835 distance=0.3165 norm_score=0.7596
+     Clinical concept: pain severity greater than 7/10 (on a 0–10 scale) has been reported in association with spinal infection (Severe pain; SUGGESTIVE_OF;Infection)
+Synonyms and patient phrases: severe p...
+  5. chunk_id=r_23 cosine_sim=0.6768 distance=0.3232 norm_score=0.7558
+     Clinical concept: constant or steadily worsening pain that does not improve with position or activity is a red-flag pain profile for malignancy (Constant pain; SUGGESTIVE_OF;Malignancy)
+Synonyms and p...
+  6. chunk_id=r_56 cosine_sim=0.6648 distance=0.3352 norm_score=0.7490
+     Clinical concept: venous stasis (slowed venous flow in the legs) is a core mechanism for deep vein thrombosis in Virchow’s triad (Venous stasis; RISK_FACTOR_FOR;DVT)
+Synonyms and patient phrases: veno...
+  7. chunk_id=r_60 cosine_sim=0.6570 distance=0.3430 norm_score=0.7446
+     Clinical concept: calf pain with redness or swelling (especially if unilateral) suggests possible deep vein thrombosis in low back pain (Calf pain; RISK_FACTOR_FOR;DVT)
+Synonyms and patient phrases: c...
+  8. chunk_id=r_33 cosine_sim=0.6563 distance=0.3437 norm_score=0.7442
+     Clinical concept: night sweats since the onset of back pain are a spinal infection red flag, screened alongside fever (Night sweats; SUGGESTIVE_OF;Infection)
+Synonyms and patient phrases: night sweats...
+  9. chunk_id=r_41 cosine_sim=0.6547 distance=0.3453 norm_score=0.7433
+     Clinical concept: new or worsening neurologic sensory symptoms (electric shock-like pain, tingling, numbness, loss of proprioception) alongside spinal pain raises concern for spinal cord compression b...
+  10. chunk_id=r_43 cosine_sim=0.6542 distance=0.3458 norm_score=0.7431
+     Clinical concept: new or worsening neurologic sensory symptoms (electric shock-like pain, tingling, numbness, loss of proprioception) in both limbs alongside spinal pain is worrying for cauda equina s...
+  11. chunk_id=r_61 cosine_sim=0.6531 distance=0.3469 norm_score=0.7424
+     Clinical concept: calf swelling with pain or redness (especially if unilateral) suggests possible deep vein thrombosis in low back pain (Calf swelling; RISK_FACTOR_FOR;DVT)
+Synonyms and patient phrase...
+  12. chunk_id=r_40 cosine_sim=0.6524 distance=0.3476 norm_score=0.7421
+     Clinical concept: new or worsening neurologic motor symptoms (leg weakness, poor balance when walking, foot drop) alongside spinal pain raises concern for spinal cord compression by abscess following ...
+  13. chunk_id=r_25 cosine_sim=0.6504 distance=0.3496 norm_score=0.7409
+     Clinical concept: pain severity greater than 7/10 (on a 0–10 scale) has been reported in association with vertebral malignancy (Severe pain; ASSOCIATED_WITH;Malignancy)
+Synonyms and patient phrases: s...
+  14. chunk_id=r_29 cosine_sim=0.6501 distance=0.3499 norm_score=0.7408
+     Clinical concept: new or worsening neurologic sensory symptoms (electric shock-like pain, tingling, numbness, loss of proprioception) alongside spinal pain raises concern for spinal cord compression b...
+  15. chunk_id=r_32 cosine_sim=0.6496 distance=0.3504 norm_score=0.7405
+     Clinical concept: chills since the onset of back pain are a spinal infection red flag, screened alongside fever (Chills; SUGGESTIVE_OF;Infection)
+Synonyms and patient phrases: chills, rigors, shiverin...
+  16. chunk_id=r_65 cosine_sim=0.6480 distance=0.3520 norm_score=0.7397
+     Clinical concept: diabetes contributes to hypercoagulability- in the context of low back pain, it modestly raises concern for deep vein thrombosis when calf pain/redness/swelling (especially unilatera...
+  17. chunk_id=r_31 cosine_sim=0.6456 distance=0.3544 norm_score=0.7383
+     Clinical concept: fever since the onset of spinal pain is a red-flag symptom for spinal infection and forms part of the classic triad with back pain and potential neurological dysfunction (Fever; SUGG...
+  18. chunk_id=r_66 cosine_sim=0.6455 distance=0.3545 norm_score=0.7383
+     Clinical concept: hypertension contributes to hypercoagulability- in the context of low back pain, it modestly raises concern for deep vein thrombosis when calf pain/redness/swelling (especially unila...
+  19. chunk_id=r_5 cosine_sim=0.6448 distance=0.3552 norm_score=0.7379
+     Clinical concept: pain severity greater than 7/10 (on a 0–10 scale) has been reported in association with vertebral fracture (Severe pain; ASSOCIATED_WITH;Fracture)
+Synonyms and patient phrases: sever...
+  20. chunk_id=r_28 cosine_sim=0.6441 distance=0.3559 norm_score=0.7375
+     Clinical concept: new or worsening neurologic motor symptoms (leg weakness, poor balance when walking, foot drop) alongside spinal pain raises concern for spinal cord compression by tumour (Neuro moto...
+
+Cosine similarity vs corpus index (all indexed chunks, CSV order):
+  corpus_idx | chunk_id | cosine_sim
+           0 | r_1      | 0.4984
+           1 | r_2      | 0.5576
+           2 | r_3      | 0.5797
+           3 | r_4      | 0.4625
+           4 | r_5      | 0.6448
+           5 | r_6      | 0.5399
+           6 | r_7      | 0.4764
+           7 | r_8      | 0.5015
+           8 | r_9      | 0.4610
+           9 | r_10     | 0.4615
+          10 | r_11     | 0.5637
+          11 | r_12     | 0.5424
+          12 | r_13     | 0.5325
+          13 | r_14     | 0.5470
+          14 | r_15     | 0.6197
+          15 | r_16     | 0.5766
+          16 | r_17     | 0.6389
+          17 | r_18     | 0.6328
+          18 | r_19     | 0.4840
+          19 | r_20     | 0.5393
+          20 | r_21     | 0.6040
+          21 | r_22     | 0.6311
+          22 | r_23     | 0.6768
+          23 | r_24     | 0.4624
+          24 | r_25     | 0.6504
+          25 | r_26     | 0.7245
+          26 | r_27     | 0.5543
+          27 | r_28     | 0.6441
+          28 | r_29     | 0.6501
+          29 | r_30     | 0.6179
+          30 | r_31     | 0.6456
+          31 | r_32     | 0.6496
+          32 | r_33     | 0.6563
+          33 | r_34     | 0.5760
+          34 | r_35     | 0.5448
+          35 | r_36     | 0.4843
+          36 | r_37     | 0.6998
+          37 | r_38     | 0.7490
+          38 | r_39     | 0.6835
+          39 | r_40     | 0.6524
+          40 | r_41     | 0.6547
+          41 | r_42     | 0.6310
+          42 | r_43     | 0.6542
+          43 | r_44     | 0.5727
+          44 | r_45     | 0.5296
+          45 | r_46     | 0.6081
+          46 | r_47     | 0.6292
+          47 | r_48     | 0.4101
+          48 | r_49     | 0.5056
+          49 | r_50     | 0.5509
+          50 | r_51     | 0.5497
+          51 | r_52     | 0.5533
+          52 | r_53     | 0.5544
+          53 | r_54     | 0.5509
+          54 | r_55     | 0.5668
+          55 | r_56     | 0.6648
+          56 | r_57     | 0.5977
+          57 | r_58     | 0.5672
+          58 | r_59     | 0.6342
+          59 | r_60     | 0.6570
+          60 | r_61     | 0.6531
+          61 | r_62     | 0.6278
+          62 | r_63     | 0.6164
+          63 | r_64     | 0.5581
+          64 | r_65     | 0.6480
+          65 | r_66     | 0.6455
+
+Top-k plot: C:\ROBS STUFF\UBC Postdoctoral Fellowship\DigiMSKbot\bot\Embeddings test\encode_rag_smoke_test_enriched_results.png

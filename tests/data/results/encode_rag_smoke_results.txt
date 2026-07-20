@@ -1,0 +1,100 @@
+encode_rag_smoke — production encoder + RAG
+generated_utc: 2026-05-29T23:04:04.462539+00:00
+
+=== User message ===
+  raw:        'numbness around my groin with severe low back pain'
+  normalized: 'numbness around my groin with severe low back pain'
+
+=== Configuration (production settings) ===
+  rag_load:                 True
+  ner_load:                 True
+  gliner_load:              True
+  encoder_model_dir (RAG):  E:\DigiMSKbot\Clinical_sBERT
+  rag_embedding_backend:    sentence_transformers
+  encoder_embedding_dim:    768
+  gliner_model_dir (NER):   E:\DigiMSKbot\GliNER-BioMed
+  gliner configured:        True
+  gliner loaded this run:   True
+  chroma_persist_path:      data/chroma
+  rag_top_k:                10
+
+=== Clinical checklist by extractor ===
+
+--- Regex / pattern extraction [pattern] (2 item(s)) ---
+  1. text='severe'  kind='severity'  label='symptom_severity'
+  2. text='numbness'  kind='symptom_quality'  label='symptom_quality'
+
+--- GliNER-BioMed span NER [gliner] (4 item(s)) ---
+  1. text='numbness'  kind='ner_entity'  label='symptom'
+  2. text='groin'  kind='ner_entity'  label='body part'
+  3. text='severe'  kind='ner_entity'  label='symptom severity'
+  4. text='low back pain'  kind='ner_entity'  label='symptom'
+
+Checklist counts:
+  pattern (regex):     2
+  gliner (spans):      4
+  safety_phrase:       0
+  total:               6
+
+=== Risk hits (hits_for_clinical_path) ===
+  (none)
+
+=== Deduped encoder entities (4; not used for Chroma) ===
+  1. text='severe'  label='symptom_severity'
+  2. text='numbness'  label='symptom_quality'
+  3. text='groin'  label='body part'
+  4. text='low back pain'  label='symptom'
+
+=== RAG retrieval (full normalized message; production path) ===
+  embedded_query: 'numbness around my groin with severe low back pain'
+  query_embedding_dim: 768
+  top_k: 10
+  Chroma sub-collections:
+    'red_flags': 66 document(s)
+    'clinical_guidelines': 0 document(s)
+    'clinical_vignettes': 0 document(s)
+    'conversation_templates': 0 document(s)
+    'diagnostic_confounders': 0 document(s)
+
+  Rank | Score   | Source
+  ------------------------------------------------------------------------
+     1 | 0.6801 | Maselli F (2022)
+         chunk_id: title: The diagnostic value of Red Flags in thoracolumbar pain: a systematic review | author: Maselli F | year: 2022 | authority: Disability and Rehabilitation | doi: https://doi.org/10.1080/09638288.2020.1804626
+         Loss of sensation around the perineum, buttocks, inner thighs, genitals, and anus are specific symptoms of cauda equina syndrome.
+
+     2 | 0.6630 | Maselli F (2019)
+         chunk_id: title: The use of red flags in screening patients in physiotherapy: narrative review. | author: Maselli F | year: 2019 | authority: University of Genova | doi: https://hdl.handle.net/20.500.14242/101517
+         In patients presenting with low back pain, abdominal pain that radiates or extends toward the groin raises concern for abdominal aortic aneurysm,  a vascular emergency. Combine abdominal or groin pain with age over 50, smoking, and hypertension to determine triage urgency.
+
+     3 | 0.6555 | Maselli F (2019)
+         chunk_id: title: The use of red flags in screening patients in physiotherapy: narrative review. | author: Maselli F | year: 2019 | authority: University of Genova | doi: https://hdl.handle.net/20.500.14242/101517
+         New or worsening neurologic sensory symptoms (electric shock-like pain, tingling, numbness, loss of proprioception) in both limbs alongside spinal pain is worrying for cauda equina syndrome (CES).
+
+     4 | 0.6532 | Maselli F (2022)
+         chunk_id: title: The diagnostic value of Red Flags in thoracolumbar pain: a systematic review | author: Maselli F | year: 2022 | authority: Disability and Rehabilitation | doi: https://doi.org/10.1080/09638288.2020.1804626
+         New or worsening neurologic sensory symptoms (electric shock-like pain, tingling, numbness, loss of proprioception) alongside spinal pain raises concern for spinal cord compression by abscess following spinal infection.
+
+     5 | 0.6483 | Maselli F (2022)
+         chunk_id: title: The diagnostic value of Red Flags in thoracolumbar pain: a systematic review | author: Maselli F | year: 2022 | authority: Disability and Rehabilitation | doi: https://doi.org/10.1080/09638288.2020.1804626
+         New or worsening neurologic sensory symptoms (electric shock-like pain, tingling, numbness, loss of proprioception) alongside spinal pain raises concern for spinal cord compression as a result of vertebral fracture.
+
+     6 | 0.6430 | Maselli F (2022)
+         chunk_id: title: The diagnostic value of Red Flags in thoracolumbar pain: a systematic review | author: Maselli F | year: 2022 | authority: Disability and Rehabilitation | doi: https://doi.org/10.1080/09638288.2020.1804626
+         New or worsening neurologic sensory symptoms (electric shock-like pain, tingling, numbness, loss of proprioception) alongside spinal pain raises concern for spinal cord compression by tumour.
+
+     7 | 0.6408 | Maselli F (2022)
+         chunk_id: title: The diagnostic value of Red Flags in thoracolumbar pain: a systematic review | author: Maselli F | year: 2022 | authority: Disability and Rehabilitation | doi: https://doi.org/10.1080/09638288.2020.1804626
+         New or worsening neurologic motor symptoms (leg weakness, poor balance when walking, foot drop) alongside spinal pain raises concern for spinal cord compression by abscess following spinal infection.
+
+     8 | 0.6364 | Maselli F (2022)
+         chunk_id: title: The diagnostic value of Red Flags in thoracolumbar pain: a systematic review | author: Maselli F | year: 2022 | authority: Disability and Rehabilitation | doi: https://doi.org/10.1080/09638288.2020.1804626
+         New or worsening neurologic motor symptoms (leg weakness, poor balance when walking, foot drop) alongside spinal pain raises concern for spinal cord compression as a result of vertebral fracture.
+
+     9 | 0.6353 | Maselli F (2019)
+         chunk_id: title: The use of red flags in screening patients in physiotherapy: narrative review. | author: Maselli F | year: 2019 | authority: University of Genova | doi: https://hdl.handle.net/20.500.14242/101517
+         New or worsening neurologic motor symptoms (leg weakness, poor balance when walking, foot drop) in both limbs alongside spinal pain is worrying for cauda equina syndrome (CES).
+
+    10 | 0.6318 | Maselli F (2022)
+         chunk_id: title: The diagnostic value of Red Flags in thoracolumbar pain: a systematic review | author: Maselli F | year: 2022 | authority: Disability and Rehabilitation | doi: https://doi.org/10.1080/09638288.2020.1804626
+         New or worsening neurologic motor symptoms (leg weakness, poor balance when walking, foot drop) alongside spinal pain raises concern for spinal cord compression by tumour.
+

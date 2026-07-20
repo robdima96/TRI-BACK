@@ -1,144 +1,114 @@
-"""Chroma persistent store: collection init and dev seeding.
+"""Chroma persistent store: sub-collection init and lookup.
 
-For ingestion of new chunks, call :meth:`~chromadb.Collection.add` to index text chunks with
-embeddings from the same model as :func:`app.services.rag.embeddings.compute_query_embedding`;
-embedding dimension must match ``Settings.encoder_embedding_dim``. NER metadata can be
-attached per chunk in ``metadatas``.
+For ingestion, use :func:`app.services.rag.ingest_evidence_chunk` with a
+``sub_collection`` from :data:`EVIDENCE_SUB_COLLECTIONS` (Chroma-safe slugs).
+Embeddings must match ``Settings.encoder_embedding_dim`` (Clinical_sBERT / query encoding).
 """
 
 from __future__ import annotations
 
-import hashlib
 import logging
-from typing import Any
+import re
 
 import chromadb
-import numpy as np
 from chromadb.api import Collection
 
 from app.config import settings
 
 _log = logging.getLogger(__name__)
 
-# cached client and collection handles 
+# Chroma collection names: [a-zA-Z0-9._-], 3-512 chars, no spaces.
+EVIDENCE_SUB_COLLECTIONS: tuple[str, ...] = (
+    "red_flags",
+    "clinical_guidelines",
+    "clinical_vignettes",
+    "conversation_templates",
+    "diagnostic_confounders",
+)
+
+_COLLECTION_METADATA = {"hnsw:space": "cosine"}
+
 _chroma: chromadb.PersistentClient | None = None
-_collection: Collection | None = None
-
-# Placeholder guidelines for empty DB dev/tests
-_DEFAULT_CHUNKS: list[tuple[str, str, dict[str, Any]]] = [
-    (
-        "chunk_1",
-        (
-            "Superficial heat (application of heating pads or heated blankets) is "
-            "recommended for the short term relief of acute low back pain. "
-            "Clinical experience supports a role for superficial cold packs and alternating "
-            "heat and cold as per patient preference. "
-            "Heat or cold should not be applied directly to the skin, and not for longer than "
-            "15 to 20 minutes. Use with care if lack of protective sensation."
-        ),
-        {
-            "source": "Evidence-Informed Primary Care Guideline for Management of Low Back Pain",
-            "section": "treatment",
-        },
-    ),
-    (
-        "chunk_2",
-        (
-            "Many people with new low back pain improve over days to weeks without treatment. "
-            "Red flags such as major trauma, fever, history of cancer, or progressive neurological "
-            "symptoms like numbness or tingling require urgent in-person care."
-        ),
-        {
-            "source": "Evidence-Informed Primary Care Guideline for Management of Low Back Pain",
-            "section": "prognosis",
-        },
-    ),
-    (
-        "chunk_3",
-        (
-            "Reassess patients whose symptoms are not resolving. Follow-up in 1 week if "
-            "pain is severe and has not subsided. Follow-up in 3 weeks if moderate pain is "
-            "not improving. Follow-up in 6 weeks if not substantially recovered."
-        ),
-        {
-            "source": "Evidence-Informed Primary Care Guideline for Management of Low Back Pain",
-            "section": "follow-up",
-        },
-    ),
-]
+_collections: dict[str, Collection] = {}
 
 
-def _stable_unit_embedding(text: str, dim: int) -> list[float]:
-    """Reproducible dim-d unit vector (dev seed only when encoder is unavailable)."""
-    seed = int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:8], 16) % (2**31)
-    rng = np.random.default_rng(seed)
-    v = rng.standard_normal(dim, dtype=np.float64)
-    n = float(np.linalg.norm(v)) + 1e-9
-    v = (v / n).astype(np.float32)
-    return v.tolist()
+def _slugify_sub_collection(name: str) -> str:
+    """Map CLI input to a Chroma-safe slug (e.g. ``Red Flags`` -> ``red_flags``)."""
+    return re.sub(r"[^a-zA-Z0-9]+", "_", name.strip()).lower().strip("_")
 
 
-def _chunk_embedding_for_seed(text: str, dim: int) -> list[float]:
-    """Use the same encoder as live queries when possible; else stable random unit vector."""
-    from app.services.rag.embeddings import compute_query_embedding
+def validate_sub_collection(name: str) -> str:
+    """Return the canonical Chroma sub-collection slug or raise ``ValueError``."""
+    key = (name or "").strip()
+    if key in EVIDENCE_SUB_COLLECTIONS:
+        return key
+    slug = _slugify_sub_collection(key)
+    if slug in EVIDENCE_SUB_COLLECTIONS:
+        return slug
+    allowed = ", ".join(EVIDENCE_SUB_COLLECTIONS)
+    raise ValueError(f"Unknown sub-collection {name!r}; allowed: {allowed}")
 
-    vec = compute_query_embedding(text)
-    if len(vec) == dim:
-        return vec
-    return _stable_unit_embedding(text, dim)
 
-
-# get persistent client for Chroma and set local path
 def get_chroma_client() -> chromadb.PersistentClient:
     global _chroma
     if _chroma is None:
         path = settings.chroma_persist_path
         _chroma = chromadb.PersistentClient(
             path=path,
-            settings=chromadb.Settings(anonymized_telemetry=False), # disable telemetry
+            settings=chromadb.Settings(anonymized_telemetry=False),
         )
         _log.info("Chroma persistent client at %s", path)
     return _chroma
 
 
-def get_evidence_collection() -> Collection:
-    global _collection
-    if _collection is None:
-        client = get_chroma_client()
-        _collection = client.get_or_create_collection(
-            name=settings.chroma_collection_name,
-            metadata={"hnsw:space": "cosine"}, # use cosine similarity for retrieval
-        )
-        # dev behaviour: seed with _DEFAULT_CHUNKS if collection is empty
-        if _collection.count() == 0:
-            _seed_default_chunks(_collection)
-    return _collection
-
-# dev behaviour: seed with _DEFAULT_CHUNKS if collection is empty
-def _seed_default_chunks(collection: Collection) -> None:
-    dim = settings.encoder_embedding_dim
-    ids: list[str] = []
-    documents: list[str] = []
-    metadatas: list[dict[str, Any]] = []
-    embeddings: list[list[float]] = []
-    for chunk_id, text, meta in _DEFAULT_CHUNKS:
-        ids.append(chunk_id)
-        documents.append(text)
-        metadatas.append({**meta, "chunk_id": chunk_id})
-        embeddings.append(_chunk_embedding_for_seed(text, dim))
-    # add the chunks to the collection
-    # add and not upsert, only runs when collection is empty
-    collection.add(
-        ids=ids,
-        documents=documents,
-        metadatas=metadatas,
-        embeddings=embeddings,
+def get_sub_collection(sub_collection: str) -> Collection:
+    """Get or create one evidence sub-collection by slug."""
+    canonical = validate_sub_collection(sub_collection)
+    cached = _collections.get(canonical)
+    if cached is not None:
+        return cached
+    client = get_chroma_client()
+    coll = client.get_or_create_collection(
+        name=canonical,
+        metadata=_COLLECTION_METADATA,
     )
-    _log.info("Seeded Chroma with %d default MSK chunks (dev)", len(ids))
+    _collections[canonical] = coll
+    return coll
+
+
+def list_sub_collections() -> list[str]:
+    """Return all configured sub-collection slugs."""
+    return list(EVIDENCE_SUB_COLLECTIONS)
+
+
+def clear_sub_collection_documents(sub_collection: str) -> int:
+    """Remove all documents from a sub-collection; keep the collection itself."""
+    coll = get_sub_collection(sub_collection)
+    total = 0
+    batch_size = 500
+    while True:
+        result = coll.get(limit=batch_size, include=[])
+        ids = result.get("ids") or []
+        if not ids:
+            break
+        coll.delete(ids=ids)
+        total += len(ids)
+        if len(ids) < batch_size:
+            break
+    _log.info("Cleared %d document(s) from sub-collection %r", total, sub_collection)
+    return total
+
+
+def clear_all_sub_collection_documents() -> dict[str, int]:
+    """Empty every configured evidence sub-collection without deleting collections."""
+    counts: dict[str, int] = {}
+    for name in EVIDENCE_SUB_COLLECTIONS:
+        counts[name] = clear_sub_collection_documents(name)
+    return counts
 
 
 def reset_collection_for_tests() -> None:
     """Drop cached handles so a new test directory can be used (internal/tests only)."""
-    global _chroma, _collection
+    global _chroma, _collections
     _chroma = None
-    _collection = None
+    _collections = {}

@@ -9,19 +9,19 @@ from pathlib import Path
 from typing import Any
 
 from app.config import settings
+from app.session_enrichment import default_session_fields, engagement_from_messages
 
 _log = logging.getLogger(__name__)
 
 _MAX_STORED_MESSAGES = 40  # cap transcript size (user + assistant turns)
 
 
-# maps session id to safe and consistent file path
 def _session_file_path(session_id: str) -> Path:
     digest = hashlib.sha256(session_id.encode("utf-8")).hexdigest()
     root = Path(settings.session_store_dir)
     return root / f"sess_{digest}.json"
 
-# return decoded JSON or None if missing/invalid
+
 def load_session(session_id: str) -> dict[str, Any] | None:
     if not session_id or not session_id.strip():
         return None
@@ -38,24 +38,25 @@ def load_session(session_id: str) -> dict[str, Any] | None:
         return None
 
 
-def save_session(
-    session_id: str,
-    *,
-    clinical_checklist: list[dict[str, Any]],
-    messages: list[dict[str, str]],
-) -> None:
-    """Persist merged checklist and trimmed transcript."""
+def save_session(session_id: str, **fields: Any) -> None:
+    """Persist harmonized session snapshot (checklist, extraction history, engagement)."""
     if not session_id or not session_id.strip():
         return
     sid = session_id.strip()
+    fields.pop("session_id", None)
     path = _session_file_path(sid)
     path.parent.mkdir(parents=True, exist_ok=True)
-    trimmed = messages[-_MAX_STORED_MESSAGES:]
-    payload = {
-        "session_id": sid,
-        "clinical_checklist": clinical_checklist,
-        "messages": trimmed,
-    }
+    existing = load_session(sid) or default_session_fields(sid)
+    existing.update(fields)
+    existing["session_id"] = sid
+    trimmed = existing.get("messages") or []
+    if isinstance(trimmed, list):
+        existing["messages"] = trimmed[-_MAX_STORED_MESSAGES:]
+    if "engagement" not in fields and existing.get("messages"):
+        existing["engagement"] = engagement_from_messages(
+            existing["messages"],
+            existing=existing.get("engagement"),
+        )
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=0), encoding="utf-8")
+    tmp.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp.replace(path)

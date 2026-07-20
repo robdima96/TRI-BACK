@@ -4,19 +4,20 @@ from __future__ import annotations
 
 from app.config import settings
 from app.orchestrator.checkpointing import get_checkpointer
-from app.services.encoder import encoder_is_available
-from app.services.generator import generator_model_configured
+from app.services.encoder import encoder_is_available, encoder_status_detail
+from app.services.generator import generator_model_configured, generator_status_detail
 
 
 def probe_rag() -> tuple[bool, str]:
     if not settings.rag_load:
-        return True, "skipped (DIGIMSK_LOAD_RAG=0)"
+        return True, "skipped (DIGIMSK_RAG=0)"
     try:
-        from app.services.rag.store import get_evidence_collection
+        from app.services.rag.store import get_sub_collection, list_sub_collections
 
-        coll = get_evidence_collection()
-        _ = coll.count()
-        return True, "ok"
+        counts = []
+        for name in list_sub_collections():
+            counts.append(f"{name}={get_sub_collection(name).count()}")
+        return True, "ok (" + ", ".join(counts) + ")"
     except Exception as e:
         return False, f"{type(e).__name__}: {e}"
 
@@ -33,14 +34,15 @@ def probe_checkpointer() -> tuple[bool, str]:
 
 def probe_generator() -> tuple[bool, str]:
     if generator_model_configured():
-        return True, "ok"
-    return False, f"no safetensors under {settings.generator_model_dir}"
+        return True, generator_status_detail()
+    return False, generator_status_detail()
 
 
 def probe_encoder() -> tuple[bool, str]:
+    detail = encoder_status_detail()
     if encoder_is_available():
-        return True, "ok"
-    return False, f"no HF config.json, gliner_config.json, or encoder/ backbone under {settings.encoder_model_dir}"
+        return True, detail
+    return False, detail
 
 
 def readiness_payload() -> dict:

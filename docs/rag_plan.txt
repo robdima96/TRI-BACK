@@ -1,0 +1,203 @@
+DigiMSK — RAG / Specialized Vector Database Implementation Plan
+================================================================
+
+Purpose
+-------
+This document outlines an implementation plan for a specialized MSK
+retrieval layer (vector database + ingestion + query routing) aligned
+with the chatbot scope: after multi-turn dialogue, suggest one of
+(1) self-management at home, (2) non-urgent primary care, or (3) urgent
+emergency department care — without diagnosing or prescribing.
+
+Current codebase baseline (for implementers)
+--------------------------------------------
+- Today: Chroma persistent store, single collection, dense embedding
+  retrieval (mean-pooled encoder), top-k only; no MMR, no sparse leg,
+  no namespace-per-corpus routing in the query path.
+- Target: multiple logical sub-collections (namespaces or separate
+  collections + metadata), hybrid retrieval where beneficial, MMR /
+  deduplication, explicit chunking policy, and retrieval budgets per
+  turn. Policy / escalation logic remains outside pure "similarity
+  search" (see Binding safety below).
+
+
+Sub-collections (logical corpora)
+---------------------------------
+
+Implemented Chroma slugs (``app.services.rag.store.EVIDENCE_SUB_COLLECTIONS``):
+``red_flags``, ``clinical_guidelines``, ``clinical_vignettes``,
+``conversation_templates``, ``diagnostic_confounders``.
+
+1) Clinical Guidelines  (``clinical_guidelines``)
+   Scope: validated decision rules, red-flag criteria, imaging
+   appropriateness / guidance, referral thresholds, disposition-oriented
+   pathways where grounded in published guidance.
+   Notes:
+   - Primary home for "what to do when" content. Version and source
+     every chunk (guideline id, section, effective date) for future
+     RAG versioning and contradiction checks (see docs/features.txt).
+   - Red-flag and imaging material also appears in other buckets; use
+     metadata primary_role (e.g. rule | narrative | imaging_decision)
+     and deduplicate by canonical source span or hash at ingest.
+   - Cover self-management / rehab / activity pacing via tags
+     (e.g. self_management, exercise, activity_modification) if not
+     a separate collection — avoid a retrieval gap for "what can I do
+     at home?"
+   - Work, disability, return-to-work: optional tagged chunk set or
+     small pathway library under guidelines if not elsewhere.
+
+2) Assessment tools
+   Scope: psychosocial screening, region-specific measures, pain and
+   functional / ADL scales (e.g. yellow/blue flags, region-specific PROMs).
+   Notes:
+   - Respect licensing: separate "interpretation / thresholds /
+     clinical use summary" from full proprietary item lists when needed.
+   - Tag instrument name, population, minimal vs full form.
+
+3) Anatomy and Pathology
+   Scope: serious pathology mimics, diagnostic profiles, mechanism of
+   injury patterns, referred pain maps.
+   Notes:
+   - Expect overlap with Differential Diagnosis library; that is OK if
+     chunks declare primary_role and ingest-time dedup links
+     (linked_chunk_ids) for contradiction tooling later.
+
+4) Differential Diagnosis library
+   Scope: symptom-clusters keyed by body region, onset pattern, dominant
+   symptoms; include built-in urgency stratification per cluster.
+   Notes:
+   - Strong fit for a query router (region + urgency + dominant
+     symptoms) before retrieval. This bucket is high-impact for triage
+     appropriateness — plan targeted eval vignettes per cluster.
+   - Keep urgency metadata explicit on chunks for filtering and audits.
+
+5) Pharmacology
+   Scope: medications for MSK pain; emphasize contraindications,
+   interactions, and medications that mask symptoms (delay of
+   appropriate care).
+   Notes:
+   - High medico-legal risk: prioritize freshness, clear sourcing, and
+     cross-tags with Special populations (renal, hepatic, pregnancy,
+     anticoagulation, age extremes).
+
+6) Special Populations
+   Scope: genetic and pre-existing conditions that change interpretation,
+   thresholds, or disposition (and common MSK caveats).
+   Notes:
+   - Use cross-cutting metadata (population:pregnancy, age:pediatric,
+     comorbidity:ckd) in addition to narrative chunks; reduces duplicate
+     long prose across Pharmacology and Guidelines.
+
+7) Conversation templates
+   Scope: guardrails, mandatory phrasing banks, disposition-scoped
+   closing language, empathy / health-literacy variants — for audit
+   and consistency.
+   Notes:
+   - Do NOT query this namespace on every turn by default: use
+     conditional routing (early session, distress / literacy signals,
+     sensitive transitions, structured interview phrasing).
+   - Retrieve with low k (often 1), MMR / deduplication so templates do
+     not crowd out clinical evidence slots or repeat near-identical
+     empathy paragraphs.
+   - Store template_id, version, trigger_tags; log which template IDs
+     were injected per turn for auditability.
+   - Fine-tuning / DPO can shape default voice; templates stay editable
+     and versioned without retraining. Binding outcomes (see below)
+     still belong in orchestrator + policy, not only retrieved text.
+
+
+Cross-cutting metadata (recommended on every chunk)
+---------------------------------------------------
+- body_region, onset_pattern, dominant_symptom_tags (where applicable)
+- urgency_tier or disposition_hint (advisory metadata; see Binding safety)
+- content_type: rule | narrative | instrument | template_exemplar | ...
+- source_id, version, effective_date, chunk_hash
+- collection_id (one of the seven above)
+- primary_role vs secondary (for dedup and MMR)
+- binding: advisory | mandatory (use mandatory sparingly; see below)
+
+
+Binding safety vs advisory retrieval
+------------------------------------
+- "Binding safety" means fixed system behavior when triggers fire
+  (e.g. replace draft with mandatory escalation copy, block unsafe
+  advice) — enforced by code / policy gates, not left to whichever
+  chunk ranked highest.
+- Retrieved guideline text about red flags is often advisory context
+  for the model; non-negotiable pathways should still be backed by
+  deterministic rules + canonical strings (optionally also indexed for
+  consistency of wording).
+- Align with product dispositions: final recommendation class should
+  be defensible from structured state + templates, not only from LLM
+  "vibes."
+
+
+Disposition + templates (product alignment)
+-------------------------------------------
+- Target outputs: self-manage | primary care non-urgent | ED urgent.
+- Prefer one template family per disposition = mandatory scaffold +
+  allowed slot filling (region, key concern, return precautions) filled
+  from structured checklist, not unconstrained model invention.
+- Plan for: (a) mid-dialogue red-flag interrupt (not only end-of-chat
+  ED template), (b) explicit "cannot conclude / need more information /
+  default safer" path if three-way forcing causes overconfidence in
+  evals.
+- Final user message can combine: structured disposition + template
+  assembly + short RAG citations for "why" while disposition sentences
+  stay templated or heavily constrained.
+
+
+Ingestion and embedding pipeline
+--------------------------------
+- Chunking: target ~256 tokens with ~32 token overlap for long sources;
+  enforce at ingest; record offsets and parent doc id.
+- Use the same embedding model (or explicitly versioned pair) for ingest
+  and query; any encoder change implies re-embed + version bump
+  (features: RAG versioning).
+- Optional upgrade path: clinical-tuned dense encoders; evaluate
+  against MSK retrieval tasks before swapping.
+
+
+Vector store and retrieval mechanics
+------------------------------------
+- ANN index (e.g. HNSW) with cosine or chosen metric; namespace or
+  collection per sub-corpus above (or one store with strict
+  collection_id metadata + filtered queries).
+- Query router: map utterance + conversation state to subset of
+  collections and metadata filters (region, urgency, population).
+- Retrieval: top-k per namespace with a global per-turn budget (cap
+  slots for templates vs pharmacology vs DDx so one domain does not
+  starve others).
+- Re-ranking: MMR or equivalent for diversity; deduplicate near-identical
+  chunks across overlapping corpora.
+- Hybrid sparse + dense: consider for acronym-heavy and exact-match
+  clinical terms; pairs well with query reformulation (future feature).
+
+
+Evaluation and operations
+--------------------------
+- Triage appropriateness: stress-test Differential + Guidelines
+  retrieval with gold vignettes per cluster.
+- Log latency, errors, escalation rate, retrieval scores (structured
+  logging per stage — see docs/features.txt).
+- Contradiction detection (future): easier when chunks carry source_id
+  and version and primary_role.
+
+
+Migration from current single-collection Chroma
+-----------------------------------------------
+- Define collection_id / namespace in metadata for all new ingests.
+- Optionally maintain a legacy collection during migration; dual-write
+  or batch re-index with embedding version tags.
+- Update application settings and retrieve_evidence (or successor) to
+  accept router output: list of (collection, filters, k).
+
+
+References in-repo
+------------------
+- docs/features.txt — query reformulation, RAG versioning, groundedness,
+  contradiction detection, logging.
+- docs/targets.txt — triage appropriateness, latency, hallucination,
+  safety metrics.
+- app/services/rag/ — current Chroma + embeddings path (evolve in place
+  or behind a retrieval interface).

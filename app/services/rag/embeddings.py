@@ -1,20 +1,33 @@
-"""Pooled query embeddings for Chroma (same HF encoder/dimension as ingested chunks)."""
+"""RAG sentence embeddings for Chroma (ingest + query).
+
+Production default: **Clinical_sBERT** via ``sentence_transformers`` (``DIGIMSK_ENCODER_DIR``).
+Span NER uses GliNER-BioMed separately (``DIGIMSK_GLINER_MODEL_DIR``).
+
+Optional legacy backend ``hf_mean_pool``: Hugging Face ``AutoModel`` + mean pooling
+(GliNER bundle backbone or plain ``config.json``).
+"""
 
 from __future__ import annotations
 
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from app.config import settings
 
 _log = logging.getLogger(__name__)
 
-# cached model instances to avoid reloading
+RagEmbeddingBackend = Literal["sentence_transformers", "hf_mean_pool"]
+
+# Cached HF mean-pool encoder
 _tok_enc: Any = None
 _mdl_enc: Any = None
 _device_enc: Any = None
+
+# Cached sentence-transformers model
+_st_model: Any = None
+_st_dim: int | None = None
 
 
 def _subdir_with_hf_config(root: Path) -> Path | None:
@@ -25,7 +38,12 @@ def _subdir_with_hf_config(root: Path) -> Path | None:
     return None
 
 
-def _encoder_path_looks_valid(encoder_dir: str) -> bool:
+def _sentence_transformer_path_looks_valid(model_dir: str) -> bool:
+    root = Path(model_dir)
+    return root.is_dir() and (root / "config.json").is_file()
+
+
+def _hf_mean_pool_path_looks_valid(encoder_dir: str) -> bool:
     root = Path(encoder_dir)
     if not root.is_dir():
         return False
@@ -36,7 +54,7 @@ def _encoder_path_looks_valid(encoder_dir: str) -> bool:
     return (root / "gliner_config.json").is_file()
 
 
-def _resolved_encoder_sources(encoder_dir: str) -> list[tuple[str, bool]]:
+def _resolved_hf_encoder_sources(encoder_dir: str) -> list[tuple[str, bool]]:
     """(HF ``pretrained`` id/path, ``local_files_only``) in try order."""
     root = Path(encoder_dir)
     if not root.is_dir():
@@ -62,11 +80,49 @@ def _resolved_encoder_sources(encoder_dir: str) -> list[tuple[str, bool]]:
     return [(mid, True), (mid, False)]
 
 
+def rag_embedding_backend() -> RagEmbeddingBackend:
+    raw = (settings.rag_embedding_backend or "sentence_transformers").strip().lower()
+    if raw in ("hf", "hf_mean_pool", "mean_pool", "deberta", "gliner"):
+        return "hf_mean_pool"
+    return "sentence_transformers"
+
+
 def rag_embedding_model_configured() -> bool:
-    return _encoder_path_looks_valid(settings.encoder_model_dir)
+    if rag_embedding_backend() == "sentence_transformers":
+        return _sentence_transformer_path_looks_valid(settings.encoder_model_dir)
+    return _hf_mean_pool_path_looks_valid(settings.encoder_model_dir)
 
 
-# mean pooling operation to convert sequence of token embeddings into a single vector
+def embedding_dim_probe() -> int | None:
+    """Return configured dim, or probe ST model without retaining cache."""
+    if settings.encoder_embedding_dim > 0:
+        return settings.encoder_embedding_dim
+    if rag_embedding_backend() != "sentence_transformers":
+        return None
+    path = settings.encoder_model_dir
+    if not _sentence_transformer_path_looks_valid(path):
+        return None
+    try:
+        from sentence_transformers import SentenceTransformer
+
+        model = SentenceTransformer(str(Path(path).resolve()), local_files_only=True)
+        vec = model.encode("probe", normalize_embeddings=settings.rag_embedding_normalize)
+        return int(len(vec))
+    except Exception as e:
+        _log.debug("embedding dim probe failed: %s", e)
+        return None
+
+
+def unload_embedding_models() -> None:
+    """Release cached embedding models (tests / multi-model benchmarks)."""
+    global _tok_enc, _mdl_enc, _device_enc, _st_model, _st_dim
+    _tok_enc = None
+    _mdl_enc = None
+    _device_enc = None
+    _st_model = None
+    _st_dim = None
+
+
 def _mean_pool(last_hidden: Any, attention_mask: Any) -> Any:
     import torch
 
@@ -76,16 +132,13 @@ def _mean_pool(last_hidden: Any, attention_mask: Any) -> Any:
     return summed / counts
 
 
-# ensure encoder is properly configured
-def _ensure_encoder(encoder_dir: str) -> bool:
+def _ensure_hf_mean_pool_encoder(encoder_dir: str) -> bool:
     global _tok_enc, _mdl_enc, _device_enc
-    # if encoder is already loaded, return True
     if _mdl_enc is not None and _tok_enc is not None:
         return True
-    sources = _resolved_encoder_sources(encoder_dir)
+    sources = _resolved_hf_encoder_sources(encoder_dir)
     if not sources:
         return False
-    # lazy imports for heavy dependencies
     from transformers import AutoModel, AutoTokenizer
     import torch
 
@@ -100,7 +153,7 @@ def _ensure_encoder(encoder_dir: str) -> bool:
             _device_enc = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             _mdl_enc.to(_device_enc)
             _log.info(
-                "RAG encoder backbone loaded from %r (local_files_only=%s)",
+                "RAG HF mean-pool encoder loaded from %r (local_files_only=%s)",
                 pretrained,
                 local_only,
             )
@@ -108,26 +161,58 @@ def _ensure_encoder(encoder_dir: str) -> bool:
         except Exception as e:
             last_err = e
             _log.debug(
-                "encoder load failed for %r local_files_only=%s: %s",
+                "HF encoder load failed for %r local_files_only=%s: %s",
                 pretrained,
                 local_only,
                 e,
             )
     if last_err is not None:
-        _log.warning("all encoder load attempts failed: %s", last_err)
+        _log.warning("all HF encoder load attempts failed: %s", last_err)
     return False
 
 
-# runs sentence encoder (tokenizer + AutoModel), mean-pools token hidden states (respecting the attention mask),
-# and returns that vector as a Python list of floats for RAG indexing
-def _embed_query_to_list(
+def _ensure_sentence_transformer(model_dir: str) -> bool:
+    global _st_model, _st_dim
+    if _st_model is not None:
+        return True
+    if not _sentence_transformer_path_looks_valid(model_dir):
+        return False
+    try:
+        from sentence_transformers import SentenceTransformer
+
+        path = Path(model_dir).resolve()
+        _st_model = SentenceTransformer(str(path), local_files_only=True)
+        probe = _st_model.encode(
+            "probe",
+            normalize_embeddings=settings.rag_embedding_normalize,
+        )
+        _st_dim = int(len(probe))
+        if (
+            settings.encoder_embedding_dim > 0
+            and _st_dim != settings.encoder_embedding_dim
+        ):
+            _log.warning(
+                "Clinical_sBERT embedding dim %s != DIGIMSK_ENCODER_DIM %s",
+                _st_dim,
+                settings.encoder_embedding_dim,
+            )
+        _log.info(
+            "RAG sentence-transformers model loaded from %s (dim=%s)",
+            path,
+            _st_dim,
+        )
+        return True
+    except Exception as e:
+        _log.warning("sentence-transformers load failed for %s: %s", model_dir, e)
+        return False
+
+
+def _embed_hf_mean_pool(
     message: str,
     encoder_dir: str,
-    max_length: int = 256,
+    max_length: int,
 ) -> list[float]:
-    if not (message and str(message).strip()):  # if message is empty, return empty embedding
-        return []
-    if not _ensure_encoder(encoder_dir):  # if encoder not properly configured, return empty embedding
+    if not _ensure_hf_mean_pool_encoder(encoder_dir):
         return []
     import torch
 
@@ -135,30 +220,50 @@ def _embed_query_to_list(
         assert _tok_enc is not None and _mdl_enc is not None and _device_enc is not None
         enc = _tok_enc(
             message,
-            return_tensors="pt",  # return PyTorch tensors- expected by _mdl_enc
-            truncation=True,  # cut off if > max_length tokens
+            return_tensors="pt",
+            truncation=True,
             max_length=max_length,
-            padding=True,  # pad input to max length
+            padding=True,
         )
-        enc = {k: v.to(_device_enc) for k, v in enc.items()}  # move tensors to appropriate device
-        with torch.no_grad():  # disable gradient tracking for inference
-            out = _mdl_enc(**enc)  # forward pass through encoder
-            pooled = _mean_pool(out.last_hidden_state, enc["attention_mask"])  # pools real per-token vectors into query embedding
-            vec = pooled[0].float().cpu().tolist()  # take off GPU and convert to list of floats for RAG indexing
+        enc = {k: v.to(_device_enc) for k, v in enc.items()}
+        with torch.no_grad():
+            out = _mdl_enc(**enc)
+            pooled = _mean_pool(out.last_hidden_state, enc["attention_mask"])
+            vec = pooled[0].float().cpu().tolist()
         return list(vec)
     except Exception as e:
-        _log.exception("local encode failed: %s", e)
+        _log.exception("HF mean-pool encode failed: %s", e)
         return []
 
 
-# thin wrapper around _embed_query_to_list
-def compute_query_embedding(message: str) -> list[float]:
-    """Mean-pooled query vector for Chroma (empty list on failure/skip).
+def _embed_sentence_transformer(message: str, model_dir: str) -> list[float]:
+    if not _ensure_sentence_transformer(model_dir):
+        return []
+    try:
+        assert _st_model is not None
+        vec = _st_model.encode(
+            message,
+            normalize_embeddings=settings.rag_embedding_normalize,
+        )
+        return list(vec.astype(float))
+    except Exception as e:
+        _log.exception("sentence-transformers encode failed: %s", e)
+        return []
 
-    Uses ``settings.encoder_model_dir`` and ``settings.encoder_max_length``.
+
+def compute_query_embedding(message: str) -> list[float]:
+    """Embedding vector for Chroma query/ingest (empty list on failure/skip).
+
+    Uses ``settings.encoder_model_dir``, ``settings.rag_embedding_backend``, and
+    ``settings.encoder_max_length`` (HF backend only).
     """
-    return _embed_query_to_list(
+    if not (message and str(message).strip()):
+        return []
+    model_dir = settings.encoder_model_dir
+    if rag_embedding_backend() == "sentence_transformers":
+        return _embed_sentence_transformer(message, model_dir)
+    return _embed_hf_mean_pool(
         message,
-        settings.encoder_model_dir,
+        model_dir,
         max_length=settings.encoder_max_length,
     )
