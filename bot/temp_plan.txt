@@ -1,0 +1,62 @@
+DigiMSK disposition independence + agentic/deterministic clean split
+===================================================================
+
+Decisions
+---------
+- RAG and GraphRAG remain independent evidence toggles.
+- DIGIMSK_DISPOSITION_MODE selects reasoning style.
+- Agentic mode does not run deterministic traversal/ranking before its loop.
+- Agentic orientation uses an unranked ontology-membership tally:
+  condition -> factor_hit_count + matched_factors.
+- Prompt strategy B: separate graph-tool and traditional-RAG frameworks.
+- Bayesian scope: interfaces/configuration only; no inference model yet.
+
+Implemented shape
+-----------------
+Deterministic:
+  retrieve_evidence -> graph_traversal -> configured condition scorer
+  -> generate_draft -> policy_gate
+
+Agentic:
+  optional Chroma retrieval + factor matching + touched-condition tally
+  -> tool loop -> post-agent provenance graph (when GraphRAG enabled)
+  -> policy_gate
+
+Agentic tools:
+- Always: get_matched_factors, list_touched_conditions
+- GraphRAG enabled: get_factor_paths, get_condition_evidence
+- RAG enabled: search_evidence
+- Future/disabled: score_conditions_bayesian
+
+Fallback
+--------
+If the agent/generator cannot produce a final answer, run deterministic
+traversal when GraphRAG is enabled (RAG-only drafting otherwise), and record:
+  fallback_used=true
+  fallback_mode=deterministic
+  inference=deterministic_fallback
+
+Bayesian skeleton
+-----------------
+- DIGIMSK_GRAPH_INFERENCE=heuristic|bayesian
+- ConditionScorer protocol
+- HeuristicConditionScorer preserves current behavior
+- BayesianConditionScorer raises a clear not-configured error until reviewed
+  priors/CPTs or calibrated noisy-OR parameters are supplied
+- DIGIMSK_AGENTIC_BAYESIAN_TOOL=0 keeps the future tool out of the catalog
+
+Study UI payload safety
+-----------------------
+Study Arm-2/Arm-3 clients validate graph_traversal against their trace schema
+and silently drop malformed dicts. Every agentic turn therefore emits a
+schema-valid envelope, even when the agent touched no graph conditions
+(inference=agentic_no_graph_conditions), so matched factors still reach the UI.
+
+Validation
+----------
+- Agentic routing works when GraphRAG is disabled.
+- RAG-only tool catalog excludes graph traversal tools.
+- Agentic success does not pre-run traverse_from_turn.
+- Agentic failure runs and logs deterministic fallback.
+- Arm-3 payload is built after agent success from agent-touched provenance.
+- Full bot test suite passes.

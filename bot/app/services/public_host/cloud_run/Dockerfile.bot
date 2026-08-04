@@ -1,0 +1,34 @@
+# DigiMSK bot for Cloud Run — code + deps only; GliNER/graph/sessions via GCS mount.
+# Build from the DigiMSK monorepo root (parent of bot/):
+#   docker build -f bot/app/services/public_host/cloud_run/Dockerfile.bot -t digimsk-bot .
+
+FROM python:3.11-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DIGIMSK_RAG=0 \
+    DIGIMSK_GRAPH_RAG=1 \
+    DIGIMSK_LOAD_RAG=0 \
+    DIGIMSK_GENERATOR_BACKEND=vertex \
+    DIGIMSK_GLINER_MODEL_DIR=/mnt/digimsk/models/gliner \
+    DIGIMSK_GRAPH_CSV=/mnt/digimsk/graph/v2/red_flags_manual_v2.csv \
+    DIGIMSK_GRAPH_INVENTORY=/mnt/digimsk/graph/v2/inventory.json \
+    DIGIMSK_SESSION_STORE_DIR=/mnt/digimsk/sessions \
+    DIGIMSK_CHECKPOINT_SQLITE=/tmp/langgraph_checkpoints.sqlite
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY bot/pyproject.toml bot/README.md bot/readme.txt ./
+COPY bot/app ./app
+RUN pip install --upgrade pip \
+    && pip install -e ".[generator-api,gliner]"
+
+ENV PORT=8080
+EXPOSE 8080
+
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]

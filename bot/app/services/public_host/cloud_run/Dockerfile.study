@@ -1,0 +1,25 @@
+# DigiMSK study (Reflex) — build from DigiMSK monorepo root:
+#   docker build -f bot/app/services/public_host/cloud_run/Dockerfile.study -t digimsk-study .
+# See STUDY_SERVICE.md to finish the $PORT / Caddy entrypoint.
+
+FROM python:3.11-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DIGIMSK_PUBLIC_ACCESS=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /study
+
+COPY prototypes/digimsk_study_app/requirements.txt ./
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+COPY prototypes/digimsk_study_app/ ./
+
+ENV PORT=8080
+EXPOSE 8080
+CMD ["sh", "-c", "echo 'Study Cloud Run entry not finished — see bot/app/services/public_host/cloud_run/STUDY_SERVICE.md'; exit 1"]

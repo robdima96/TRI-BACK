@@ -1,15 +1,45 @@
+# DigiMSK monorepo
+
+# Secrets & environments
 .env
-.venv
-.tmp_*/
+**/.env
+**/.venv/
+.venv/
+**/__pycache__/
+**/.pytest_cache/
+*.py[cod]
 *.egg-info/
-.chroma_pytest/
-data/chroma/
-data/langgraph_checkpoints.sqlite
-data/langgraph_checkpoints.sqlite-*
-data/sessions/*.egg-info/
-__pycache__/
-.pytest_cache/
-*.pyc
-# Slurm batch logs (scripts/sockeye)
+**/*.egg-info/
+
+# Bot runtime / local models outputs
+bot/data/sessions/
+bot/data/latency_logs/
+bot/data/chroma/
+bot/data/langgraph_checkpoints.sqlite
+bot/data/langgraph_checkpoints.sqlite-*
+bot/.chroma_pytest/
+bot/.tmp_*/
+
+# Study app
+prototypes/digimsk_study_app/.web/
+prototypes/digimsk_study_app/.states/
+prototypes/digimsk_study_app/**/*.db
+prototypes/digimsk_study_app/data/participant_credentials.csv
+prototypes/digimsk_study_app/.venv/
+
+# Scratch / binaries (ask before forcing PDFs into git)
+**/*.pdf
+**/*.bak
+**/*.tmp
+**/node_modules/
+
+# IDE / local
+.cursor/
+*.code-workspace
 slurm-*.out
 slurm-*.err
+
+# Cloud Run local secrets
+bot/app/services/public_host/.env.public
+bot/app/services/public_host/.run/
+bot/app/services/public_host/cloud_run/.env.cloud

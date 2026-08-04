@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}{{ data.session_id }} · Session Lab{% endblock %}
+{% block head %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block body %}
+  <a class="back" href="/">← All sessions</a>
+
+  <header class="topbar">
+    <div>
+      <p class="brand">Session detail</p>
+      <h1>{{ data.session_id }}</h1>
+      <p class="sub">
+        File <code>{{ data._filename }}</code>
+        · last activity {{ data._activity_display }}
+      </p>
+    </div>
+    <div class="meta-pill">{{ turns|length }} chat turn{{ "s" if turns|length != 1 else "" }}</div>
+  </header>
+
+  {# —— Engagement —— #}
+  <section class="section">
+    <h2>Engagement</h2>
+    <div class="grid-metrics">
+      <div class="metric">
+        <div class="label">Duration</div>
+        <div class="value">{{ "%.0f"|format(chart.summary.session_duration_sec or 0) }}s</div>
+      </div>
+      <div class="metric">
+        <div class="label">Mean round-trip</div>
+        <div class="value">{{ "%.0f"|format(chart.summary.mean_round_trip_ms or 0) }}ms</div>
+      </div>
+      <div class="metric">
+        <div class="label">User words</div>
+        <div class="value">{{ chart.summary.total_user_words or 0 }}</div>
+      </div>
+      <div class="metric">
+        <div class="label">Feedback ↑ / ↓</div>
+        <div class="value">{{ chart.summary.feedback_up_count or 0 }} / {{ chart.summary.feedback_down_count or 0 }}</div>
+      </div>
+    </div>
+    {% if chart.labels %}
+      <div class="charts">
+        <div class="card chart-card">
+          <h3>Round-trip latency (ms)</h3>
+          <div class="chart-wrap"><canvas id="chart-rtt"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <h3>User words & idle time</h3>
+          <div class="chart-wrap"><canvas id="chart-words"></canvas></div>
+        </div>
+      </div>
+    {% else %}
+      <div class="card empty-state">No per-turn engagement timing in this file.</div>
+    {% endif %}
+  </section>
+
+  {# —— Chat with hover —— #}
+  <section class="section">
+    <h2>Conversation</h2>
+    <p class="sub" style="margin-top:0">
+      Hover a bot reply to see checklist items added that turn and coverage state.
+    </p>
+    <div class="card chat" id="chat">
+      {% for t in turns %}
+        {% if t.user is not none %}
+          <div class="bubble user">
+            <div class="role">User · turn {{ t.turn_index }}</div>
+            <div class="body">{{ t.user }}</div>
+          </div>
+        {% endif %}
+        {% if t.assistant is not none %}
+          <div
+            class="bubble bot"
+            data-turn-popup
+            data-turn="{{ t | tojson | forceescape }}"
+          >
+            <div class="role">Bot · turn {{ t.turn_index }}</div>
+            <div class="body">{{ t.assistant }}</div>
+            <div class="hover-hint">Hover for checklist + coverage</div>
+          </div>
+        {% endif %}
+      {% else %}
+        <div class="empty-state">No messages stored.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div id="turn-popup" role="tooltip" aria-hidden="true"></div>
+
+  {# —— Checklist —— #}
+  <section class="section">
+    <h2>Clinical checklist (latest)</h2>
+    {% if checklist %}
+      <div class="checklist">
+        {% for item in checklist %}
+          <div class="item-pill">
+            <strong>{{ item.text }}</strong>
+            <small>{{ item.kind }} / {{ item.label }} · {{ item.source }}</small>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="card empty-state">Empty checklist.</div>
+    {% endif %}
+  </section>
+
+  {# —— Latest orchestrator —— #}
+  {% if orchestrator %}
+  <section class="section">
+    <h2>Orchestrator (latest)</h2>
+    <div class="card" style="padding:14px">
+      <div class="grid-metrics">
+        <div class="metric">
+          <div class="label">Question mode</div>
+          <div class="value" style="font-size:1rem">{{ orchestrator.question_mode }}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Coverage ready</div>
+          <div class="value" style="font-size:1rem">{{ orchestrator.coverage_ready }}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Escalated</div>
+          <div class="value" style="font-size:1rem">{{ orchestrator.escalated }}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Questions asked</div>
+          <div class="value">{{ orchestrator.questions_asked }}</div>
+        </div>
+      </div>
+      <details class="panel">
+        <summary>Full orchestrator JSON</summary>
+        <pre class="raw">{{ orchestrator | tojson(indent=2) }}</pre>
+      </details>
+    </div>
+  </section>
+  {% endif %}
+
+  {# —— Disposition summary —— #}
+  {% if matched_factors or candidate_conditions or disposition_history %}
+  <section class="section">
+    <h2>Disposition (latest)</h2>
+    <div class="card" style="padding:14px">
+      <h3 style="margin:0 0 8px;font-size:0.95rem">Matched factors</h3>
+      <div class="checklist" style="margin-bottom:14px">
+        {% for f in matched_factors %}
+          <div class="item-pill"><strong>{{ f }}</strong></div>
+        {% else %}
+          <span class="chip">none</span>
+        {% endfor %}
+      </div>
+      <h3 style="margin:0 0 8px;font-size:0.95rem">Candidate conditions</h3>
+      <div class="checklist">
+        {% for c in candidate_conditions %}
+          <div class="item-pill"><strong>{{ c }}</strong></div>
+        {% else %}
+          <span class="chip">none</span>
+        {% endfor %}
+      </div>
+      {% if traversed_chunk_ids %}
+        <p class="sub">Chunks: {{ traversed_chunk_ids | join(", ") }}</p>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {# —— Factor matching audit —— #}
+  {% if factor_audit %}
+  <section class="section">
+    <h2>Factor matching audit</h2>
+    <div class="card" style="padding:14px">
+      {% set summary = factor_audit.summary or {} %}
+      <div class="grid-metrics">
+        <div class="metric"><div class="label">Matched</div><div class="value">{{ summary.matched_count or 0 }}</div></div>
+        <div class="metric"><div class="label">Unmatched</div><div class="value">{{ summary.unmatched_count or 0 }}</div></div>
+        <div class="metric"><div class="label">Gaps</div><div class="value">{{ summary.gap_count or 0 }}</div></div>
+      </div>
+      {% if factor_audit.gaps %}
+        <h3 style="font-size:0.95rem">Gaps</h3>
+        {% for g in factor_audit.gaps %}
+          <div class="gap-row">
+            <div><code>{{ g.code }}</code></div>
+            <div>{{ (g.checklist_item or {}).text }}</div>
+            <div>{{ g.factor_name or "—" }}</div>
+          </div>
+        {% endfor %}
+      {% endif %}
+      <details class="panel" style="margin-top:12px">
+        <summary>Full factor_matching_audit</summary>
+        <pre class="raw">{{ factor_audit | tojson(indent=2) }}</pre>
+      </details>
+    </div>
+  </section>
+  {% endif %}
+
+  {# —— Histories / raw —— #}
+  <section class="section">
+    <h2>Full logged payloads</h2>
+    <details class="panel">
+      <summary>extraction_history ({{ extraction_history|length }})</summary>
+      <pre class="raw">{{ extraction_history | tojson(indent=2) }}</pre>
+    </details>
+    <details class="panel">
+      <summary>orchestrator_history ({{ orchestrator_history|length }})</summary>
+      <pre class="raw">{{ orchestrator_history | tojson(indent=2) }}</pre>
+    </details>
+    <details class="panel">
+      <summary>disposition_history ({{ disposition_history|length }})</summary>
+      <pre class="raw">{{ disposition_history | tojson(indent=2) }}</pre>
+    </details>
+    <details class="panel">
+      <summary>agent_trace</summary>
+      <pre class="raw">{{ agent_trace | tojson(indent=2) }}</pre>
+    </details>
+    <details class="panel">
+      <summary>graph_traversal</summary>
+      <pre class="raw">{{ graph_traversal | tojson(indent=2) }}</pre>
+    </details>
+    <details class="panel">
+      <summary>engagement</summary>
+      <pre class="raw">{{ data.engagement | tojson(indent=2) }}</pre>
+    </details>
+    <details class="panel">
+      <summary>Entire session JSON</summary>
+      <pre class="raw">{{ raw_json }}</pre>
+    </details>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script id="chart-data" type="application/json">{{ chart_json | safe }}</script>
+  <script src="/static/session.js"></script>
+{% endblock %}

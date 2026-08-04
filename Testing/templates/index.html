@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Sessions · DigiMSK Session Lab{% endblock %}
+{% block body %}
+  <header class="topbar">
+    <div>
+      <p class="brand">DigiMSK · Testing</p>
+      <h1>Session logs</h1>
+      <p class="sub">
+        Browse bot session JSON from <code>{{ sessions_dir }}</code>.
+        Newest activity at the top. Open a row to inspect checklist growth,
+        coverage, engagement, and disposition audits.
+      </p>
+    </div>
+    <div class="meta-pill">{{ session_count }} session{{ "s" if session_count != 1 else "" }}</div>
+  </header>
+
+  {% if not sessions %}
+    <div class="card empty-state">
+      No session files found. Start a chat against the bot so
+      <code>bot/data/sessions/</code> is populated.
+    </div>
+  {% else %}
+    <div class="session-list">
+      {% for s in sessions %}
+        <a class="session-row" href="/session/{{ s.file_key }}">
+          <div class="sid">
+            {{ s.session_id }}
+            {% if s.is_reference %}<span class="tag ref">reference</span>{% endif %}
+            {% if s.is_study_id and not s.is_reference %}<span class="tag">study</span>{% endif %}
+          </div>
+          <div class="when">{{ s.activity_display }}</div>
+          <div class="stats">
+            <span class="chip">{{ s.user_turns }} turn{{ "s" if s.user_turns != 1 else "" }}</span>
+            <span class="chip">{{ s.checklist_count }} checklist</span>
+            {% if s.has_orchestrator %}<span class="chip on">orchestrator</span>{% endif %}
+            {% if s.has_disposition %}<span class="chip on">disposition</span>{% endif %}
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

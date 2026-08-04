@@ -1,0 +1,238 @@
+"""Session enrichment helpers."""
+
+from app.orchestrator.checklist import merge_checklist_items
+from app.schemas import ChecklistItem
+from app.session_enrichment import (
+    build_disposition_record,
+    build_orchestrator_snapshot,
+    build_turn_extraction_record,
+    compact_graph_for_session,
+    default_engagement,
+    engagement_from_messages,
+    slim_factor_matching_audit,
+    split_checklist_by_source,
+)
+from app.session_store import (
+    is_study_session_id,
+    merge_session_fields,
+    session_file_path,
+)
+
+
+def test_split_checklist_by_source():
+    items = [
+        ChecklistItem(text="70", kind="demographic", source="pattern", label="age"),
+        ChecklistItem(text="pain", kind="symptom", source="gliner", label="symptom"),
+    ]
+    grouped = split_checklist_by_source(items)
+    assert len(grouped["pattern"]) == 1
+    assert len(grouped["gliner"]) == 1
+    assert grouped["safety_phrase"] == []
+
+
+def test_turn_extraction_record_tracks_new_items_without_full_checklist():
+    prior = [
+        {"text": "70", "kind": "demographic", "source": "pattern", "label": "age"},
+    ]
+    current = [
+        ChecklistItem(text="70", kind="demographic", source="pattern", label="age"),
+        ChecklistItem(text="pain", kind="symptom", source="gliner", label="symptom"),
+    ]
+    merged = merge_checklist_items(prior, current)
+    record = build_turn_extraction_record(
+        turn_index=2,
+        user_message="back pain",
+        turn_items=current,
+        prior_checklist=prior,
+        merged_checklist=merged,
+        timestamp="2026-07-03T12:00:00-07:00",
+    )
+    assert record["turn_index"] == 2
+    assert len(record["by_source"]["gliner"]) == 1
+    assert len(record["new_items"]) == 1
+    assert record["new_items"][0]["text"] == "pain"
+    assert "clinical_checklist" not in record
+
+
+def test_turn_extraction_record_includes_llm_enrichment():
+    prior: list[dict[str, str]] = []
+    merged = [
+        {
+            "text": "low back pain",
+            "kind": "ner_entity",
+            "source": "llm",
+            "label": "symptom",
+        }
+    ]
+    record = build_turn_extraction_record(
+        turn_index=1,
+        user_message="yes",
+        turn_items=[],
+        prior_checklist=prior,
+        merged_checklist=merged,
+        llm_enrichment={
+            "status": "applied",
+            "summary_reason": "Confirmed chief complaint.",
+            "applied": merged,
+            "proposed": merged,
+            "rejected": [],
+            "comorbidities_acknowledged": False,
+        },
+    )
+    assert record["llm_enrichment"]["summary_reason"] == "Confirmed chief complaint."
+    assert record["by_source"]["llm"][0]["text"] == "low back pain"
+    assert record["new_items"] == merged
+
+
+def test_engagement_from_messages_counts_user_turns():
+    messages = [
+        {"role": "user", "content": "hello world"},
+        {"role": "assistant", "content": "hi"},
+        {"role": "user", "content": "knee pain"},
+    ]
+    engagement = engagement_from_messages(messages, existing=default_engagement())
+    assert len(engagement["turns"]) == 2
+    assert engagement["total_user_words"] == 4
+
+
+def test_study_session_filenames_are_literal(tmp_path):
+    assert is_study_session_id("admin_15")
+    assert is_study_session_id("user_55")
+    assert is_study_session_id("425_1")
+    assert not is_study_session_id("sess-multi-1")
+    assert session_file_path("admin_15", root=tmp_path).name == "admin_15.json"
+    assert session_file_path("ad-hoc", root=tmp_path).name.startswith("sess_")
+
+
+def test_compact_graph_strips_duplicated_fields():
+    compact = compact_graph_for_session(
+        {
+            "trace_id": "t1",
+            "checklist_items": [{"text": "x"}],
+            "matched_factors": ["Age over 50"],
+            "candidate_conditions": ["Fracture"],
+            "factor_matching": {"summary": {}},
+            "agent_trace": {"status": "ok"},
+            "steps": [{"title": "seed"}],
+        }
+    )
+    assert compact is not None
+    assert compact["trace_id"] == "t1"
+    assert compact["steps"]
+    assert "checklist_items" not in compact
+    assert "matched_factors" not in compact
+    assert "candidate_conditions" not in compact
+    assert "factor_matching" not in compact
+    assert "agent_trace" not in compact
+
+
+def test_slim_factor_audit_drops_partitions():
+    slim = slim_factor_matching_audit(
+        {
+            "summary": {"matched_count": 1},
+            "items": [{"status": "matched"}],
+            "gaps": [],
+            "matched": [{"status": "matched"}],
+            "unmatched": [],
+        }
+    )
+    assert slim is not None
+    assert "matched" not in slim
+    assert "unmatched" not in slim
+    assert slim["items"]
+
+
+def test_orchestrator_snapshot_includes_safety_fields():
+    snap = build_orchestrator_snapshot(
+        {
+            "risk_hits": ["cancer_history"],
+            "escalated": True,
+            "safety_reason": "risk_policy",
+            "question_mode": False,
+            "questions_asked": 2,
+            "coverage": {"ready_for_disposition": True, "missing_slots": []},
+            "generator_failed": False,
+        },
+        turn_index=3,
+    )
+    assert snap["risk_hits"] == ["cancer_history"]
+    assert snap["escalated"] is True
+    assert snap["safety_reason"] == "risk_policy"
+    assert snap["coverage_ready"] is True
+
+
+def test_disposition_skipped_on_question_mode():
+    assert (
+        build_disposition_record(
+            {"question_mode": True, "matched_factors": ["Age over 50"]},
+            turn_index=1,
+        )
+        is None
+    )
+
+
+def test_merge_preserves_disposition_after_question_turn():
+    existing = {
+        "session_id": "s1",
+        "disposition_history": [
+            {
+                "turn_index": 2,
+                "matched_factors": ["Age over 50"],
+                "candidate_conditions": ["Fracture"],
+            }
+        ],
+        "matched_factors": ["Age over 50"],
+        "candidate_conditions": ["Fracture"],
+        "graph_traversal": {"trace_id": "keep-me"},
+        "agent_trace": {"status": "ok"},
+    }
+    merged = merge_session_fields(
+        existing,
+        {
+            "clinical_checklist": [{"text": "pain", "kind": "symptom", "source": "gliner", "label": ""}],
+            "orchestrator": {
+                "turn_index": 3,
+                "question_mode": True,
+                "escalated": False,
+                "risk_hits": [],
+                "safety_reason": None,
+            },
+            # Accidental empties from a question turn must not wipe.
+            "matched_factors": [],
+            "candidate_conditions": [],
+            "graph_traversal": None,
+            "agent_trace": None,
+        },
+    )
+    assert merged["matched_factors"] == ["Age over 50"]
+    assert merged["candidate_conditions"] == ["Fracture"]
+    assert merged["graph_traversal"]["trace_id"] == "keep-me"
+    assert merged["agent_trace"]["status"] == "ok"
+    assert len(merged["disposition_history"]) == 1
+    assert merged["orchestrator"]["question_mode"] is True
+    assert len(merged["orchestrator_history"]) == 1
+
+
+def test_merge_appends_disposition_history():
+    existing = {
+        "session_id": "s1",
+        "disposition_history": [],
+        "orchestrator_history": [],
+    }
+    merged = merge_session_fields(
+        existing,
+        {
+            "disposition": {
+                "turn_index": 4,
+                "matched_factors": ["Diabetes"],
+                "candidate_conditions": ["Infection"],
+                "graph_traversal": {"trace_id": "d1"},
+                "factor_matching_audit": {"summary": {}},
+                "agent_trace": None,
+                "traversed_chunk_ids": ["c1"],
+            }
+        },
+    )
+    assert len(merged["disposition_history"]) == 1
+    assert merged["matched_factors"] == ["Diabetes"]
+    assert merged["graph_traversal"]["trace_id"] == "d1"

@@ -1,0 +1,8 @@
+.web
+.states
+.venv
+assets/external/
+__pycache__/
+*.db
+*.py[cod]
+data/participant_credentials.csv
