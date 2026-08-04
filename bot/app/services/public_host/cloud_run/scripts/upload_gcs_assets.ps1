@@ -16,14 +16,13 @@ param(
 $ErrorActionPreference = "Stop"
 
 if (-not $RepoRoot) {
-  # scripts -> cloud_run -> public_host -> services -> app -> bot (git root)
+  # scripts -> cloud_run -> public_host -> services -> app -> bot -> DigiMSK monorepo root
   $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\..")).Path
 }
 
-# Knowledge graph packs live in the DigiMSKbot workspace sibling of this git repo.
-$WorkspaceRoot = (Resolve-Path (Join-Path $RepoRoot "..")).Path
-$GraphCsv = Join-Path $WorkspaceRoot "Graphs\backups\red flags\v2\source\red_flags_manual_v2.csv"
-$GraphInv = Join-Path $WorkspaceRoot "Graphs\backups\red flags\v2\inventory.json"
+# Knowledge graph packs live under the monorepo workspace (Graphs/ next to bot/).
+$GraphCsv = Join-Path $RepoRoot "Graphs\backups\red flags\v2\source\red_flags_manual_v2.csv"
+$GraphInv = Join-Path $RepoRoot "Graphs\backups\red flags\v2\inventory.json"
 
 if (-not (Test-Path $GraphCsv)) { throw "Missing graph CSV: $GraphCsv" }
 if (-not (Test-Path $GraphInv)) { throw "Missing inventory: $GraphInv" }

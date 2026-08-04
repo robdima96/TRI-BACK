@@ -87,10 +87,12 @@ Volume mounts and secrets are applied at **deploy** time (`deploy_bot.ps1`), not
 
 ## Implementation phases
 
-1. **Done in-repo:** this folder, GCS layout, upload + deploy scripts, bot Dockerfile, GraphRAG-only env template.  
-2. **You run:** create bucket, upload assets, build image, `deploy_bot.ps1`.  
-3. **Next:** study Dockerfile completion + public service + Connect repo.  
-4. **Decide:** max instances for bot given session store (ask below).
+Operator steps are in **[STUDY_SERVICE.md](STUDY_SERVICE.md)** (Phases A–G).
+
+1. **Done in-repo:** monorepo layout, this folder, GCS layout, upload + deploy scripts, bot Dockerfile, GraphRAG-only env template.  
+2. **You run next:** Phase A–C (bucket, upload, build bot, `deploy_bot.ps1`, smoke).  
+3. **Then:** Phase D–F (Caddy + Reflex in `Dockerfile.study`, public study service, acceptance).  
+4. **Optional:** Phase G continuous deploy from Git. **Decided:** bot `max-instances=1` (below).
 
 ---
 
