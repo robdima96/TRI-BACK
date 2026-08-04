@@ -1,0 +1,21 @@
+# DigiMSK study UI — Caddy serves static frontend and proxies Reflex backend.
+# Cloud Run terminates TLS and sets $PORT (usually 8080).
+
+:{$PORT}
+
+encode gzip
+
+@backend_routes path /_event /_event/* /ping /_upload /_upload/* /_health /_health/*
+handle @backend_routes {
+	reverse_proxy 127.0.0.1:8000 {
+		transport http {
+			versions 1.1
+		}
+	}
+}
+
+root * /srv
+route {
+	try_files {path} {path}/ /404.html
+	file_server
+}

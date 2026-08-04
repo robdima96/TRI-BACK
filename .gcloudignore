@@ -1,0 +1,61 @@
+# Cloud Build context for study (and future) image builds — keep small.
+.git/
+.cursor/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.web/
+**/.states/
+**/node_modules/
+**/*.egg-info/
+
+Graphs/
+Project/
+Reports/
+Uncanny Valley/
+data/
+Testing/
+/scripts/
+shared/
+Neo4j-*.txt
+*.pptx
+
+bot/data/
+bot/Embeddings test/
+bot/Knowledge Base/
+bot/docs/
+bot/scripts/
+bot/tests/
+bot/temp_plan.txt
+bot/readme.txt
+bot/README.md
+bot/pyproject.toml
+bot/app/orchestrator/
+bot/app/services/agentic_graph_rag/
+bot/app/services/graphrag/
+bot/app/services/rag/
+bot/app/services/encoder.py
+bot/app/services/generator.py
+bot/app/services/generator_backends.py
+bot/app/services/gliner_ner.py
+bot/app/services/intake_enricher.py
+bot/app/services/intake_llm.py
+bot/app/services/policy.py
+bot/app/services/preprocess.py
+bot/app/services/vertex_auth.py
+bot/app/services/warmup.py
+bot/app/main.py
+bot/app/config.py
+bot/app/schemas.py
+bot/app/readiness.py
+bot/app/session_store.py
+bot/app/session_enrichment.py
+
+# Keep: bot/app/services/public_host/cloud_run/** for Dockerfiles
+
+prototypes/sessions/
+prototypes/alignment_specifics.txt
+prototypes/improve_prompt.py
+prototypes/prompt.txt
+prototypes/prompt_2.txt
+prototypes/temp_prompt_kgt.txt

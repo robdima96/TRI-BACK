@@ -1,0 +1,34 @@
+# Build + push study image only (from DigiMSK monorepo root).
+#   gcloud builds submit --config bot/app/services/public_host/cloud_run/cloudbuild.study.yaml .
+
+substitutions:
+  _REGION: us-central1
+  _REPO: digimsk
+  _PUBLIC_BASE_URL: https://tri-back-study-PLACEHOLDER.us-central1.run.app
+  _TAG: latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-study
+    args:
+      - build
+      - -f
+      - bot/app/services/public_host/cloud_run/Dockerfile.study
+      - --build-arg
+      - PUBLIC_BASE_URL=${_PUBLIC_BASE_URL}
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study:${_TAG}
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-study
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study:${_TAG}
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study:${_TAG}

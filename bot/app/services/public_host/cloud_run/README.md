@@ -21,10 +21,13 @@ Traditional Chroma RAG is **off** on the hosted bot (`DIGIMSK_RAG=0`); GraphRAG 
 | [gcs_layout.md](gcs_layout.md) | Bucket prefixes and env path mapping |
 | [.env.cloud.example](.env.cloud.example) | Cloud Run env template |
 | [Dockerfile.bot](Dockerfile.bot) | Bot image (ready; no models baked in) |
-| [Dockerfile.study](Dockerfile.study) | Study / Reflex image (finish entrypoint in Phase D) |
-| [cloudbuild.yaml](cloudbuild.yaml) | Build both images (use after study Dockerfile works) |
+| [Dockerfile.study](Dockerfile.study) | Study / Reflex + Caddy one-port image |
+| [Caddyfile.study](Caddyfile.study) | Proxy `/_event` + static `/srv` |
+| [cloudbuild.study.yaml](cloudbuild.study.yaml) | Build/push study image only |
 | [scripts/upload_gcs_assets.ps1](scripts/upload_gcs_assets.ps1) | Upload GliNER + v2 graph; ensure `sessions/` |
 | [scripts/deploy_bot.ps1](scripts/deploy_bot.ps1) | Deploy bot with GCS mounts |
+| [scripts/deploy_study.ps1](scripts/deploy_study.ps1) | Deploy public study UI wired to bot |
+| [scripts/entrypoint_study.sh](scripts/entrypoint_study.sh) | Container start: Redis → Reflex → Caddy |
 
 ## Short path (bot only)
 
