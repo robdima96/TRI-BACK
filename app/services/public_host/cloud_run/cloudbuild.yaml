@@ -1,0 +1,35 @@
+# Build DigiMSK bot image. Submit from the bot git root:
+#   gcloud builds submit --config app/services/public_host/cloud_run/cloudbuild.yaml
+#
+# Study image is built separately from the DigiMSKbot workspace root (see STUDY_SERVICE.md).
+
+substitutions:
+  _REGION: us-central1
+  _REPO: digimsk
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-bot
+    args:
+      - build
+      - -f
+      - app/services/public_host/cloud_run/Dockerfile.bot
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-bot:$COMMIT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-bot:latest
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-bot
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-bot
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-bot

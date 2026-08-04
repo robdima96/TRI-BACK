@@ -115,6 +115,7 @@ def _normalize_generator_backend(raw: str | None) -> str:
 
 
 DEFAULT_DISPOSITION_MODE = "deterministic"
+DEFAULT_GRAPH_INFERENCE = "heuristic"
 
 
 def _normalize_disposition_mode(raw: str | None) -> str:
@@ -134,6 +135,17 @@ def _normalize_disposition_mode(raw: str | None) -> str:
             "(supported: deterministic, agentic)"
         )
     return normalized
+
+
+def _normalize_graph_inference(raw: str | None) -> str:
+    """Graph condition inference backend (Bayesian is a future skeleton)."""
+    value = (raw or DEFAULT_GRAPH_INFERENCE).strip().lower()
+    if value not in ("heuristic", "bayesian"):
+        raise ValueError(
+            f"unsupported DIGIMSK_GRAPH_INFERENCE: {raw!r} "
+            "(supported: heuristic, bayesian)"
+        )
+    return value
 
 
 
@@ -205,6 +217,16 @@ class Settings(BaseModel):
 
     agentic_max_steps: int = 6
 
+    # Condition scorer used by deterministic graph traversal.
+    graph_inference: str = DEFAULT_GRAPH_INFERENCE
+
+    # Future Bayesian agent tool registration; off until a model is configured.
+    agentic_bayesian_tool: bool = False
+
+    # LLM cross-check for unmatched checklist → Factor mapping (pre-traversal).
+    # When off, matching stays fully deterministic (regex / kind / fuzzy only).
+    llm_factor_match: bool = False
+
     # Max deterministic intake questions per session before best-effort disposition.
 
     max_questions: int = 10
@@ -214,6 +236,14 @@ class Settings(BaseModel):
     # LangGraph SqliteSaver; thread_id maps to chat session_id.
 
     checkpoint_sqlite_path: str = "data/langgraph_checkpoints.sqlite"
+
+    # Shared secret for study UI → bot chat calls. Empty = no auth (local default).
+    bot_api_key: str | None = None
+
+    # Sliding-window limits for POST /api/v1/chat (0 disables).
+    chat_rate_limit: int = 60
+
+    chat_rate_window_sec: int = 60
 
 
 
@@ -301,6 +331,14 @@ settings = Settings(
 
     agentic_max_steps=_env_int("DIGIMSK_AGENTIC_MAX_STEPS", 6),
 
+    graph_inference=_normalize_graph_inference(
+        _env_str("DIGIMSK_GRAPH_INFERENCE", DEFAULT_GRAPH_INFERENCE)
+    ),
+
+    agentic_bayesian_tool=_env_bool("DIGIMSK_AGENTIC_BAYESIAN_TOOL", False),
+
+    llm_factor_match=_env_bool("DIGIMSK_LLM_FACTOR_MATCH", False),
+
     max_questions=_env_int("DIGIMSK_MAX_QUESTIONS", 10),
 
     session_store_dir=_env_str("DIGIMSK_SESSION_STORE_DIR", "data/sessions")
@@ -314,6 +352,12 @@ settings = Settings(
     )
 
     or "data/langgraph_checkpoints.sqlite",
+
+    bot_api_key=_env_str("DIGIMSK_BOT_API_KEY"),
+
+    chat_rate_limit=_env_int("DIGIMSK_CHAT_RATE_LIMIT", 60),
+
+    chat_rate_window_sec=_env_int("DIGIMSK_CHAT_RATE_WINDOW_SEC", 60),
 
 )
 

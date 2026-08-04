@@ -3,7 +3,7 @@
 This scaffold provides a practical Month 1 baseline:
 
 - FastAPI service with health and chat endpoints
-- LangGraph orchestration with **SQLite checkpoints** (`thread_id` = `session_id`) and **first-class `messages` state** (append reducer); JSON under `data/sessions/` written each turn for logging/audit.
+- LangGraph orchestration with **SQLite checkpoints** (`thread_id` = `session_id`) and **first-class `messages` state** (append reducer); JSON under `data/sessions/` written each turn for logging/audit (study ids like `admin_15` → `admin_15.json`; other ids → `sess_<sha256>.json`). Disposition audits append and are never wiped by later question turns.
 - RAG, generation, and policy stubs
 - Tests for API routes and orchestration flow
 
@@ -17,6 +17,8 @@ This scaffold provides a practical Month 1 baseline:
      `uvicorn app.main:app --reload --host 127.0.0.1 --port 8001`
 3. Run tests:
    - `pytest`
+
+Optional **Cloud Run hosting** (GCS mounts, GraphRAG-only bot): see `app/services/public_host/cloud_run/`.
 
 ## Knowledge base → Chroma (two steps)
 
@@ -40,15 +42,23 @@ Review CSVs on disk first; ingest only when ready.
 
 See `Knowledge Base/Red Flags/chunks/README.md`.
 
-## Graph traversal (local v1 CSV)
+## Disposition evidence and reasoning
 
-The chatbot traverses the red-flags knowledge graph from **`Graphs/backups/red flags/v1/source/red_flags_manual_failsafe.csv`** (no Neo4j in the chat path). Each disposition turn runs a three-leg pipeline:
+The chatbot uses the graph pack configured by `DIGIMSK_GRAPH_CSV` (no Neo4j
+in the chat path). Disposition has two independent evidence toggles:
 
-1. **Regex factor matching** — encoder checklist items → canonical Factor names (`inventory.json`).
-2. **RAG path (`DIGIMSK_RAG=1`)** — Clinical_sBERT semantic search over Chroma plus checklist lexical matches; chunk evidence for the generator.
-3. **Graph RAG path (`DIGIMSK_GRAPH_RAG=1`)** — local CSV traversal; uses RAG chunk seeds when both paths are enabled.
+1. **RAG (`DIGIMSK_RAG=1`)** — Clinical_sBERT semantic search over Chroma plus checklist lexical matches.
+2. **GraphRAG (`DIGIMSK_GRAPH_RAG=1`)** — local CSV paths; may use RAG chunk seeds when both are enabled.
 
-**Env:** `DIGIMSK_RAG` (default `1`), `DIGIMSK_GRAPH_RAG` (default `1`), `DIGIMSK_GRAPH_BACKEND=local`. At least one path must be enabled.
+`DIGIMSK_DISPOSITION_MODE=deterministic|agentic` independently selects the
+reasoning style. Deterministic mode traverses/ranks before drafting. Agentic
+mode receives factor matches and an unranked condition-membership tally, then
+retrieves evidence lazily through enabled tools; deterministic traversal runs
+only as an explicitly logged fallback.
+
+At least one of `DIGIMSK_RAG` / `DIGIMSK_GRAPH_RAG` must be enabled.
+`DIGIMSK_GRAPH_INFERENCE=heuristic` preserves current deterministic ranking;
+`bayesian` is currently an interface skeleton and is not yet configured.
 
 **Generator evidence:** RAG and graph paths merge independently into `citations` on disposition turns. Disable either path with `=0`.
 

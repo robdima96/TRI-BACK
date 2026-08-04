@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from langchain_core.messages import HumanMessage
 
@@ -11,7 +11,12 @@ from app.orchestrator.checkpointing import close_checkpointer, get_checkpointer
 from app.orchestrator.graph import build_chat_graph
 from app.orchestrator.messages import transcript_from_messages
 from app.schemas import ChatRequest, ChatResponse
+from app.session_enrichment import build_disposition_record, build_orchestrator_snapshot
 from app.session_store import save_session
+from app.services.public_host.api_auth import (
+    enforce_chat_rate_limit,
+    require_bot_api_key,
+)
 
 
 @asynccontextmanager
@@ -46,12 +51,17 @@ def ready() -> JSONResponse:
 
 # chat endpoint
 # every time a user sends a message, this endpoint is called
-@app.post("/api/v1/chat", response_model=ChatResponse)
-def chat(req: ChatRequest) -> ChatResponse:
+@app.post(
+    "/api/v1/chat",
+    response_model=ChatResponse,
+    dependencies=[Depends(require_bot_api_key)],
+)
+def chat(req: ChatRequest, request: Request) -> ChatResponse:
     if not req.session_id.strip():
         raise HTTPException(status_code=400, detail="session_id is required")
 
     sid = req.session_id.strip()
+    enforce_chat_rate_limit(request, sid)
     config = {"configurable": {"thread_id": sid}} # LangGraph thread_id maps to chat session_id
 
     state = chat_graph.invoke( # invoke the chat graph with the session_id and the user message
@@ -66,16 +76,30 @@ def chat(req: ChatRequest) -> ChatResponse:
     # JSON snapshot for logging / auditing (in addition to LangGraph checkpoints).
     extraction_history = list(state.get("extraction_history") or [])
     turn_extraction = extraction_history[-1] if extraction_history else None
-    transcript = transcript_from_messages(state["messages"])
-    save_session(
-        sid,
-        clinical_checklist=state["clinical_checklist"],
-        messages=transcript,
-        extraction_history=extraction_history,
+    turn_index = int(
+        (turn_extraction or {}).get("turn_index")
+        or len(extraction_history)
+        or 1
     )
+    transcript = transcript_from_messages(state["messages"])
+    graph_trace = state.get("graph_traversal")
+    factor_audit = state.get("factor_matching_audit")
+    orchestrator = build_orchestrator_snapshot(state, turn_index=turn_index)
+    disposition = build_disposition_record(state, turn_index=turn_index)
+
+    # Disposition fields are only passed when this turn produced a disposition
+    # record; merge_session_fields preserves prior disposition_* on question turns.
+    save_kwargs: dict = {
+        "clinical_checklist": state["clinical_checklist"],
+        "messages": transcript,
+        "extraction_history": extraction_history,
+        "orchestrator": orchestrator,
+    }
+    if disposition is not None:
+        save_kwargs["disposition"] = disposition
+    save_session(sid, **save_kwargs)
 
     coverage = state.get("coverage") or {}
-    graph_trace = state.get("graph_traversal")
     return ChatResponse(
         session_id=state["session_id"],
         response=state["final_response"],
@@ -89,6 +113,7 @@ def chat(req: ChatRequest) -> ChatResponse:
         matched_factors=list(state.get("matched_factors") or []),
         candidate_conditions=list(state.get("candidate_conditions") or []),
         traversed_chunk_ids=list(state.get("traversed_chunk_ids") or []),
+        factor_matching_audit=factor_audit,
         clinical_checklist=list(state.get("clinical_checklist") or []),
         extraction_history=extraction_history,
         turn_extraction=turn_extraction,

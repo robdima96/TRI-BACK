@@ -1,0 +1,3 @@
+# Local secrets / scratch for cloud_run helpers
+.env.cloud
+*.local.ps1
