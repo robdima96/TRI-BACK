@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 
 if (-not $RepoRoot) {
   # scripts -> cloud_run -> public_host -> services -> app -> bot -> DigiMSK monorepo root
-  $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\..")).Path
+  $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\..\..")).Path
 }
 
 # Knowledge graph packs live under the monorepo workspace (Graphs/ next to bot/).
@@ -27,7 +27,7 @@ $GraphInv = Join-Path $RepoRoot "Graphs\backups\red flags\v2\inventory.json"
 if (-not (Test-Path $GraphCsv)) { throw "Missing graph CSV: $GraphCsv" }
 if (-not (Test-Path $GraphInv)) { throw "Missing inventory: $GraphInv" }
 if (-not (Test-Path $GliNERDir)) {
-  throw "GliNER directory not found: $GliNERDir — set -GliNERDir or DIGIMSK_GLINER_MODEL_DIR"
+  throw "GliNER directory not found: $GliNERDir - set -GliNERDir or DIGIMSK_GLINER_MODEL_DIR"
 }
 
 Write-Host "Project:  $ProjectId"

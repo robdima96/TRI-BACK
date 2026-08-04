@@ -517,7 +517,9 @@ def encoder_status_detail() -> str:
     from app.services.rag.embeddings import rag_embedding_model_configured
 
     parts: list[str] = []
-    if rag_embedding_model_configured():
+    if not settings.rag_load:
+        parts.append("RAG embedding skipped (DIGIMSK_RAG=0)")
+    elif rag_embedding_model_configured():
         parts.append("embedding ok")
     else:
         backend = getattr(settings, "rag_embedding_backend", "sentence_transformers")
@@ -546,7 +548,7 @@ def encoder_status_detail() -> str:
 def encoder_is_available() -> bool:
     from app.services.rag.embeddings import rag_embedding_model_configured
 
-    if not rag_embedding_model_configured():
+    if settings.rag_load and not rag_embedding_model_configured():
         return False
     if settings.ner_load and settings.gliner_load:
         from app.services.gliner_ner import _get_gliner_model, gliner_configured
