@@ -19,6 +19,7 @@ bot/data/langgraph_checkpoints.sqlite
 bot/data/langgraph_checkpoints.sqlite-*
 bot/.chroma_pytest/
 bot/.tmp_*/
+bot/Embeddings test/
 
 # Study app
 prototypes/digimsk_study_app/.web/

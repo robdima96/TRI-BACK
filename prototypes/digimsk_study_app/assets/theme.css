@@ -163,6 +163,87 @@ body {
   color: var(--text-on-light);
 }
 
+/* Smartphone-style "bot is typing" bubble */
+.bubble-typing {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.4rem;
+  background: var(--white);
+  border: 1px solid var(--blue-100);
+  border-radius: 18px 18px 18px 6px;
+  padding: 0.7rem 1rem;
+  box-shadow: var(--shadow);
+}
+
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 0.9rem;
+}
+
+.typing-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: linear-gradient(
+    120deg,
+    var(--gray-500) 0%,
+    var(--blue-600) 40%,
+    var(--blue-100) 55%,
+    var(--gray-500) 100%
+  );
+  background-size: 220% 100%;
+  animation:
+    typing-bounce 1.35s ease-in-out infinite,
+    typing-shimmer 1.8s linear infinite;
+  will-change: transform, opacity, background-position;
+}
+
+.typing-dot:nth-child(1) {
+  animation-delay: 0s, 0s;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.18s, 0.12s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.36s, 0.24s;
+}
+
+@keyframes typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-0.28rem);
+    opacity: 1;
+  }
+}
+
+@keyframes typing-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing-dot {
+    animation: none;
+    opacity: 0.7;
+    background: var(--gray-500);
+  }
+}
+
 .escalation-banner {
   background: #fef2f2;
   border: 1px solid #fecaca;

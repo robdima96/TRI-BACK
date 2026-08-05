@@ -8,7 +8,7 @@
 param(
   [string]$ProjectId = $(if ($env:DIGIMSK_GCP_PROJECT) { $env:DIGIMSK_GCP_PROJECT } else { "YOUR_GCP_PROJECT" }),
   [string]$Region = "us-central1",
-  [string]$Service = "digimsk-bot",
+  [string]$Service = "digimskbot",
   [string]$Bucket = $(if ($env:DIGIMSK_GCS_BUCKET) { $env:DIGIMSK_GCS_BUCKET } else { "digimsk-cloudrun-$ProjectId" }),
   [string]$Image = "",
   [string]$Memory = "8Gi",

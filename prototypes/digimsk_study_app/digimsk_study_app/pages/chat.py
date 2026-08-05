@@ -5,6 +5,7 @@ from __future__ import annotations
 import reflex as rx
 
 from digimsk_study_app.components.chat_message import chat_message
+from digimsk_study_app.components.typing_indicator import typing_indicator
 from digimsk_study_app.state.chat_state import ChatState
 
 
@@ -49,6 +50,7 @@ def chat_page() -> rx.Component:
                 ),
                 rx.box(
                     rx.foreach(ChatState.messages, chat_message),
+                    rx.cond(ChatState.loading, typing_indicator(), rx.fragment()),
                     class_name="message-list",
                     min_height="50vh",
                 ),
@@ -60,16 +62,11 @@ def chat_page() -> rx.Component:
                         disabled=ChatState.loading,
                         width="100%",
                     ),
-                    rx.hstack(
-                        rx.cond(ChatState.loading, rx.spinner(size="3"), rx.fragment()),
-                        rx.button(
-                            "Send",
-                            on_click=ChatState.send_message,
-                            class_name="btn-primary",
-                            disabled=ChatState.loading,
-                        ),
-                        spacing="3",
-                        align="center",
+                    rx.button(
+                        "Send",
+                        on_click=ChatState.send_message,
+                        class_name="btn-primary",
+                        disabled=ChatState.loading,
                     ),
                     class_name="composer",
                 ),

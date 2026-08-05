@@ -23,7 +23,7 @@ Traditional Chroma RAG is **off** on the hosted bot (`DIGIMSK_RAG=0`); GraphRAG 
 | [Dockerfile.bot](Dockerfile.bot) | Bot image (ready; no models baked in) |
 | [Dockerfile.study](Dockerfile.study) | Study / Reflex + Caddy one-port image |
 | [Caddyfile.study](Caddyfile.study) | Proxy `/_event` + static `/srv` |
-| [cloudbuild.study.yaml](cloudbuild.study.yaml) | Build/push study image only |
+| [cloudbuild.study.yaml](cloudbuild.study.yaml) | Build/push/**deploy** study (`digimsk-study-deploy` trigger) |
 | [scripts/upload_gcs_assets.ps1](scripts/upload_gcs_assets.ps1) | Upload GliNER + v2 graph; ensure `sessions/` |
 | [scripts/deploy_bot.ps1](scripts/deploy_bot.ps1) | Deploy bot with GCS mounts |
 | [scripts/deploy_study.ps1](scripts/deploy_study.ps1) | Deploy public study UI wired to bot |
