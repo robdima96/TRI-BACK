@@ -142,7 +142,8 @@ def engagement_from_messages(
     existing: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Server-side engagement rollup from flat user/assistant transcript."""
-    engagement = dict(existing or default_engagement())
+    prior = dict(existing or default_engagement())
+    engagement = dict(prior)
     turns: list[dict[str, Any]] = []
     turn_index = 0
     for msg in messages:
@@ -162,9 +163,43 @@ def engagement_from_messages(
                 "idle_before_turn_sec": 0.0,
             }
         )
+    # Prefer richer study-app turn timing when lengths still match.
+    prior_turns = prior.get("turns") or []
+    if isinstance(prior_turns, list) and len(prior_turns) == len(turns):
+        for i, turn in enumerate(turns):
+            prev = prior_turns[i] if isinstance(prior_turns[i], dict) else {}
+            for key in (
+                "composer_to_send_ms",
+                "round_trip_ms",
+                "idle_before_turn_sec",
+                "timestamp",
+            ):
+                if prev.get(key) not in (None, "", 0, 0.0):
+                    turn[key] = prev[key]
     engagement["turns"] = turns
     engagement["total_user_words"] = sum(t["user_word_count"] for t in turns)
     engagement["total_user_chars"] = sum(t["user_char_count"] for t in turns)
+
+    up = down = 0
+    for msg in messages:
+        if msg.get("role") != "assistant":
+            continue
+        fb = msg.get("feedback") if isinstance(msg, dict) else None
+        rating = fb.get("rating") if isinstance(fb, dict) else None
+        if rating == "up":
+            up += 1
+        elif rating == "down":
+            down += 1
+    engagement["feedback_up_count"] = up
+    engagement["feedback_down_count"] = down
+
+    for key in (
+        "mean_round_trip_ms",
+        "median_round_trip_ms",
+        "session_duration_sec",
+    ):
+        if prior.get(key) not in (None, ""):
+            engagement[key] = prior[key]
     return engagement
 
 

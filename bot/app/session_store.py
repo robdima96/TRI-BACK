@@ -91,18 +91,82 @@ def _append_by_turn_index(
     return out
 
 
+def merge_messages_preserving_study(
+    existing_messages: list[Any] | None,
+    incoming_messages: list[Any] | None,
+) -> list[dict[str, Any]]:
+    """Keep study overlay fields (feedback, message_id, …) when the bot rewrites messages.
+
+    Aligns by index when ``role``+``content`` match, otherwise by the same pair
+    anywhere in the prior transcript.
+    """
+    old = [m for m in (existing_messages or []) if isinstance(m, dict)]
+    new = [dict(m) for m in (incoming_messages or []) if isinstance(m, dict)]
+    if not old:
+        return new
+    if not new:
+        return old
+
+    preserve_keys = (
+        "message_id",
+        "feedback",
+        "reasoning_text",
+        "graph_json",
+        "has_graph",
+        "timestamp",
+        "citations",
+    )
+
+    def _feedback_has_rating(fb: Any) -> bool:
+        return isinstance(fb, dict) and bool(fb.get("rating"))
+
+    def _find_prior(msg: dict[str, Any], index: int) -> dict[str, Any] | None:
+        if index < len(old):
+            cand = old[index]
+            if cand.get("role") == msg.get("role") and cand.get("content") == msg.get("content"):
+                return cand
+        for cand in old:
+            if cand.get("role") == msg.get("role") and cand.get("content") == msg.get("content"):
+                return cand
+        return None
+
+    for i, msg in enumerate(new):
+        prev = _find_prior(msg, i)
+        if not prev:
+            continue
+        for key in preserve_keys:
+            if key == "feedback":
+                if not _feedback_has_rating(msg.get("feedback")) and _feedback_has_rating(
+                    prev.get("feedback")
+                ):
+                    msg["feedback"] = prev["feedback"]
+                continue
+            incoming_val = msg.get(key)
+            prior_val = prev.get(key)
+            if incoming_val in (None, "", []) and prior_val not in (None, "", []):
+                msg[key] = prior_val
+    return new
+
+
 def merge_session_fields(existing: dict[str, Any], fields: dict[str, Any]) -> dict[str, Any]:
     """Merge a turn update into the session snapshot without wiping disposition.
 
     - ``disposition`` / ``orchestrator`` records append to history lists.
     - Empty/None disposition snapshot fields from a question turn do not clear
       previously stored graph / factor / agent audits.
+    - Incoming ``messages`` keep prior study feedback / message_id overlays.
     """
     merged = dict(existing)
     incoming = dict(fields)
 
     disposition = incoming.pop("disposition", None)
     orchestrator = incoming.pop("orchestrator", None)
+
+    if "messages" in incoming:
+        incoming["messages"] = merge_messages_preserving_study(
+            merged.get("messages"),
+            incoming.get("messages"),
+        )
 
     # Never let callers null-out durable disposition snapshots.
     for key in DISPOSITION_SNAPSHOT_KEYS:

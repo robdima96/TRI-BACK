@@ -47,6 +47,7 @@ $envVars = @(
   "DIGIMSK_BOT_API_KEY=$BotApiKey",
   "DIGIMSK_ADMIN_PASSWORD=$AdminPassword",
   "DIGIMSK_STUDY_DB=/mnt/digimsk/study/digimsk.db",
+  "DIGIMSK_SESSIONS_DIR=/mnt/digimsk/sessions",
   "REFLEX_REDIS_URL=redis://127.0.0.1:6379"
 ) -join ","
 

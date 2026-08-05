@@ -14,6 +14,7 @@ from app.session_enrichment import (
 )
 from app.session_store import (
     is_study_session_id,
+    merge_messages_preserving_study,
     merge_session_fields,
     session_file_path,
 )
@@ -236,3 +237,66 @@ def test_merge_appends_disposition_history():
     assert len(merged["disposition_history"]) == 1
     assert merged["matched_factors"] == ["Diabetes"]
     assert merged["graph_traversal"]["trace_id"] == "d1"
+
+
+def test_merge_messages_preserves_feedback_and_message_id():
+    existing = [
+        {"role": "user", "content": "hi", "message_id": "msg_000"},
+        {
+            "role": "assistant",
+            "content": "How old are you?",
+            "message_id": "msg_001",
+            "feedback": {"rating": "up", "rated_at": "2026-08-05T12:00:00+00:00"},
+        },
+    ]
+    incoming = [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "How old are you?"},
+        {"role": "user", "content": "50"},
+        {"role": "assistant", "content": "What sex?"},
+    ]
+    merged = merge_messages_preserving_study(existing, incoming)
+    assert merged[1]["feedback"]["rating"] == "up"
+    assert merged[1]["message_id"] == "msg_001"
+    assert merged[3]["content"] == "What sex?"
+
+
+def test_merge_session_fields_keeps_feedback_when_bot_rewrites_messages():
+    existing = {
+        "session_id": "admin_1",
+        "messages": [
+            {"role": "user", "content": "hello", "message_id": "msg_000"},
+            {
+                "role": "assistant",
+                "content": "How old are you?",
+                "message_id": "msg_001",
+                "feedback": {"rating": "down", "rated_at": "t0"},
+            },
+        ],
+        "engagement": {"feedback_up_count": 0, "feedback_down_count": 1, "turns": []},
+    }
+    merged = merge_session_fields(
+        existing,
+        {
+            "messages": [
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": "How old are you?"},
+                {"role": "user", "content": "50"},
+                {"role": "assistant", "content": "Next?"},
+            ],
+        },
+    )
+    assert merged["messages"][1]["feedback"]["rating"] == "down"
+    assert merged["messages"][1]["message_id"] == "msg_001"
+
+
+def test_engagement_from_messages_counts_feedback_ratings():
+    messages = [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "a", "feedback": {"rating": "up"}},
+        {"role": "user", "content": "more"},
+        {"role": "assistant", "content": "b", "feedback": {"rating": "down"}},
+    ]
+    engagement = engagement_from_messages(messages, existing=default_engagement())
+    assert engagement["feedback_up_count"] == 1
+    assert engagement["feedback_down_count"] == 1

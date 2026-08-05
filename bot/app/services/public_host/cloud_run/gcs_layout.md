@@ -26,7 +26,7 @@ gs://<bucket>/
     v2/
       red_flags_manual_v2.csv   # from Graphs/backups/red flags/v2/source/
       inventory.json            # from Graphs/backups/red flags/v2/
-  sessions/                 # bot DIGIMSK_SESSION_STORE_DIR (JSON per session)
+  sessions/                 # bot DIGIMSK_SESSION_STORE_DIR + study DIGIMSK_SESSIONS_DIR
   checkpoints/              # optional; prefer local /tmp until SQLite-on-FUSE is validated
 ```
 

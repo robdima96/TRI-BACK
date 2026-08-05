@@ -227,14 +227,16 @@ class ChatState(AuthState):
             updated.append(msg)
         self.messages = updated
 
-        session = load_session(self.session_id) or {}
-        messages = session.get("messages") or []
         rated_at = _now_iso()
+        # UI transcript is authoritative for study overlay (stable ids + ratings).
+        messages = _messages_to_session(self.messages)
         for msg in messages:
             if msg.get("message_id") == message_id and msg.get("role") == "assistant":
                 msg["feedback"] = {"rating": rating, "rated_at": rated_at}
+
+        session = load_session(self.session_id) or {}
         up, down = feedback_tallies(messages)
-        engagement = session.get("engagement") or {}
+        engagement = dict(session.get("engagement") or {})
         engagement["feedback_up_count"] = up
         engagement["feedback_down_count"] = down
         save_session(self.session_id, messages=messages, engagement=engagement)
