@@ -58,6 +58,17 @@ MAX_STORED_MESSAGES = 40
 LOGIN_RATE_LIMIT = 8
 LOGIN_RATE_WINDOW_SEC = 300
 
+# Study-only welcome (not sent to the bot intake pipeline).
+INTRO_MESSAGE_ID = "msg_intro"
+INTRO_DELAY_SEC = _env_int("DIGIMSK_INTRO_DELAY_SEC", 10)
+INTRO_MESSAGE = _env_str(
+    "DIGIMSK_INTRO_MESSAGE",
+    "Hi, I'm DigiMSK. I'll ask a few questions about your musculoskeletal concern "
+    "to help guide next steps. This is not a medical diagnosis—if you think you "
+    "have an emergency, seek urgent care right away. When you're ready, tell me "
+    "what's bothering you.",
+)
+
 PUBLIC_ACCESS = _env_bool("DIGIMSK_PUBLIC_ACCESS", False)
 PUBLIC_BASE_URL = _env_str("DIGIMSK_PUBLIC_BASE_URL", "").rstrip("/")
 # 7 days local; 12 hours when public HTTPS share link is active.

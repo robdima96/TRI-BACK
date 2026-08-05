@@ -76,3 +76,30 @@ def test_merge_checklist_dedupes():
     ]
     merged = merge_checklist_items(prior, current)
     assert len(merged) == 2
+    assert all(row.get("id") for row in merged)
+    assert merged[0]["confirmed"] is False
+
+
+def test_merge_checklist_preserves_stable_ids():
+    from app.orchestrator.checklist import merge_checklist_items
+    from app.schemas import ChecklistItem
+
+    prior = [
+        {
+            "id": "cl_keep",
+            "text": "diabetes",
+            "kind": "comorbidity",
+            "source": "pattern",
+            "label": "comorbidity",
+            "confirmed": True,
+        },
+    ]
+    current = [
+        ChecklistItem(text="diabetes", kind="comorbidity", source="pattern", label="comorbidity"),
+        ChecklistItem(text="2 weeks", kind="duration", source="pattern", label="duration"),
+    ]
+    merged = merge_checklist_items(prior, current)
+    assert merged[0]["id"] == "cl_keep"
+    assert merged[0]["confirmed"] is True
+    assert merged[1]["id"]
+    assert merged[1]["text"] == "2 weeks"

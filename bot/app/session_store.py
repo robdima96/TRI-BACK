@@ -99,6 +99,9 @@ def merge_messages_preserving_study(
 
     Aligns by index when ``role``+``content`` match, otherwise by the same pair
     anywhere in the prior transcript.
+
+    Also keeps leading study-only assistant rows (e.g. canned ``msg_intro``) that
+    never appear in the bot LangGraph transcript.
     """
     old = [m for m in (existing_messages or []) if isinstance(m, dict)]
     new = [dict(m) for m in (incoming_messages or []) if isinstance(m, dict)]
@@ -120,15 +123,30 @@ def merge_messages_preserving_study(
     def _feedback_has_rating(fb: Any) -> bool:
         return isinstance(fb, dict) and bool(fb.get("rating"))
 
+    def _same_turn(a: dict[str, Any], b: dict[str, Any]) -> bool:
+        return a.get("role") == b.get("role") and a.get("content") == b.get("content")
+
     def _find_prior(msg: dict[str, Any], index: int) -> dict[str, Any] | None:
         if index < len(old):
             cand = old[index]
-            if cand.get("role") == msg.get("role") and cand.get("content") == msg.get("content"):
+            if _same_turn(cand, msg):
                 return cand
         for cand in old:
-            if cand.get("role") == msg.get("role") and cand.get("content") == msg.get("content"):
+            if _same_turn(cand, msg):
                 return cand
         return None
+
+    def _in_new(cand: dict[str, Any]) -> bool:
+        return any(_same_turn(cand, msg) for msg in new)
+
+    # Study-only prefix (canned intro): leading assistants absent from bot transcript.
+    prefix: list[dict[str, Any]] = []
+    for cand in old:
+        if cand.get("role") != "assistant":
+            break
+        if _in_new(cand):
+            break
+        prefix.append(dict(cand))
 
     for i, msg in enumerate(new):
         prev = _find_prior(msg, i)
@@ -145,7 +163,7 @@ def merge_messages_preserving_study(
             prior_val = prev.get(key)
             if incoming_val in (None, "", []) and prior_val not in (None, "", []):
                 msg[key] = prior_val
-    return new
+    return prefix + new
 
 
 def merge_session_fields(existing: dict[str, Any], fields: dict[str, Any]) -> dict[str, Any]:

@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 
 import reflex as rx
 
 from digimsk_study_app.adapters.presentation import get_presentation_adapter
-from digimsk_study_app.config import IDLE_TIMEOUT_SEC
+from digimsk_study_app.config import (
+    IDLE_TIMEOUT_SEC,
+    INTRO_DELAY_SEC,
+    INTRO_MESSAGE,
+    INTRO_MESSAGE_ID,
+)
 from digimsk_study_app.models.chat_types import (
     ChatMessageItem,
     CitationItem,
@@ -73,6 +79,21 @@ def _session_messages_to_chat(items: list[dict] | None) -> list[ChatMessageItem]
     return out
 
 
+def should_play_intro(messages: list[ChatMessageItem] | list[dict]) -> bool:
+    """True when this session has no transcript yet (intro not shown)."""
+    return len(messages) == 0
+
+
+def build_intro_message(*, timestamp: str | None = None) -> ChatMessageItem:
+    """Study-local welcome bubble (never posted to ``POST /api/v1/chat``)."""
+    return empty_message(
+        message_id=INTRO_MESSAGE_ID,
+        role="assistant",
+        content=INTRO_MESSAGE,
+        timestamp=timestamp or _now_iso(),
+    )
+
+
 class ChatState(AuthState):
     messages: list[ChatMessageItem] = []
     draft: str = ""
@@ -105,11 +126,53 @@ class ChatState(AuthState):
         self.escalated = bool(session.get("escalated"))
         self.safety_reason = str(session.get("safety_reason") or "")
 
-    @rx.event
-    def mount_chat(self):
-        if not self._ensure_authenticated():
-            return rx.redirect("/")
-        self._load_chat_from_session()
+    def _persist_messages(self) -> None:
+        session = load_session(self.session_id) or {}
+        engagement = session.get("engagement") or {}
+        msg_dicts = _messages_to_session(self.messages)
+        up, down = feedback_tallies(msg_dicts)
+        engagement = dict(engagement)
+        engagement["feedback_up_count"] = up
+        engagement["feedback_down_count"] = down
+        save_session(
+            self.session_id,
+            study_id=self.study_id,
+            role=self.role,
+            group_id=self.group_id,
+            login_count=self.login_count,
+            login_at=self.login_at,
+            turn_count=self.turn_count,
+            messages=msg_dicts,
+            engagement=engagement,
+        )
+
+    @rx.event(background=True)
+    async def mount_chat(self):
+        async with self:
+            if not self._ensure_authenticated():
+                yield rx.redirect("/")
+                return
+            self._load_chat_from_session()
+            if not should_play_intro(self.messages):
+                return
+            # Typing bubble while the intentional delay runs (warmup started at login).
+            self.loading = True
+            self.error = ""
+
+        await asyncio.sleep(float(INTRO_DELAY_SEC))
+
+        async with self:
+            if not self._ensure_authenticated():
+                self.loading = False
+                return
+            # Another tab / remount may have written the intro already.
+            self._load_chat_from_session()
+            if not should_play_intro(self.messages):
+                self.loading = False
+                return
+            self.messages = [build_intro_message()]
+            self._persist_messages()
+            self.loading = False
 
     @rx.event
     def set_draft(self, value: str):
@@ -213,30 +276,32 @@ class ChatState(AuthState):
             self.loading = False
 
     @rx.event
-    async def rate_message(self, message_id: str, rating: str):
+    def rate_message(self, message_id: str, rating: str):
+        if not self._ensure_authenticated():
+            return
         if rating not in ("up", "down"):
             return
-        if not self._ensure_authenticated():
-            self.error = "Session expired. Please log in again."
-            return
-
+        # Prefer the live UI transcript so feedback sticks even when the shared
+        # session file was briefly overwritten by a concurrent bot save.
         updated: list[ChatMessageItem] = []
+        found = False
         for msg in self.messages:
-            if msg["message_id"] == message_id and msg["role"] == "assistant":
-                msg = {**msg, "feedback_rating": rating}
-            updated.append(msg)
+            if msg["message_id"] == message_id:
+                updated.append({**msg, "feedback_rating": rating})
+                found = True
+            else:
+                updated.append(msg)
+        if not found:
+            return
         self.messages = updated
 
-        rated_at = _now_iso()
-        # UI transcript is authoritative for study overlay (stable ids + ratings).
         messages = _messages_to_session(self.messages)
         for msg in messages:
-            if msg.get("message_id") == message_id and msg.get("role") == "assistant":
-                msg["feedback"] = {"rating": rating, "rated_at": rated_at}
-
-        session = load_session(self.session_id) or {}
+            if msg.get("message_id") == message_id:
+                msg["feedback"] = {"rating": rating, "rated_at": _now_iso()}
+        engagement = (load_session(self.session_id) or {}).get("engagement") or {}
         up, down = feedback_tallies(messages)
-        engagement = dict(session.get("engagement") or {})
+        engagement = recompute_engagement(engagement)
         engagement["feedback_up_count"] = up
         engagement["feedback_down_count"] = down
         save_session(self.session_id, messages=messages, engagement=engagement)

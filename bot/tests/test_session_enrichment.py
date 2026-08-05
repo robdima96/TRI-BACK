@@ -261,6 +261,35 @@ def test_merge_messages_preserves_feedback_and_message_id():
     assert merged[3]["content"] == "What sex?"
 
 
+def test_merge_messages_keeps_study_intro_prefix_and_feedback():
+    existing = [
+        {
+            "role": "assistant",
+            "content": "Welcome to DigiMSK.",
+            "message_id": "msg_intro",
+            "feedback": {"rating": "up", "rated_at": "t0"},
+        },
+        {"role": "user", "content": "low back pain", "message_id": "msg_000_u"},
+        {
+            "role": "assistant",
+            "content": "How old are you?",
+            "message_id": "msg_000",
+            "feedback": {"rating": "down", "rated_at": "t1"},
+        },
+    ]
+    # Bot LangGraph transcript has no canned intro.
+    incoming = [
+        {"role": "user", "content": "low back pain"},
+        {"role": "assistant", "content": "How old are you?"},
+    ]
+    merged = merge_messages_preserving_study(existing, incoming)
+    assert merged[0]["message_id"] == "msg_intro"
+    assert merged[0]["feedback"]["rating"] == "up"
+    assert merged[1]["content"] == "low back pain"
+    assert merged[2]["feedback"]["rating"] == "down"
+    assert merged[2]["message_id"] == "msg_000"
+
+
 def test_merge_session_fields_keeps_feedback_when_bot_rewrites_messages():
     existing = {
         "session_id": "admin_1",

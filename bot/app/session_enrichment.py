@@ -25,24 +25,36 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
-def _item_key(d: dict[str, str]) -> tuple[str, str, str, str]:
+def _item_key(d: dict[str, Any]) -> tuple[str, str, str, str]:
     return (
-        d.get("text", ""),
-        d.get("kind", ""),
-        d.get("source", ""),
-        d.get("label", ""),
+        str(d.get("text", "")),
+        str(d.get("kind", "")),
+        str(d.get("source", "")),
+        str(d.get("label", "")),
     )
 
 
-def checklist_item_dict(item: ChecklistItem | dict[str, str]) -> dict[str, str]:
+def checklist_item_dict(item: ChecklistItem | dict[str, Any]) -> dict[str, Any]:
     if isinstance(item, ChecklistItem):
         return item.model_dump()
-    return {
+    out: dict[str, Any] = {
         "text": str(item.get("text", "")),
         "kind": str(item.get("kind", "")),
         "source": str(item.get("source", "")),
         "label": str(item.get("label", "")),
     }
+    raw_id = str(item.get("id") or "").strip()
+    if raw_id:
+        out["id"] = raw_id
+    if "confirmed" in item:
+        confirmed = item.get("confirmed")
+        if isinstance(confirmed, bool):
+            out["confirmed"] = confirmed
+        elif isinstance(confirmed, str):
+            out["confirmed"] = confirmed.strip().casefold() in {"true", "1", "yes"}
+        else:
+            out["confirmed"] = bool(confirmed)
+    return out
 
 
 def split_checklist_by_source(

@@ -2,7 +2,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 import logging
 
-from app.orchestrator.checklist import merge_checklist_items
+from app.orchestrator.checklist import ensure_checklist_ids, merge_checklist_items
 from app.session_enrichment import append_turn_extraction, build_turn_extraction_record
 from app.services.intake_enricher import propose_checklist_enrichment
 
@@ -143,14 +143,18 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
         turn_index=turn_index,
     )
 
-    final_checklist = encoder_merged
+    final_checklist = ensure_checklist_ids([dict(x) for x in encoder_merged])
     if enrichment.resulting_checklist is not None:
         # Trusted post-filter snapshot (adds / modifies / deletes already validated).
-        final_checklist = [dict(x) for x in enrichment.resulting_checklist]
+        final_checklist = ensure_checklist_ids(
+            [dict(x) for x in enrichment.resulting_checklist]
+        )
         state["clinical_checklist"] = final_checklist
     elif enrichment.applied_items:
         # Backward-compatible path if only additions were returned.
         final_checklist = merge_checklist_items(encoder_merged, enrichment.applied_items)
+        state["clinical_checklist"] = final_checklist
+    else:
         state["clinical_checklist"] = final_checklist
 
     if enrichment.comorbidities_acknowledged:

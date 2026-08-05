@@ -27,10 +27,14 @@ class ChecklistItem(BaseModel):
 
     text: str
     kind: str
-    # pattern | gliner | safety_phrase
+    # pattern | gliner | safety_phrase | llm | slot_answer | ...
     source: str
     # optional: NER label, risk id, or pattern label (demographic, duration, comorbidity, ...)
     label: str = ""
+    # Stable row id (assigned once; preserved across modify). Empty until ensured.
+    id: str = ""
+    # True once LLM enrichment successfully adds or modifies this row.
+    confirmed: bool = False
 
 
 class ClinicalChecklist(BaseModel):
@@ -65,6 +69,6 @@ class ChatResponse(BaseModel):
     candidate_conditions: list[str] = Field(default_factory=list)
     traversed_chunk_ids: list[str] = Field(default_factory=list)
     factor_matching_audit: dict | None = None
-    clinical_checklist: list[dict[str, str]] = Field(default_factory=list)
+    clinical_checklist: list[dict] = Field(default_factory=list)
     extraction_history: list[dict] = Field(default_factory=list)
     turn_extraction: dict | None = None

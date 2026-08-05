@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import reflex as rx
 
+from digimsk_study_app.adapters.http_client import ping_bot_ready
 from digimsk_study_app.auth.hydrate import auth_fields_from_session
 from digimsk_study_app.auth.session import login_admin, login_participant
 from digimsk_study_app.config import (
@@ -71,6 +72,11 @@ class AuthState(rx.State):
         self._failed_attempts = [t for t in self._failed_attempts if t >= window_start]
         return len(self._failed_attempts) >= LOGIN_RATE_LIMIT
 
+    @rx.event(background=True)
+    async def ping_bot_warmup(self):
+        """Fire-and-forget wake of the bot service (GliNER / Vertex lifespan)."""
+        await ping_bot_ready()
+
     @rx.event
     async def login_participant_submit(self, form_data: dict):
         if self._rate_limited():
@@ -86,7 +92,8 @@ class AuthState(rx.State):
             self.login_error = result.error or "Invalid credentials"
             return
         self._apply_login(result)
-        return rx.redirect("/chat")
+        # Warmup starts immediately; chat mount shows the delayed intro in parallel.
+        return [AuthState.ping_bot_warmup, rx.redirect("/chat")]
 
     @rx.event
     async def login_admin_submit(self, form_data: dict):
@@ -109,7 +116,7 @@ class AuthState(rx.State):
             return
         self.admin_selected_arm = selected_arm
         self._apply_login(result)
-        return rx.redirect("/chat")
+        return [AuthState.ping_bot_warmup, rx.redirect("/chat")]
 
     def _apply_login(self, result) -> None:
         self.is_authenticated = True

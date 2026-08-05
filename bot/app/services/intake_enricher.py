@@ -8,6 +8,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from app.orchestrator.checklist import (
+    ensure_checklist_ids,
+    kind_family,
+    new_checklist_id,
+)
 from app.orchestrator.coverage import coverage_intake_summary, evaluate_checklist_coverage
 from app.orchestrator.intake_models import SlotName
 from app.orchestrator.intake_slots import select_next_missing_slot
@@ -108,13 +113,13 @@ class ChecklistOperation:
     text: str = ""
     kind: str = ""
     label: str = ""
-    # 1-based index into the checklist shown to the LLM (modify / delete only)
-    index: int | None = None
+    # Stable checklist row id (modify / delete only)
+    id: str | None = None
 
     def to_log_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {"op": self.op, "reason": self.reason}
-        if self.index is not None:
-            out["index"] = self.index
+        if self.id is not None:
+            out["id"] = self.id
         if self.op in ("add", "modify"):
             out["text"] = self.text
             out["kind"] = self.kind
@@ -131,8 +136,8 @@ class IntakeEnrichmentResult:
     applied: list[ChecklistItem] = field(default_factory=list)
     modified: list[dict[str, Any]] = field(default_factory=list)
     deleted: list[dict[str, Any]] = field(default_factory=list)
-    rejected: list[dict[str, str]] = field(default_factory=list)
-    resulting_checklist: list[dict[str, str]] | None = None
+    rejected: list[dict[str, Any]] = field(default_factory=list)
+    resulting_checklist: list[dict[str, Any]] | None = None
     comorbidities_acknowledged: bool = False
     # Draft next intake question from the same LLM call (may be unused if the
     # deterministic planner picks a different slot after applying ops).
@@ -169,14 +174,16 @@ class IntakeEnrichmentResult:
         return out
 
 
-def _format_checklist_block(checklist: list[dict[str, str]]) -> str:
+def _format_checklist_block(checklist: list[dict[str, Any]]) -> str:
     if not checklist:
         return "(empty)"
     lines: list[str] = []
     for i, row in enumerate(checklist, 1):
+        confirmed = "yes" if row.get("confirmed") else "no"
         lines.append(
-            f"  {i}. text={row.get('text', '')!r} kind={row.get('kind', '')!r} "
-            f"source={row.get('source', '')!r} label={row.get('label', '')!r}"
+            f"  [{row.get('id', '')}] ({i}) text={row.get('text', '')!r} "
+            f"kind={row.get('kind', '')!r} source={row.get('source', '')!r} "
+            f"label={row.get('label', '')!r} confirmed={confirmed}"
         )
     return "\n".join(lines)
 
@@ -317,23 +324,19 @@ def _validate_proposed_row(raw: Any) -> ProposedChecklistRow | None:
     )
 
 
-def _row_identity(row: dict[str, str]) -> tuple[str, str, str]:
+def _row_identity(row: dict[str, Any]) -> tuple[str, str, str]:
     return (
-        row.get("text", "").casefold(),
-        row.get("kind", ""),
-        row.get("label", "").casefold(),
+        str(row.get("text", "")).casefold(),
+        str(row.get("kind", "")),
+        str(row.get("label", "")).casefold(),
     )
 
 
-def _parse_index(raw: Any) -> int | None:
-    if isinstance(raw, bool):
+def _parse_row_id(raw: Any) -> str | None:
+    if raw is None or isinstance(raw, bool):
         return None
-    if isinstance(raw, int):
-        return raw if raw >= 1 else None
-    if isinstance(raw, str) and raw.strip().isdigit():
-        value = int(raw.strip())
-        return value if value >= 1 else None
-    return None
+    value = str(raw).strip()
+    return value or None
 
 
 def _validate_operation(raw: Any) -> ChecklistOperation | None:
@@ -351,10 +354,10 @@ def _validate_operation(raw: Any) -> ChecklistOperation | None:
     reason = str(raw.get("reason") or "").strip() or "Inferred from conversation context."
 
     if op == "delete":
-        index = _parse_index(raw.get("index"))
-        if index is None:
+        row_id = _parse_row_id(raw.get("id"))
+        if row_id is None:
             return None
-        return ChecklistOperation(op="delete", reason=reason, index=index)
+        return ChecklistOperation(op="delete", reason=reason, id=row_id)
 
     row = _validate_row_fields(
         str(raw.get("text") or ""),
@@ -374,8 +377,8 @@ def _validate_operation(raw: Any) -> ChecklistOperation | None:
             label=row.label,
         )
 
-    index = _parse_index(raw.get("index"))
-    if index is None:
+    row_id = _parse_row_id(raw.get("id"))
+    if row_id is None:
         return None
     return ChecklistOperation(
         op="modify",
@@ -383,7 +386,7 @@ def _validate_operation(raw: Any) -> ChecklistOperation | None:
         text=row.text,
         kind=row.kind,
         label=row.label,
-        index=index,
+        id=row_id,
     )
 
 
@@ -408,92 +411,109 @@ def _collect_raw_operations(payload: dict[str, Any]) -> list[Any]:
 
 
 def apply_checklist_operations(
-    checklist: list[dict[str, str]],
+    checklist: list[dict[str, Any]],
     operations: list[ChecklistOperation],
 ) -> tuple[
-    list[dict[str, str]],
+    list[dict[str, Any]],
     list[ChecklistItem],
     list[dict[str, Any]],
     list[dict[str, Any]],
-    list[dict[str, str]],
+    list[dict[str, Any]],
 ]:
     """
-    Apply validated ops against the numbered starting checklist.
+    Apply validated ops against the starting checklist by stable row id.
 
-    Indexes always refer to the original checklist numbering (stable across the
-    batch). Delete wins over modify on the same index. Adds append after
-    surviving rows and are deduped by (text, kind, label).
+    Ids always refer to the original checklist (stable across the batch).
+    Delete wins over modify on the same id. Adds append after surviving rows
+    and are deduped by (text, kind, label). Successful add/modify rows are
+    marked ``confirmed=True``. Confirmed rows reject cross-family modifies.
     """
-    n = len(checklist)
-    delete_idxs: set[int] = set()
-    modify_by_idx: dict[int, ChecklistOperation] = {}
+    starting = ensure_checklist_ids([dict(r) for r in checklist])
+    by_id = {str(row["id"]): row for row in starting}
+    delete_ids: set[str] = set()
+    modify_by_id: dict[str, ChecklistOperation] = {}
     adds: list[ChecklistOperation] = []
-    rejected: list[dict[str, str]] = []
+    rejected: list[dict[str, Any]] = []
 
     for op in operations:
         if op.op == "add":
             adds.append(op)
             continue
-        assert op.index is not None
-        if op.index < 1 or op.index > n:
+        assert op.id is not None
+        row_id = op.id
+        if row_id not in by_id:
             rejected.append(
                 {
-                    **{k: str(v) for k, v in op.to_log_dict().items()},
-                    "reject_reason": "index_out_of_range",
+                    **op.to_log_dict(),
+                    "reject_reason": "unknown_id",
                 }
             )
             continue
         if op.op == "delete":
-            delete_idxs.add(op.index)
-            modify_by_idx.pop(op.index, None)
+            delete_ids.add(row_id)
+            modify_by_id.pop(row_id, None)
             continue
         # modify
-        if op.index in delete_idxs:
+        if row_id in delete_ids:
             rejected.append(
                 {
-                    **{k: str(v) for k, v in op.to_log_dict().items()},
-                    "reject_reason": "conflicting_delete_on_same_index",
+                    **op.to_log_dict(),
+                    "reject_reason": "conflicting_delete_on_same_id",
                 }
             )
             continue
-        modify_by_idx[op.index] = op
+        target = by_id[row_id]
+        if bool(target.get("confirmed")) and kind_family(
+            str(target.get("kind", "")), str(target.get("label", ""))
+        ) != kind_family(op.kind, op.label):
+            rejected.append(
+                {
+                    **op.to_log_dict(),
+                    "reject_reason": "kind_family_mismatch",
+                }
+            )
+            continue
+        modify_by_id[row_id] = op
 
     applied: list[ChecklistItem] = []
     modified: list[dict[str, Any]] = []
     deleted: list[dict[str, Any]] = []
-    resulting: list[dict[str, str]] = []
+    resulting: list[dict[str, Any]] = []
     seen = set()
 
-    for i, row in enumerate(checklist, 1):
-        if i in delete_idxs:
+    for row in starting:
+        row_id = str(row["id"])
+        if row_id in delete_ids:
             deleted.append(
                 {
-                    "index": i,
+                    "id": row_id,
                     "before": checklist_item_dict(row),
                     "reason": next(
                         (
                             op.reason
                             for op in operations
-                            if op.op == "delete" and op.index == i
+                            if op.op == "delete" and op.id == row_id
                         ),
                         "Removed based on conversation context.",
                     ),
                 }
             )
             continue
-        if i in modify_by_idx:
-            op = modify_by_idx[i]
-            new_row = {
+        if row_id in modify_by_id:
+            op = modify_by_id[row_id]
+            new_row: dict[str, Any] = {
+                "id": row_id,
                 "text": op.text,
                 "kind": op.kind,
                 "source": "llm",
                 "label": op.label,
+                "confirmed": True,
             }
             key = _row_identity(new_row)
             if key in seen:
                 rejected.append(
                     {
-                        **{k: str(v) for k, v in op.to_log_dict().items()},
+                        **op.to_log_dict(),
                         "reject_reason": "duplicate_of_existing_checklist_row",
                     }
                 )
@@ -504,23 +524,36 @@ def apply_checklist_operations(
                     resulting.append(dict(row))
                 continue
             if key == _row_identity(row) and new_row["text"] == row.get("text"):
-                # No material change (ignore source flip alone when text/kind/label same)
-                key_orig = _row_identity(row)
+                # No material change to text/kind/label; still confirm if enrichment
+                # re-accepted the same fact.
+                kept = dict(row)
+                kept["confirmed"] = True
+                key_orig = _row_identity(kept)
                 if key_orig not in seen:
                     seen.add(key_orig)
-                    resulting.append(dict(row))
-                rejected.append(
-                    {
-                        **{k: str(v) for k, v in op.to_log_dict().items()},
-                        "reject_reason": "no_material_change",
-                    }
-                )
+                    resulting.append(kept)
+                if not row.get("confirmed"):
+                    modified.append(
+                        {
+                            "id": row_id,
+                            "before": checklist_item_dict(row),
+                            "after": checklist_item_dict(kept),
+                            "reason": op.reason,
+                        }
+                    )
+                else:
+                    rejected.append(
+                        {
+                            **op.to_log_dict(),
+                            "reject_reason": "no_material_change",
+                        }
+                    )
                 continue
             seen.add(key)
             resulting.append(new_row)
             modified.append(
                 {
-                    "index": i,
+                    "id": row_id,
                     "before": checklist_item_dict(row),
                     "after": dict(new_row),
                     "reason": op.reason,
@@ -535,17 +568,20 @@ def apply_checklist_operations(
         resulting.append(dict(row))
 
     for op in adds:
+        row_id = new_checklist_id()
         item = ChecklistItem(
             text=op.text,
             kind=op.kind,
             source="llm",
             label=op.label,
+            id=row_id,
+            confirmed=True,
         )
         key = _row_identity(item.model_dump())
         if key in seen:
             rejected.append(
                 {
-                    **{k: str(v) for k, v in op.to_log_dict().items()},
+                    **op.to_log_dict(),
                     "reject_reason": "duplicate_of_existing_checklist_row",
                 }
             )
@@ -579,7 +615,7 @@ def _parse_next_intake(
 
 def _build_enrichment_messages(
     *,
-    checklist: list[dict[str, str]],
+    checklist: list[dict[str, Any]],
     conversation_history: list[dict[str, str]],
     latest_user_message: str,
     last_asked_slot: SlotName | None,
@@ -627,15 +663,24 @@ def _build_enrichment_messages(
         "Important rules for checklist_operations:\n"
         "- Prefer evidence already stated by the patient; do not invent medications, "
         "diagnoses, or unrelated conditions.\n"
-        "- Use 1-based indexes from the numbered Existing checklist for modify/delete.\n"
+        "- Address modify/delete by the stable row id in brackets (e.g. cl_a1b2c3d4e5f6). "
+        "Do NOT use numeric indexes to target rows.\n"
+        "- New comorbidities, medications, or unrelated conditions → always use add. "
+        "Never modify an existing row into a different clinical topic "
+        "(e.g. do not overwrite a fall/trauma provocative row with a medication).\n"
+        "- modify only to refine the SAME fact: wording, specificity, or a better "
+        "allowed kind/label for that same finding (e.g. refine severity text, upgrade "
+        "'fall' to 'fell from a ladder' while staying provocative).\n"
+        "- Rows marked confirmed=yes were already accepted; do not silently overwrite "
+        "them with a different kind of fact—add a new row instead.\n"
         "- If the assistant asked for confirmation (e.g. chief complaint) and the "
         "patient answered yes/affirmed, add the chief complaint as a symptom row.\n"
         "- If the patient restated their main symptom, add or correct it as "
         "kind=ner_entity, label=symptom.\n"
-        "- Modify when a prior row is incomplete, mistyped, contradicted, or should use "
-        "a better allowed kind/label (e.g. refine severity text).\n"
         "- Delete only when clearly unsupported now (explicit correction, clear "
-        "negation of that fact, or obvious extractor error). Do not delete uncertain rows.\n"
+        "negation of that fact, or obvious extractor error). Do not delete uncertain "
+        "rows. Do not delete trauma/mechanism rows unless the patient explicitly "
+        "denied them.\n"
         "- Do not duplicate facts already present after your changes.\n"
         "- Each operation needs a short reason string.\n\n"
         "Allowed kinds and labels:\n"
@@ -665,7 +710,7 @@ def _build_enrichment_messages(
         "set next_intake to null.\n\n"
         f"Last intake slot asked by assistant: {slot_hint}\n"
         f"Coverage before enrichment:\n{gap_summary}\n\n"
-        f"Existing checklist (1-based indexes for modify/delete):\n"
+        f"Existing checklist (modify/delete by id in brackets; numbers are display-only):\n"
         f"{_format_checklist_block(checklist)}\n\n"
         f"Conversation transcript:\n{_format_history_block(conversation_history)}\n"
         f"Latest patient message: {latest_user_message.strip() or '(none)'}\n\n"
@@ -675,9 +720,9 @@ def _build_enrichment_messages(
         '  "comorbidities_acknowledged": false,\n'
         '  "checklist_operations": [\n'
         '    {"op": "add", "text": "...", "kind": "...", "label": "...", "reason": "..."},\n'
-        '    {"op": "modify", "index": 1, "text": "...", "kind": "...", "label": "...", '
+        '    {"op": "modify", "id": "cl_...", "text": "...", "kind": "...", "label": "...", '
         '"reason": "..."},\n'
-        '    {"op": "delete", "index": 2, "reason": "..."}\n'
+        '    {"op": "delete", "id": "cl_...", "reason": "..."}\n'
         "  ],\n"
         '  "next_intake": {"slot": "age", "question": "How old are you?"}\n'
         "}\n"
@@ -698,7 +743,7 @@ def _build_enrichment_messages(
 
 def propose_checklist_enrichment(
     *,
-    checklist: list[dict[str, str]],
+    checklist: list[dict[str, Any]],
     conversation_history: list[dict[str, str]],
     latest_user_message: str,
     last_asked_slot: SlotName | None = None,
@@ -712,8 +757,10 @@ def propose_checklist_enrichment(
 
     ``evaluate_checklist_coverage`` remains authoritative for which slot is
     asked; the drafted question is only used when it matches the planner's
-    chosen slot. Mutations still pass kind/label/index filters before merge.
+    chosen slot. Mutations still pass kind/label/id filters before merge.
     """
+    checklist = ensure_checklist_ids([dict(r) for r in checklist])
+
     if not generator_model_configured():
         return IntakeEnrichmentResult(
             status="unavailable",

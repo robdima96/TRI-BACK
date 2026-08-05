@@ -94,40 +94,48 @@ def test_enrich_checklist_node_applies_modify_and_delete():
         summary_reason="Corrected symptom; removed false palliative.",
         modified=[
             {
-                "index": 1,
+                "id": "cl_sx",
                 "before": {
+                    "id": "cl_sx",
                     "text": "knee pain",
                     "kind": "ner_entity",
                     "source": "gliner",
                     "label": "symptom",
+                    "confirmed": False,
                 },
                 "after": {
+                    "id": "cl_sx",
                     "text": "low back pain",
                     "kind": "ner_entity",
                     "source": "llm",
                     "label": "symptom",
+                    "confirmed": True,
                 },
                 "reason": "Patient corrected region.",
             }
         ],
         deleted=[
             {
-                "index": 2,
+                "id": "cl_pal",
                 "before": {
+                    "id": "cl_pal",
                     "text": "rest",
                     "kind": "palliative",
                     "source": "pattern",
                     "label": "palliative",
+                    "confirmed": False,
                 },
                 "reason": "Patient denied rest helps.",
             }
         ],
         resulting_checklist=[
             {
+                "id": "cl_sx",
                 "text": "low back pain",
                 "kind": "ner_entity",
                 "source": "llm",
                 "label": "symptom",
+                "confirmed": True,
             }
         ],
     )

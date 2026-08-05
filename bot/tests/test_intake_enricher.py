@@ -44,16 +44,28 @@ def test_validate_proposed_row_rejects_unknown_kind():
     )
 
 
-def test_apply_modify_and_delete_with_stable_indexes():
+def test_apply_modify_and_delete_with_stable_ids():
     checklist = [
-        {"text": "70", "kind": "demographic", "source": "pattern", "label": "age"},
-        {"text": "knee pain", "kind": "ner_entity", "source": "gliner", "label": "symptom"},
-        {"text": "ibuprofen", "kind": "palliative", "source": "pattern", "label": "palliative"},
+        {"id": "cl_age", "text": "70", "kind": "demographic", "source": "pattern", "label": "age"},
+        {
+            "id": "cl_sx",
+            "text": "knee pain",
+            "kind": "ner_entity",
+            "source": "gliner",
+            "label": "symptom",
+        },
+        {
+            "id": "cl_pal",
+            "text": "ibuprofen",
+            "kind": "palliative",
+            "source": "pattern",
+            "label": "palliative",
+        },
     ]
     ops = [
         ChecklistOperation(
             op="modify",
-            index=2,
+            id="cl_sx",
             text="low back pain",
             kind="ner_entity",
             label="symptom",
@@ -61,7 +73,7 @@ def test_apply_modify_and_delete_with_stable_indexes():
         ),
         ChecklistOperation(
             op="delete",
-            index=3,
+            id="cl_pal",
             reason="Patient said medication was not for this pain.",
         ),
         ChecklistOperation(
@@ -78,19 +90,25 @@ def test_apply_modify_and_delete_with_stable_indexes():
     assert not rejected
     assert len(deleted) == 1
     assert deleted[0]["before"]["text"] == "ibuprofen"
+    assert deleted[0]["id"] == "cl_pal"
     assert len(modified) == 1
     assert modified[0]["after"]["text"] == "low back pain"
+    assert modified[0]["after"]["id"] == "cl_sx"
+    assert modified[0]["after"]["confirmed"] is True
     assert [r["text"] for r in resulting] == ["70", "low back pain", "3 months"]
     assert len(applied) == 1
     assert applied[0].text == "3 months"
+    assert applied[0].confirmed is True
+    assert applied[0].id
+    assert resulting[1]["id"] == "cl_sx"
 
 
-def test_apply_rejects_out_of_range_and_duplicate_add():
+def test_apply_rejects_unknown_id_and_duplicate_add():
     checklist = [
-        {"text": "70", "kind": "demographic", "source": "pattern", "label": "age"},
+        {"id": "cl_age", "text": "70", "kind": "demographic", "source": "pattern", "label": "age"},
     ]
     ops = [
-        ChecklistOperation(op="delete", index=9, reason="bad index"),
+        ChecklistOperation(op="delete", id="cl_missing", reason="bad id"),
         ChecklistOperation(
             op="add",
             text="70",
@@ -102,28 +120,35 @@ def test_apply_rejects_out_of_range_and_duplicate_add():
     resulting, applied, modified, deleted, rejected = apply_checklist_operations(
         checklist, ops
     )
-    assert resulting == checklist
+    assert resulting[0]["text"] == "70"
+    assert resulting[0]["id"] == "cl_age"
     assert not applied and not modified and not deleted
     assert {r["reject_reason"] for r in rejected} == {
-        "index_out_of_range",
+        "unknown_id",
         "duplicate_of_existing_checklist_row",
     }
 
 
-def test_delete_wins_over_modify_on_same_index():
+def test_delete_wins_over_modify_on_same_id():
     checklist = [
-        {"text": "sharp", "kind": "symptom_quality", "source": "pattern", "label": "symptom_quality"},
+        {
+            "id": "cl_q",
+            "text": "sharp",
+            "kind": "symptom_quality",
+            "source": "pattern",
+            "label": "symptom_quality",
+        },
     ]
     ops = [
         ChecklistOperation(
             op="modify",
-            index=1,
+            id="cl_q",
             text="dull",
             kind="symptom_quality",
             label="symptom_quality",
             reason="correction",
         ),
-        ChecklistOperation(op="delete", index=1, reason="retracted"),
+        ChecklistOperation(op="delete", id="cl_q", reason="retracted"),
     ]
     resulting, applied, modified, deleted, rejected = apply_checklist_operations(
         checklist, ops
@@ -131,6 +156,76 @@ def test_delete_wins_over_modify_on_same_index():
     assert resulting == []
     assert deleted and not modified and not applied
     assert not rejected  # modify cleared when delete arrives after
+
+
+def test_apply_rejects_kind_family_mismatch_on_confirmed_row():
+    checklist = [
+        {
+            "id": "cl_trauma",
+            "text": "fell from a ladder",
+            "kind": "provocative",
+            "source": "llm",
+            "label": "provocative",
+            "confirmed": True,
+        },
+    ]
+    ops = [
+        ChecklistOperation(
+            op="modify",
+            id="cl_trauma",
+            text="aspirin",
+            kind="comorbidity",
+            label="comorbidity",
+            reason="Patient takes aspirin.",
+        ),
+        ChecklistOperation(
+            op="add",
+            text="aspirin",
+            kind="comorbidity",
+            label="comorbidity",
+            reason="Patient takes aspirin.",
+        ),
+    ]
+    resulting, applied, modified, deleted, rejected = apply_checklist_operations(
+        checklist, ops
+    )
+    assert not modified and not deleted
+    assert any(r["reject_reason"] == "kind_family_mismatch" for r in rejected)
+    assert resulting[0]["text"] == "fell from a ladder"
+    assert resulting[0]["id"] == "cl_trauma"
+    assert len(applied) == 1
+    assert applied[0].text == "aspirin"
+    assert applied[0].confirmed is True
+
+
+def test_apply_allows_cross_family_modify_when_unconfirmed():
+    checklist = [
+        {
+            "id": "cl_x",
+            "text": "chair",
+            "kind": "ner_entity",
+            "source": "gliner",
+            "label": "body part",
+            "confirmed": False,
+        },
+    ]
+    ops = [
+        ChecklistOperation(
+            op="modify",
+            id="cl_x",
+            text="sitting",
+            kind="provocative",
+            label="provocative",
+            reason="Mislabelled extractor row.",
+        ),
+    ]
+    resulting, applied, modified, deleted, rejected = apply_checklist_operations(
+        checklist, ops
+    )
+    assert not rejected
+    assert modified[0]["after"]["kind"] == "provocative"
+    assert resulting[0]["confirmed"] is True
+    assert resulting[0]["id"] == "cl_x"
 
 
 @patch("app.services.intake_enricher.generator_model_configured", return_value=False)
@@ -181,8 +276,11 @@ def test_enrichment_applies_symptom_from_confirmation(mock_cfg, mock_gen):
     assert len(result.applied) == 1
     assert result.applied[0].source == "llm"
     assert result.applied[0].label == "symptom"
+    assert result.applied[0].confirmed is True
     assert result.resulting_checklist is not None
     assert result.resulting_checklist[-1]["text"] == "low back pain"
+    assert result.resulting_checklist[-1]["confirmed"] is True
+    assert all(r.get("id") for r in result.resulting_checklist)
 
     merged = result.resulting_checklist
     coverage, _, _ = evaluate_checklist_coverage(
@@ -233,7 +331,7 @@ def test_enrichment_operations_modify_and_delete(mock_cfg, mock_gen):
             "checklist_operations": [
                 {
                     "op": "modify",
-                    "index": 1,
+                    "id": "cl_sx",
                     "text": "low back pain",
                     "kind": "ner_entity",
                     "label": "symptom",
@@ -241,15 +339,27 @@ def test_enrichment_operations_modify_and_delete(mock_cfg, mock_gen):
                 },
                 {
                     "op": "delete",
-                    "index": 2,
+                    "id": "cl_pal",
                     "reason": "Patient said rest does not help.",
                 },
             ],
         }
     )
     checklist = [
-        {"text": "knee pain", "kind": "ner_entity", "source": "gliner", "label": "symptom"},
-        {"text": "rest", "kind": "palliative", "source": "pattern", "label": "palliative"},
+        {
+            "id": "cl_sx",
+            "text": "knee pain",
+            "kind": "ner_entity",
+            "source": "gliner",
+            "label": "symptom",
+        },
+        {
+            "id": "cl_pal",
+            "text": "rest",
+            "kind": "palliative",
+            "source": "pattern",
+            "label": "palliative",
+        },
     ]
     result = propose_checklist_enrichment(
         checklist=checklist,
@@ -263,12 +373,54 @@ def test_enrichment_operations_modify_and_delete(mock_cfg, mock_gen):
     assert len(result.deleted) == 1
     assert result.resulting_checklist == [
         {
+            "id": "cl_sx",
             "text": "low back pain",
             "kind": "ner_entity",
             "source": "llm",
             "label": "symptom",
+            "confirmed": True,
         }
     ]
+
+
+@patch("app.services.intake_enricher.generate_from_messages")
+@patch("app.services.intake_enricher.generator_model_configured", return_value=True)
+def test_enrichment_index_ops_are_invalid(mock_cfg, mock_gen):
+    """Index-addressed ops must not apply (no deprecated fallback)."""
+    mock_gen.return_value = json.dumps(
+        {
+            "summary_reason": "Tried indexes.",
+            "checklist_operations": [
+                {
+                    "op": "modify",
+                    "index": 1,
+                    "text": "aspirin",
+                    "kind": "comorbidity",
+                    "label": "comorbidity",
+                    "reason": "med",
+                },
+                {"op": "delete", "index": 1, "reason": "gone"},
+            ],
+        }
+    )
+    checklist = [
+        {
+            "id": "cl_trauma",
+            "text": "fell from a ladder",
+            "kind": "provocative",
+            "source": "llm",
+            "label": "provocative",
+            "confirmed": True,
+        },
+    ]
+    result = propose_checklist_enrichment(
+        checklist=checklist,
+        conversation_history=[],
+        latest_user_message="I take aspirin",
+    )
+    assert not result.proposed
+    assert result.status == "no_changes"
+    assert result.resulting_checklist is None
 
 
 @patch("app.services.intake_enricher.generate_from_messages")
@@ -296,6 +448,7 @@ def test_enrichment_rejects_invalid_operation_kind(mock_cfg, mock_gen):
     assert result.status == "no_changes"
     assert not result.proposed
     assert result.resulting_checklist is None
+
 
 @patch("app.services.intake_enricher.generate_from_messages")
 @patch("app.services.intake_enricher.generator_model_configured", return_value=True)
@@ -329,7 +482,7 @@ def test_consistency_guard_clears_next_slot_when_skipping_gap(mock_cfg, mock_gen
             "checklist_operations": [
                 {
                     "op": "delete",
-                    "index": 7,
+                    "id": "cl_chair",
                     "reason": "chair is not a body part.",
                 },
             ],
@@ -340,33 +493,38 @@ def test_consistency_guard_clears_next_slot_when_skipping_gap(mock_cfg, mock_gen
         }
     )
     checklist = [
-        {"text": "30", "kind": "demographic", "source": "slot_answer", "label": "age"},
-        {"text": "male", "kind": "demographic", "source": "pattern", "label": "sex"},
+        {"id": "cl_age", "text": "30", "kind": "demographic", "source": "slot_answer", "label": "age"},
+        {"id": "cl_sex", "text": "male", "kind": "demographic", "source": "pattern", "label": "sex"},
         {
+            "id": "cl_sx",
             "text": "dull ache",
             "kind": "ner_entity",
             "source": "gliner",
             "label": "symptom",
         },
         {
+            "id": "cl_q",
             "text": "dull",
             "kind": "symptom_quality",
             "source": "pattern",
             "label": "symptom_quality",
         },
         {
+            "id": "cl_sev",
             "text": "5",
             "kind": "severity",
             "source": "pattern",
             "label": "symptom_severity",
         },
         {
+            "id": "cl_dur",
             "text": "3 weeks",
             "kind": "duration",
             "source": "pattern",
             "label": "duration",
         },
         {
+            "id": "cl_chair",
             "text": "chair",
             "kind": "ner_entity",
             "source": "gliner",
