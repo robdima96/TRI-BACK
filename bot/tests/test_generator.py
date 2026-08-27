@@ -86,6 +86,32 @@ def test_generator_unavailable_stub_is_non_clinical_system_failure():
     assert "generator unavailable" not in text
 
 
+def test_build_messages_includes_disposition_brief():
+    from app.services.generator import _build_messages_for_chat
+
+    brief = {
+        "authoritative_summary": "Graph rank #1 is Fracture.",
+        "primary_condition": "Fracture",
+        "primary_score": 8.5,
+        "minimum_triage_level": "urgent_care",
+        "insufficient_evidence": False,
+        "ranked_conditions": [{"condition": "Fracture", "score": 8.5}],
+        "matched_factors": ["Recent trauma"],
+        "evidence_factors": [],
+    }
+    messages = _build_messages_for_chat(
+        "What should I do?",
+        [{"source": "paper", "snippet": "seek care"}],
+        None,
+        disposition_brief=brief,
+    )
+    assert len(messages) == 1
+    content = messages[0]["content"]
+    assert "Graph disposition brief (AUTHORITATIVE" in content
+    assert "Primary condition: Fracture" in content
+    assert "Evidence:" in content
+
+
 def test_extract_response_text_raises_on_empty_max_tokens():
     part = MagicMock()
     part.thought = False

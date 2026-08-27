@@ -437,6 +437,7 @@ def graph_traversal_node(state: ChatState) -> ChatState:
 
 def generate_draft_node(state: ChatState) -> ChatState:
 
+    from app.services.disposition_brief import build_disposition_brief_from_state
     from app.services.generator import generate_response, is_generator_system_failure
 
     msgs = state.get("messages") or []
@@ -444,6 +445,9 @@ def generate_draft_node(state: ChatState) -> ChatState:
     history = conversation_history_before_last_user(msgs)
 
     intake = coverage_intake_summary(state.get("coverage") or {})
+
+    brief = build_disposition_brief_from_state(state)
+    state["disposition_brief"] = brief
 
     draft = generate_response(
 
@@ -454,6 +458,8 @@ def generate_draft_node(state: ChatState) -> ChatState:
         conversation_history=history,
 
         intake_summary=intake,
+
+        disposition_brief=brief,
 
     )
 

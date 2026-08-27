@@ -156,6 +156,17 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
     graph_payload["factor_matching"] = factor_audit
     state["agent_trace"] = compact
     state["graph_traversal"] = graph_payload
+
+    from app.services.disposition_brief import build_disposition_brief
+
+    state["disposition_brief"] = build_disposition_brief(
+        graph_traversal=graph_payload,
+        factor_matching_audit=factor_audit,
+        clinical_checklist=checklist,
+        candidate_conditions=list(agent_trace.used_conditions),
+        matched_factors=matched_factors,
+        inference_mode=str(graph_payload.get("inference") or "agentic"),
+    )
     return state
 
 
@@ -194,8 +205,19 @@ def _deterministic_fallback(
 ) -> ChatState:
     """Run deterministic disposition only after the independent agent fails."""
     from app.config import settings
+    from app.services.disposition_brief import build_disposition_brief_from_state
     from app.services.generator import generate_response, is_generator_system_failure
     from app.services.rag.evidence_builder import build_generator_evidence
+
+    fallback_log = dict(agent_trace or {})
+    fallback_log.update(
+        {
+            "status": "fallback",
+            "stop_reason": stop_reason,
+            "fallback_used": True,
+            "fallback_mode": "deterministic",
+        }
+    )
 
     trace = None
     if settings.graphrag_load:
@@ -211,25 +233,6 @@ def _deterministic_fallback(
         trace=trace,
         chunk_matches=chunk_matches if settings.rag_load else None,
     )
-    draft = generate_response(
-        query,
-        evidence,
-        conversation_history=history,
-        intake_summary=intake,
-    )
-    fallback_log = dict(agent_trace or {})
-    fallback_log.update(
-        {
-            "status": "fallback",
-            "stop_reason": stop_reason,
-            "fallback_used": True,
-            "fallback_mode": "deterministic",
-        }
-    )
-    state["draft_response"] = draft
-    state["generator_failed"] = is_generator_system_failure(draft)
-    state["evidence"] = evidence
-    state["agent_trace"] = fallback_log
     if trace is not None:
         state["matched_factors"] = list(trace.matched_factors)
         state["candidate_conditions"] = list(trace.candidate_conditions)
@@ -246,5 +249,20 @@ def _deterministic_fallback(
     payload["agent_trace"] = fallback_log
     payload["inference"] = "deterministic_fallback"
     state["graph_traversal"] = payload
+    state["evidence"] = evidence
+
+    brief = build_disposition_brief_from_state(state)
+    state["disposition_brief"] = brief
+
+    draft = generate_response(
+        query,
+        evidence,
+        conversation_history=history,
+        intake_summary=intake,
+        disposition_brief=brief,
+    )
+    state["draft_response"] = draft
+    state["generator_failed"] = is_generator_system_failure(draft)
+    state["agent_trace"] = fallback_log
     _log.warning("agentic disposition used deterministic fallback: %s", stop_reason)
     return state

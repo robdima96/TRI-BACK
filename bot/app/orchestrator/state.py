@@ -62,3 +62,5 @@ class ChatState(TypedDict):
     factor_matching_audit: NotRequired[dict | None]
     # Audit trail for the agentic disposition path (DIGIMSK_DISPOSITION_MODE=agentic)
     agent_trace: NotRequired[dict | None]
+    # Authoritative graph rank + factor provenance for disposition generation.
+    disposition_brief: NotRequired[dict | None]

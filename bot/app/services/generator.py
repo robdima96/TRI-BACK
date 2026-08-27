@@ -194,15 +194,22 @@ def _build_messages_for_chat(
     conversation_history: list[dict[str, str]] | None,
     *,
     intake_summary: str | None = None,
+    disposition_brief: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
+    from app.services.disposition_brief import format_brief_for_prompt
+
     lines = [f"- [{e.get('source', '')}] \"{e.get('snippet', '')}\"" for e in evidence]
     block = "\n".join(lines) if lines else "No evidence available."
     intake_block = ""
     if intake_summary and intake_summary.strip():
         intake_block = f"Structured intake (from conversation):\n{intake_summary.strip()}\n\n"
+    brief_block = format_brief_for_prompt(disposition_brief)
+    if brief_block:
+        brief_block = f"{brief_block}\n\n"
     current_content = (
         f"{_SYSTEM_INSTRUCTION}\n\n"
         f"{intake_block}"
+        f"{brief_block}"
         f"Evidence:\n{block}\n\n"
         f"Current user message: {query}"
     )
@@ -227,6 +234,7 @@ def generate_response(
     *,
     conversation_history: list[dict[str, str]] | None = None,
     intake_summary: str | None = None,
+    disposition_brief: dict[str, Any] | None = None,
 ) -> str:
     """Generate a draft with the configured backend, or a system-failure stub."""
     if not generator_model_configured():
@@ -235,7 +243,11 @@ def generate_response(
     try:
         ev: list[dict[str, Any]] = [e.model_dump() for e in evidence]
         messages = _build_messages_for_chat(
-            query, ev, conversation_history, intake_summary=intake_summary
+            query,
+            ev,
+            conversation_history,
+            intake_summary=intake_summary,
+            disposition_brief=disposition_brief,
         )
         raw = generate_from_messages(
             messages,

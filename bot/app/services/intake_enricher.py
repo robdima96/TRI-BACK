@@ -22,7 +22,7 @@ from app.session_enrichment import checklist_item_dict
 
 _log = logging.getLogger(__name__)
 
-INTAKE_ENRICH_MAX_NEW_TOKENS = 4096
+INTAKE_ENRICH_MAX_NEW_TOKENS = 1536
 
 _JSON_FENCE_RE = re.compile(
     r"```(?:json)?\s*([\s\S]*?)\s*```",
@@ -186,18 +186,6 @@ def _format_checklist_block(checklist: list[dict[str, Any]]) -> str:
             f"label={row.get('label', '')!r} confirmed={confirmed}"
         )
     return "\n".join(lines)
-
-
-def _format_history_block(history: list[dict[str, str]]) -> str:
-    if not history:
-        return "(no prior turns)"
-    lines: list[str] = []
-    for turn in history[-12:]:
-        role = turn.get("role", "user")
-        content = str(turn.get("content", "")).strip()
-        if content:
-            lines.append(f"  {role}: {content}")
-    return "\n".join(lines) if lines else "(no prior turns)"
 
 
 def _coverage_gap_summary(
@@ -613,13 +601,33 @@ def _parse_next_intake(
     return question, slot_raw  # type: ignore[return-value]
 
 
+def _format_last_exchange_block(
+    *,
+    last_assistant_message: str,
+    latest_user_message: str,
+) -> str:
+    lines: list[str] = []
+    if last_assistant_message.strip():
+        lines.append(f"  assistant: {last_assistant_message.strip()}")
+    if latest_user_message.strip():
+        lines.append(f"  user: {latest_user_message.strip()}")
+    return "\n".join(lines) if lines else "(first patient turn — no prior assistant question)"
+
+
+def _last_assistant_from_history(history: list[dict[str, str]]) -> str:
+    for turn in reversed(history):
+        if turn.get("role") == "assistant":
+            return str(turn.get("content") or "").strip()
+    return ""
+
+
 def _build_enrichment_messages(
     *,
     checklist: list[dict[str, Any]],
-    conversation_history: list[dict[str, str]],
     latest_user_message: str,
     last_asked_slot: SlotName | None,
     comorbidities_acknowledged: bool,
+    last_assistant_message: str = "",
 ) -> list[dict[str, str]]:
     slot_hint = last_asked_slot or "(none)"
     gap_summary = _coverage_gap_summary(
@@ -628,25 +636,28 @@ def _build_enrichment_messages(
         last_asked_slot=last_asked_slot,
         latest_user_message=latest_user_message,
     )
+    exchange = _format_last_exchange_block(
+        last_assistant_message=last_assistant_message,
+        latest_user_message=latest_user_message,
+    )
     instruction = (
         "You are a careful overseer of a structured clinical intake checklist for a "
         "musculoskeletal triage chatbot.\n\n"
         "In ONE response you must (1) maintain the checklist and (2) draft the next "
         "intake question if coverage will still be incomplete after your updates.\n\n"
-        "Read the transcript, existing checklist, coverage gaps, and the latest patient "
-        "message. Maintain the checklist so it stays accurate and cumulative: add missing "
-        "facts, correct rows that are wrong or outdated, and delete rows that the patient "
-        "clearly retracted or that were recorded in error.\n\n"
+        "Read the last exchange, existing checklist, coverage gaps, and the latest "
+        "patient message. Prior turns are already captured on the checklist—do not "
+        "require the full transcript. Maintain the checklist so it stays accurate "
+        "and cumulative: add missing facts, correct rows that are wrong or outdated, "
+        "and delete rows that the patient clearly retracted or that were recorded in "
+        "error.\n\n"
         "Volunteered facts (critical):\n"
         "- Last intake slot asked is a HINT about what the assistant was seeking, NOT a "
         "limit on what you may add or edit.\n"
         "- Pattern extractors and GliNER often miss or mislabel facts. If the patient "
-        "clearly stated something clinically relevant and it is not already on the "
-        "checklist with the correct kind/label, you MUST add or modify a row for it in "
-        "this turn—deleting bad extractor rows alone is not enough.\n"
-        "- You may fill ANY still-missing slot from the latest message or transcript "
-        "(duration, quality, severity, provocative, palliative, comorbidities, etc.), "
-        "even when that slot was not the one just asked.\n"
+        "clearly stated something clinically relevant in the last exchange and it is "
+        "not already on the checklist with the correct kind/label, you MUST add or "
+        "modify a row for it in this turn.\n"
         "- Prefer typed kinds that satisfy coverage: duration, severity, "
         "symptom_quality, provocative, palliative (rather than only ner_entity aliases) "
         "when the fact fills an intake slot.\n"
@@ -695,7 +706,7 @@ def _build_enrichment_messages(
         "symptom provocative factor | symptom palliative factor | body part | sign\n\n"
         "Rules for next_intake (the follow-up question):\n"
         "- After imagining your checklist_operations applied, pick the single highest-"
-        "priority still-missing slot and write ONE plain question for it.\n"
+        "priority still-missing slot and write ONE plain, conversational question for it.\n"
         "- Slot priority order: age → sex → symptom_anchor → symptom_quality → "
         "symptom_severity → symptom_duration → provocative → palliative → "
         "comorbidities.\n"
@@ -712,8 +723,7 @@ def _build_enrichment_messages(
         f"Coverage before enrichment:\n{gap_summary}\n\n"
         f"Existing checklist (modify/delete by id in brackets; numbers are display-only):\n"
         f"{_format_checklist_block(checklist)}\n\n"
-        f"Conversation transcript:\n{_format_history_block(conversation_history)}\n"
-        f"Latest patient message: {latest_user_message.strip() or '(none)'}\n\n"
+        f"Last exchange (assistant question + latest patient reply):\n{exchange}\n\n"
         "Return JSON only with this shape:\n"
         "{\n"
         '  "summary_reason": "one sentence explaining your updates or why none",\n'
@@ -731,35 +741,30 @@ def _build_enrichment_messages(
         "other health conditions after being asked (e.g. none / no conditions).\n"
         "Set next_intake to null when no further intake question is needed."
     )
-    messages: list[dict[str, str]] = []
-    for turn in conversation_history:
-        role = turn.get("role", "user")
-        if role not in ("user", "assistant"):
-            role = "user"
-        messages.append({"role": role, "content": turn.get("content", "")})
-    messages.append({"role": "user", "content": instruction})
-    return messages
+    return [{"role": "user", "content": instruction}]
 
 
 def propose_checklist_enrichment(
     *,
     checklist: list[dict[str, Any]],
-    conversation_history: list[dict[str, str]],
+    conversation_history: list[dict[str, str]] | None = None,
     latest_user_message: str,
     last_asked_slot: SlotName | None = None,
     comorbidities_acknowledged: bool = False,
     session_id: str = "",
     turn_index: int = 0,
+    last_assistant_message: str = "",
 ) -> IntakeEnrichmentResult:
     """
     Ask the generator LLM to oversee checklist rows (add / modify / delete)
     and draft the next intake question in the same call.
 
-    ``evaluate_checklist_coverage`` remains authoritative for which slot is
-    asked; the drafted question is only used when it matches the planner's
-    chosen slot. Mutations still pass kind/label/id filters before merge.
+    Uses a slim single-message prompt (last exchange + checklist + gaps), not
+    full transcript replay.
     """
     checklist = ensure_checklist_ids([dict(r) for r in checklist])
+    history = conversation_history or []
+    assistant_msg = last_assistant_message.strip() or _last_assistant_from_history(history)
 
     if not generator_model_configured():
         return IntakeEnrichmentResult(
@@ -770,10 +775,10 @@ def propose_checklist_enrichment(
     try:
         messages = _build_enrichment_messages(
             checklist=checklist,
-            conversation_history=conversation_history,
             latest_user_message=latest_user_message,
             last_asked_slot=last_asked_slot,
             comorbidities_acknowledged=comorbidities_acknowledged,
+            last_assistant_message=assistant_msg,
         )
         raw = generate_from_messages(
             messages,

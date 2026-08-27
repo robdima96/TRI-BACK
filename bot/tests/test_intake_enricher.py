@@ -228,6 +228,41 @@ def test_apply_allows_cross_family_modify_when_unconfirmed():
     assert resulting[0]["id"] == "cl_x"
 
 
+@patch("app.services.intake_enricher.generate_from_messages")
+@patch("app.services.intake_enricher.generator_model_configured", return_value=True)
+def test_enrichment_uses_slim_single_message_prompt(mock_cfg, mock_gen):
+    mock_gen.return_value = json.dumps(
+        {
+            "summary_reason": "No changes.",
+            "comorbidities_acknowledged": False,
+            "checklist_operations": [],
+            "next_intake": None,
+        }
+    )
+    history = [
+        {"role": "user", "content": "Low back pain for 3 weeks"},
+        {"role": "assistant", "content": "How severe is the pain on a 0-10 scale?"},
+        {"role": "user", "content": "About 7"},
+        {"role": "assistant", "content": "What makes it worse?"},
+    ]
+    propose_checklist_enrichment(
+        checklist=[{"text": "low back pain", "kind": "ner_entity", "label": "symptom"}],
+        conversation_history=history,
+        latest_user_message="Sitting makes it worse",
+        last_asked_slot="provocative",
+    )
+    mock_gen.assert_called_once()
+    messages = mock_gen.call_args[0][0]
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    content = messages[0]["content"]
+    assert "Last exchange (assistant question + latest patient reply):" in content
+    assert "assistant: What makes it worse?" in content
+    assert "user: Sitting makes it worse" in content
+    assert "Low back pain for 3 weeks" not in content
+    assert mock_gen.call_args.kwargs.get("max_new_tokens") == 1536
+
+
 @patch("app.services.intake_enricher.generator_model_configured", return_value=False)
 def test_enrichment_skipped_when_generator_unavailable(mock_cfg):
     result = propose_checklist_enrichment(

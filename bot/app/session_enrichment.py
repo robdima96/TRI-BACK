@@ -331,6 +331,7 @@ def build_disposition_record(
         "traversed_chunk_ids": chunks,
         "factor_matching_audit": audit,
         "agent_trace": agent,
+        "disposition_brief": state.get("disposition_brief"),
         "graph_traversal": compact_graph_for_session(graph if isinstance(graph, dict) else None),
         "evidence": evidence,
         "final_response": state.get("final_response"),

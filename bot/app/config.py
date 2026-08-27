@@ -225,7 +225,7 @@ class Settings(BaseModel):
 
     # LLM cross-check for unmatched checklist → Factor mapping (pre-traversal).
     # When off, matching stays fully deterministic (regex / kind / fuzzy only).
-    llm_factor_match: bool = False
+    llm_factor_match: bool = True
 
     # Max deterministic intake questions per session before best-effort disposition.
 
@@ -337,7 +337,7 @@ settings = Settings(
 
     agentic_bayesian_tool=_env_bool("DIGIMSK_AGENTIC_BAYESIAN_TOOL", False),
 
-    llm_factor_match=_env_bool("DIGIMSK_LLM_FACTOR_MATCH", False),
+    llm_factor_match=_env_bool("DIGIMSK_LLM_FACTOR_MATCH", True),
 
     max_questions=_env_int("DIGIMSK_MAX_QUESTIONS", 10),
 
