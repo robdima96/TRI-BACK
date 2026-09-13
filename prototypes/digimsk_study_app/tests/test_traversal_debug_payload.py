@@ -67,3 +67,29 @@ def test_build_traversal_debug_payload_groups_conditions():
     raw = traversal_debug_json(trace)
     assert "Fracture" in raw
     assert "Infection" in raw
+
+
+def test_traversal_step_accepts_confirmed_bool():
+    step = TraversalStep.model_validate(
+        {
+            "step": 1,
+            "action": "checklist_item",
+            "checklist_item": {
+                "text": "low back pain",
+                "kind": "symptom",
+                "source": "pattern",
+                "label": "symptom",
+                "id": "c1",
+                "confirmed": False,
+            },
+        }
+    )
+    assert step.checklist_item["confirmed"] is False
+    trace = GraphTraversalTrace.model_validate(
+        {
+            "trace_id": "t-confirmed",
+            "title": "confirmed-bool",
+            "steps": [step.model_dump()],
+        }
+    )
+    assert trace.steps[0].checklist_item["confirmed"] is False

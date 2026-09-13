@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 
 from app.config import settings
-from app.schemas import ChecklistItem, ChunkMatch, Evidence
+from app.schemas import ChecklistItem, ChecklistItemDump, ChunkMatch, Evidence
 from app.services.rag.embeddings import compute_query_embedding
 from app.services.rag.factor_patterns import known_chunk_ids
 from app.services.rag.store import get_sub_collection, validate_sub_collection
@@ -42,7 +42,7 @@ def _embedding_dim_ok(query_embedding: list[float]) -> bool:
 
 
 def _parse_checklist(
-    checklist: list[ChecklistItem] | list[dict[str, str]],
+    checklist: list[ChecklistItem] | list[ChecklistItemDump],
 ) -> list[ChecklistItem]:
     parsed: list[ChecklistItem] = []
     for row in checklist:
@@ -156,7 +156,7 @@ def _indexed_docs_for(canonical: str) -> tuple[_IndexedDoc, ...]:
 
 
 def match_checklist_to_chroma_chunks(
-    checklist: list[ChecklistItem] | list[dict[str, str]],
+    checklist: list[ChecklistItem] | list[ChecklistItemDump],
     *,
     sub_collections: list[str] | None = None,
 ) -> list[ChunkMatch]:
@@ -275,7 +275,7 @@ def retrieve_chunk_matches(
 def retrieve_rag_chunk_matches(
     query: str,
     query_embedding: list[float] | None,
-    checklist: list[ChecklistItem] | list[dict[str, str]],
+    checklist: list[ChecklistItem] | list[ChecklistItemDump],
     *,
     top_k: int | None = None,
     sub_collections: list[str] | None = None,

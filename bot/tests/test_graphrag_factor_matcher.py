@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import pytest
+
 from app.schemas import ChecklistItem
 from app.services.graphrag.factor_matcher import match_checklist_to_factors
 from app.services.graphrag.orchestrator import traverse_from_checklist
+from app.services.graphrag.schemas import FactorMatch, GraphTraversalTrace, TraversalStep
 
 
 def test_match_severe_pain():
@@ -146,6 +149,42 @@ def test_match_recent_trauma_alias():
     assert matches[0].factor_name == "Recent trauma"
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("my stomach really hurts", "Abdominal pain"),
+        ("high blood pressure", "Hypertension"),
+        ("sweating at night", "Night sweats"),
+        ("both legs weak", "Bilat neuro motor deficit"),
+        ("I smoke", "Smoking"),
+        ("had a clot before", "Previous DVT"),
+        ("shaking chills", "Chills"),
+        ("tender to touch", "Point tenderness"),
+        ("legs feel weak", "Neuro motor deficit"),
+        ("family history of aneurysm", "Family history of AAA"),
+    ],
+)
+def test_match_v3_colloquial_aliases(text: str, expected: str):
+    items = [
+        ChecklistItem(text=text, kind="symptom", source="gliner", label="symptom"),
+    ]
+    matches = match_checklist_to_factors(items)
+    assert matches[0].factor_name == expected
+
+
+def test_sitting_alias_stays_mechanical_not_venous_stasis():
+    items = [
+        ChecklistItem(
+            text="sitting makes it worse",
+            kind="provocative",
+            source="pattern",
+            label="provocative",
+        ),
+    ]
+    matches = match_checklist_to_factors(items)
+    assert matches[0].factor_name == "Prolonged sitting aggravates"
+
+
 def test_match_fell_alias():
     items = [
         ChecklistItem(
@@ -214,3 +253,61 @@ def test_traverse_offline_produces_steps():
     assert "Severe pain" in trace.matched_factors
     assert "Recent trauma" in trace.matched_factors
     assert trace.model_dump()["highlight"]["node_ids"] == trace.highlight.node_ids
+
+
+def _dumped_item(*, confirmed: bool) -> dict:
+    return ChecklistItem(
+        text="low back pain",
+        kind="symptom",
+        source="pattern",
+        label="symptom",
+        confirmed=confirmed,
+    ).model_dump()
+
+
+def test_factor_match_accepts_confirmed_bool():
+    dumped = _dumped_item(confirmed=False)
+    match = FactorMatch(checklist_item=dumped, match_method="none", match_score=0.0)
+    assert match.checklist_item["confirmed"] is False
+
+    dumped_yes = _dumped_item(confirmed=True)
+    match_yes = FactorMatch(checklist_item=dumped_yes)
+    assert match_yes.checklist_item["confirmed"] is True
+
+
+def test_match_checklist_preserves_confirmed_bools():
+    items = [
+        ChecklistItem(
+            text="30",
+            kind="demographic",
+            source="pattern",
+            label="age",
+            confirmed=False,
+        ),
+        ChecklistItem(
+            text="low back pain",
+            kind="symptom",
+            source="gliner",
+            label="symptom",
+            confirmed=True,
+        ),
+    ]
+    matches = match_checklist_to_factors(items)
+    assert len(matches) == 2
+    assert matches[0].checklist_item["confirmed"] is False
+    assert matches[1].checklist_item["confirmed"] is True
+
+
+def test_traversal_models_accept_confirmed_bool():
+    dumped = _dumped_item(confirmed=False)
+    step = TraversalStep(step=1, action="checklist_item", checklist_item=dumped)
+    trace = GraphTraversalTrace(
+        trace_id="t-confirmed",
+        title="confirmed-bool",
+        checklist_items=[dumped],
+        unmatched_items=[dumped],
+        steps=[step],
+    )
+    assert step.checklist_item["confirmed"] is False
+    assert trace.checklist_items[0]["confirmed"] is False
+    assert trace.unmatched_items[0]["confirmed"] is False

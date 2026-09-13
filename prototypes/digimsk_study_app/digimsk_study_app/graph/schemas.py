@@ -7,6 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 GraphNodeLabel = Literal["Factor", "Condition", "Chunk"]
+TraversalMode = Literal["traversal", "intake_gap"]
 TraversalAction = Literal[
     "checklist_item",
     "match_factor",
@@ -16,6 +17,9 @@ TraversalAction = Literal[
     "traverse_mediated",
     "evidence_link",
     "aggregate_conditions",
+    "graph_gap",
+    "ask_factor",
+    "deny_factor",
 ]
 
 
@@ -62,7 +66,8 @@ class EdgeRef(BaseModel):
 class TraversalStep(BaseModel):
     step: int
     action: TraversalAction
-    checklist_item: dict[str, str] | None = None
+    # Dumped checklist rows include bool flags (e.g. confirmed).
+    checklist_item: dict[str, str | bool] | None = None
     factor: str | None = None
     condition: str | None = None
     mediator: str | None = None
@@ -96,7 +101,7 @@ class ConditionTraversal(BaseModel):
 
 class GraphTraversalTrace(BaseModel):
     trace_id: str
-    mode: Literal["traversal"] = "traversal"
+    mode: TraversalMode = "traversal"
     title: str = ""
     graph_version: str = "red_flags/v1"
     matched_factors: list[str] = Field(default_factory=list)

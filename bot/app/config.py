@@ -228,8 +228,11 @@ class Settings(BaseModel):
     llm_factor_match: bool = True
 
     # Max deterministic intake questions per session before best-effort disposition.
+    # Floor is ~9 slots; 20 leaves ~11 discretionary graph turns.
+    max_questions: int = 20
 
-    max_questions: int = 10
+    # Test/debug: force the next intake question to this canonical Factor name.
+    force_factor_ask: str | None = None
 
     session_store_dir: str = "data/sessions"
 
@@ -339,7 +342,9 @@ settings = Settings(
 
     llm_factor_match=_env_bool("DIGIMSK_LLM_FACTOR_MATCH", True),
 
-    max_questions=_env_int("DIGIMSK_MAX_QUESTIONS", 10),
+    max_questions=_env_int("DIGIMSK_MAX_QUESTIONS", 20),
+
+    force_factor_ask=_env_str("DIGIMSK_FORCE_FACTOR_ASK"),
 
     session_store_dir=_env_str("DIGIMSK_SESSION_STORE_DIR", "data/sessions")
 

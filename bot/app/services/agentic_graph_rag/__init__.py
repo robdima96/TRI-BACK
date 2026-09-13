@@ -15,6 +15,7 @@ from __future__ import annotations
 __all__ = [
     "agentic_disposition_node",
     "load_ontology",
+    "get_factor_question_spec",
     "render_ontology_card",
     "run_disposition_agent",
     "FRAMEWORK_PATH",
@@ -35,6 +36,12 @@ def run_disposition_agent(*args, **kwargs):
 
 def load_ontology(*args, **kwargs):
     from app.services.agentic_graph_rag.ontology import load_ontology as _fn
+
+    return _fn(*args, **kwargs)
+
+
+def get_factor_question_spec(*args, **kwargs):
+    from app.services.agentic_graph_rag.ontology import get_factor_question_spec as _fn
 
     return _fn(*args, **kwargs)
 

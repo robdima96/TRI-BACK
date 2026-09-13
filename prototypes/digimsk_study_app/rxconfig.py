@@ -25,6 +25,9 @@ _base = (os.getenv("DIGIMSK_PUBLIC_BASE_URL") or os.getenv("API_URL") or "").str
 
 _config_kwargs: dict = {
     "app_name": "digimsk_study_app",
+    # Pin local ports so Reflex does not auto-increment onto the bot (:8001).
+    "frontend_port": 3000,
+    "backend_port": 8000,
     "plugins": [
         RadixThemesPlugin(
             theme=rx.theme(accent_color="blue", appearance="light", has_background=False),

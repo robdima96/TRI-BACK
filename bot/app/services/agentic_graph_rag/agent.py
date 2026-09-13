@@ -16,7 +16,7 @@ import logging
 import re
 from typing import Any
 
-from app.schemas import Evidence
+from app.schemas import ChecklistItemDump, Evidence
 from app.services.agentic_graph_rag.ontology import RedFlagOntology
 from app.services.agentic_graph_rag.prompt_template import render_system_prompt
 from app.services.agentic_graph_rag.schemas import (
@@ -86,7 +86,7 @@ def _accumulate(trace: AgentTrace, result: ToolResult) -> None:
 def run_disposition_agent(
     *,
     query: str,
-    checklist: list[dict[str, str]],
+    checklist: list[ChecklistItemDump],
     chunk_matches: list,
     ontology: RedFlagOntology,
     matched_factors: list[str],

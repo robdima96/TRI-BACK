@@ -3,14 +3,22 @@
 from __future__ import annotations
 
 from app.orchestrator.intake_models import (
-    REQUIRED_SYMPTOM_SLOTS,
     CoverageReport,
     SlotName,
     SymptomInstance,
 )
 
-_SESSION_ORDER: tuple[SlotName, ...] = ("age", "sex")
-_SYMPTOM_SLOT_ORDER: tuple[SlotName, ...] = REQUIRED_SYMPTOM_SLOTS
+# Floor-only fallback order (matches the ranker when no graph factors compete).
+# symptom_anchor is the only real prerequisite; duration ranks last among
+# symptom attributes because it opens no graph territory.
+_SESSION_ORDER: tuple[SlotName, ...] = ("age", "sex", "comorbidities")
+_SYMPTOM_SLOT_ORDER: tuple[SlotName, ...] = (
+    "symptom_quality",
+    "symptom_severity",
+    "provocative",
+    "palliative",
+    "symptom_duration",
+)
 
 
 def question_template(
@@ -99,31 +107,30 @@ def select_next_missing_slot(
     *,
     comorbidities_acknowledged: bool,
 ) -> tuple[SlotName | None, str | None]:
-    """Pick the highest-priority missing slot and optional symptom id."""
+    """Pick the highest-priority missing floor slot and optional symptom id.
+
+    Graph factors are ranked separately. This is the floor-only fallback used
+    by the enricher consistency guard and by the ranker when budget forces
+    floor slots.
+    """
     missing_slots = coverage.get("missing_slots") or []
     missing_set = {m["slot"] for m in missing_slots}
     instances = coverage.get("symptom_instances") or []
 
-    for slot in _SESSION_ORDER:
-        if slot in missing_set:
-            return slot, coverage.get("active_symptom_id")
-
     if "symptom_anchor" in missing_set or not instances:
         return "symptom_anchor", None
+
+    for slot in _SESSION_ORDER:
+        if slot not in missing_set:
+            continue
+        if slot == "comorbidities" and comorbidities_acknowledged:
+            continue
+        return slot, coverage.get("active_symptom_id")
 
     for inst in instances:
         sid = inst["symptom_id"]
         slot = _first_missing_for_symptom(coverage, sid)
         if slot:
             return slot, sid
-
-    if "comorbidities" in missing_set and not comorbidities_acknowledged:
-        symptom_gaps = [
-            m
-            for m in missing_slots
-            if m.get("slot") in REQUIRED_SYMPTOM_SLOTS or m.get("slot") == "symptom_anchor"
-        ]
-        if not symptom_gaps:
-            return "comorbidities", coverage.get("active_symptom_id")
 
     return None, coverage.get("active_symptom_id")

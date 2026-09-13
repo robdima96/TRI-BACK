@@ -6,7 +6,7 @@ import logging
 import uuid
 from pathlib import Path
 
-from app.schemas import ChecklistItem, ChunkMatch
+from app.schemas import ChecklistItem, ChecklistItemDump, ChunkMatch
 from app.services.graphrag.condition_traversals import build_condition_traversals
 from app.services.graphrag.graph_client_protocol import PathSegment
 from app.services.graphrag.local_graph import LocalGraphClient, get_graph_client
@@ -18,13 +18,19 @@ from app.services.graphrag.schemas import (
     NodeRef,
     TraversalStep,
 )
-from app.services.rag.factor_matcher import match_checklist_to_factors
+from app.services.rag.factor_matcher import (
+    affirmed_factor_names,
+    match_checklist_to_factors,
+    match_is_affirmed,
+)
 
 _log = logging.getLogger(__name__)
 
 
-def _checklist_rows(items: list[ChecklistItem] | list[dict[str, str]]) -> list[dict[str, str]]:
-    rows: list[dict[str, str]] = []
+def _checklist_rows(
+    items: list[ChecklistItem] | list[ChecklistItemDump],
+) -> list[ChecklistItemDump]:
+    rows: list[ChecklistItemDump] = []
     for item in items:
         if isinstance(item, ChecklistItem):
             rows.append(item.model_dump())
@@ -223,7 +229,7 @@ def _segment_steps(
 
 def traverse_from_turn(
     *,
-    checklist: list[ChecklistItem] | list[dict[str, str]],
+    checklist: list[ChecklistItem] | list[ChecklistItemDump],
     chunk_matches: list[ChunkMatch] | None = None,
     factor_matches: list[FactorMatch] | None = None,
     trace_id: str | None = None,
@@ -252,16 +258,12 @@ def traverse_from_turn(
         )
 
     matches = factor_matches or match_checklist_to_factors(rows)
-    matched_factors: list[str] = []
-    unmatched_items: list[dict[str, str]] = []
-    seen_factor_names: set[str] = set()
+    matched_factors: list[str] = affirmed_factor_names(matches)
+    unmatched_items: list[ChecklistItemDump] = []
 
     for match in matches:
         step_num += 1
-        if match.factor_name:
-            if match.factor_name not in seen_factor_names:
-                seen_factor_names.add(match.factor_name)
-                matched_factors.append(match.factor_name)
+        if match_is_affirmed(match):
             factor_ref = _node_ref("Factor", match.factor_name)
             steps.append(
                 TraversalStep(
@@ -277,14 +279,20 @@ def traverse_from_turn(
             )
         else:
             unmatched_items.append(match.checklist_item)
+            denied = match.polarity == "denied"
             steps.append(
                 TraversalStep(
                     step=step_num,
                     action="unmatched",
                     checklist_item=match.checklist_item,
+                    factor=match.factor_name if denied else None,
                     match_method=match.match_method,
                     match_score=match.match_score,
-                    note="No graph Factor matched this checklist item",
+                    note=(
+                        f"Denied Factor '{match.factor_name}' (excluded from traversal)"
+                        if denied
+                        else "No graph Factor matched this checklist item"
+                    ),
                 )
             )
 
@@ -366,7 +374,7 @@ def traverse_from_turn(
 
 
 def traverse_from_checklist(
-    items: list[ChecklistItem] | list[dict[str, str]],
+    items: list[ChecklistItem] | list[ChecklistItemDump],
     *,
     trace_id: str | None = None,
     title: str | None = None,

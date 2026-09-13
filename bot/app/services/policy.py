@@ -11,6 +11,12 @@ import re
 
 from app.schemas import ClinicalChecklist
 
+# Hard escalate is limited to immediately life-threatening presentations.
+# Low-back red-flag clusters (CES / AAA / DVT / fracture / infection /
+# malignancy) are evaluated by the disposition model from factor clusters,
+# the clinical-reasoning framework, and the high-acuity priority list — not
+# by this catalog.
+
 # Catalog id -> trigger substrings (lowercase, normalized for matching)
 RISK_CATALOG: dict[str, frozenset[str]] = {
     "suicide_self_harm": frozenset(

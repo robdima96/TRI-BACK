@@ -12,18 +12,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_GRAPHS_ENV = _REPO_ROOT / "Graphs" / ".env"
 _BOT_ENV = _REPO_ROOT / "bot" / ".env"
 
-_V1_INVENTORY = (
-    _REPO_ROOT / "Graphs" / "backups" / "red flags" / "v1" / "inventory.json"
+_KB_MANUAL = (
+    _REPO_ROOT / "bot" / "Knowledge Base" / "Red Flags" / "chunks" / "manual"
 )
-_V1_CSV = (
-    _REPO_ROOT
-    / "Graphs"
-    / "backups"
-    / "red flags"
-    / "v1"
-    / "source"
-    / "red_flags_manual_failsafe.csv"
-)
+_DEFAULT_CSV = _KB_MANUAL / "red_flags_edges_v4_2026.9.10.csv"
+_DEFAULT_INVENTORY = _KB_MANUAL / "red_flags_inventory_v4_2026.9.10.json"
+_DEFAULT_FACTORS = _KB_MANUAL / "red_flags_factors_v4_2026.9.10.csv"
 
 
 def _resolve_env_path(var_name: str, fallback: Path) -> Path:
@@ -43,8 +37,9 @@ def _resolve_env_path(var_name: str, fallback: Path) -> Path:
     return path
 
 
-DEFAULT_INVENTORY_PATH = _resolve_env_path("DIGIMSK_GRAPH_INVENTORY", _V1_INVENTORY)
-DEFAULT_CSV_PATH = _resolve_env_path("DIGIMSK_GRAPH_CSV", _V1_CSV)
+DEFAULT_INVENTORY_PATH = _resolve_env_path("DIGIMSK_GRAPH_INVENTORY", _DEFAULT_INVENTORY)
+DEFAULT_CSV_PATH = _resolve_env_path("DIGIMSK_GRAPH_CSV", _DEFAULT_CSV)
+DEFAULT_FACTORS_PATH = _resolve_env_path("DIGIMSK_GRAPH_FACTORS", _DEFAULT_FACTORS)
 
 
 @dataclass(frozen=True)

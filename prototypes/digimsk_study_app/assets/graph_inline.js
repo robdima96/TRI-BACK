@@ -61,10 +61,67 @@
     return cy;
   }
 
-  function renderSharedSteps(container, _sharedSteps) {
-    // Study arms: hide intake checklist noise; condition tabs/paths remain.
-    container.hidden = true;
-    container.innerHTML = "";
+  function renderSharedSteps(container, sharedSteps, visible) {
+    if (!visible) {
+      container.hidden = true;
+      container.innerHTML = "";
+      return;
+    }
+    const steps = sharedSteps || [];
+    if (!steps.length) {
+      container.hidden = true;
+      container.innerHTML = "";
+      return;
+    }
+    container.hidden = false;
+    container.innerHTML = `
+      <ol class="traversal-step-list traversal-shared-list">
+        ${steps
+          .map(
+            (step) =>
+              `<li>
+                <span class="traversal-step-num">${step.step}</span>
+                ${escapeHtml(step.summary || "")}
+              </li>`
+          )
+          .join("")}
+      </ol>
+    `;
+  }
+
+  function viewsFromPayload(payload) {
+    if (payload && (Object.prototype.hasOwnProperty.call(payload, "intake") ||
+        Object.prototype.hasOwnProperty.call(payload, "disposition"))) {
+      const views = [];
+      if (payload.intake) {
+        views.push({
+          key: "intake",
+          title: "Question path",
+          payload: payload.intake,
+          showAllConditions: true,
+          showShared: true,
+        });
+      }
+      if (payload.disposition) {
+        views.push({
+          key: "disposition",
+          title: "Why this advice",
+          payload: payload.disposition,
+          showAllConditions: false,
+          showShared: false,
+        });
+      }
+      return views;
+    }
+    return [
+      {
+        key: "disposition",
+        title: "",
+        payload: payload,
+        showAllConditions: false,
+        showShared: false,
+      },
+    ];
   }
 
   function topRankedCondition(conditions) {
@@ -81,12 +138,12 @@
   }
 
   function renderConditionTabs(tabsEl, conditions, onSelect) {
-    // Study UI: show only the top-ranked condition (backend still ranks all).
     tabsEl.innerHTML = conditions
       .map((cond, idx) => {
         const active = idx === 0 ? " active" : "";
+        const disabled = onSelect ? "" : " disabled";
         return `
-          <button type="button" class="traversal-tab${active}" data-index="${idx}" disabled>
+          <button type="button" class="traversal-tab${active}" data-index="${idx}"${disabled}>
             <span class="traversal-tab-rank">#${cond.rank}</span>
             <span class="traversal-tab-name">${escapeHtml(cond.condition)}</span>
             <span class="traversal-tab-score">${Number(cond.riskScore).toFixed(1)}</span>
@@ -94,6 +151,13 @@
         `;
       })
       .join("");
+    if (!onSelect) return;
+    tabsEl.querySelectorAll(".traversal-tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const idx = Number(tab.getAttribute("data-index"));
+        onSelect(idx);
+      });
+    });
   }
 
   function renderConditionSteps(stepsEl, condition, onStepClick) {
@@ -186,44 +250,69 @@
       return;
     }
 
-    const conditions = topRankedCondition(payload.conditions || []);
-    if (!conditions.length) {
+    const views = viewsFromPayload(payload).filter((view) => {
+      const data = view.payload || {};
+      return (data.conditions && data.conditions.length) || (data.sharedSteps && data.sharedSteps.length);
+    });
+    if (!views.length) {
       root.textContent = "No candidate conditions in this traversal.";
       return;
     }
 
-    // Display payload keeps only the top condition; full ranking remains on the bot.
-    payload = { ...payload, conditions };
-
-    root.innerHTML = `
-      <div class="traversal-panel">
-        <div class="traversal-shared"></div>
-        <div class="traversal-tabs"></div>
+    root.innerHTML = views
+      .map(
+        (view, viewIdx) => `
+      <div class="traversal-panel" data-view="${escapeHtml(view.key)}">
+        ${view.title ? `<h3 class="traversal-view-title">${escapeHtml(view.title)}</h3>` : ""}
+        <div class="traversal-shared" data-view-index="${viewIdx}"></div>
+        <div class="traversal-tabs" data-view-index="${viewIdx}"></div>
         <div class="traversal-body">
-          <div class="traversal-graph"></div>
-          <div class="traversal-steps"></div>
+          <div class="traversal-graph" data-view-index="${viewIdx}"></div>
+          <div class="traversal-steps" data-view-index="${viewIdx}"></div>
         </div>
       </div>
-    `;
+    `
+      )
+      .join("");
 
-    const sharedEl = root.querySelector(".traversal-shared");
-    const tabsEl = root.querySelector(".traversal-tabs");
-    const graphEl = root.querySelector(".traversal-graph");
-    const stepsEl = root.querySelector(".traversal-steps");
+    views.forEach((view, viewIdx) => {
+      const panel = root.querySelectorAll(".traversal-panel")[viewIdx];
+      if (!panel) return;
+      const data = { ...view.payload };
+      const conditions = view.showAllConditions
+        ? data.conditions || []
+        : topRankedCondition(data.conditions || []);
+      data.conditions = conditions;
 
-    renderSharedSteps(sharedEl, payload.sharedSteps || []);
+      const sharedEl = panel.querySelector(".traversal-shared");
+      const tabsEl = panel.querySelector(".traversal-tabs");
+      const graphEl = panel.querySelector(".traversal-graph");
+      const stepsEl = panel.querySelector(".traversal-steps");
 
-    const state = {
-      payload,
-      graphEl,
-      stepsEl,
-      cy: null,
-      activeIndex: 0,
-    };
-    stateByRoot.set(root, state);
+      renderSharedSteps(sharedEl, data.sharedSteps || [], view.showShared);
 
-    renderConditionTabs(tabsEl, conditions);
-    selectCondition(root, 0);
+      const state = {
+        payload: data,
+        graphEl,
+        stepsEl,
+        cy: null,
+        activeIndex: 0,
+      };
+      stateByRoot.set(panel, state);
+
+      if (conditions.length) {
+        renderConditionTabs(
+          tabsEl,
+          conditions,
+          view.showAllConditions ? (idx) => selectCondition(panel, idx) : null
+        );
+        selectCondition(panel, 0);
+      } else {
+        tabsEl.innerHTML = "";
+        graphEl.innerHTML = "";
+        stepsEl.innerHTML = `<p class="traversal-muted">No graph paths for this question yet.</p>`;
+      }
+    });
   }
 
   function boot() {

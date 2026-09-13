@@ -6,7 +6,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas import ChecklistItemDump
+
 GraphNodeLabel = Literal["Factor", "Condition", "Chunk"]
+TraversalMode = Literal["traversal", "intake_gap"]
 TraversalAction = Literal[
     "checklist_item",
     "match_factor",
@@ -16,6 +19,9 @@ TraversalAction = Literal[
     "traverse_mediated",
     "evidence_link",
     "aggregate_conditions",
+    "graph_gap",
+    "ask_factor",
+    "deny_factor",
 ]
 
 
@@ -70,7 +76,7 @@ class TraversalStep(BaseModel):
 
     step: int
     action: TraversalAction
-    checklist_item: dict[str, str] | None = None
+    checklist_item: ChecklistItemDump | None = None
     factor: str | None = None
     condition: str | None = None
     mediator: str | None = None
@@ -84,11 +90,24 @@ class TraversalStep(BaseModel):
     note: str | None = None
 
 
+class FactorMention(BaseModel):
+    """One factor mention inside a checklist item (span-scoped polarity)."""
+
+    factor_name: str
+    polarity: Literal["affirmed", "denied"]
+    match_method: str = "regex"
+    match_score: float = 0.0
+
+
 class FactorMatch(BaseModel):
-    checklist_item: dict[str, str]
+    checklist_item: ChecklistItemDump
     factor_name: str | None = None
     match_method: str = "none"
     match_score: float = 0.0
+    # denied matches keep factor_name so the LLM matcher cannot re-affirm them.
+    polarity: Literal["affirmed", "denied"] | None = None
+    # Additional factors mentioned in the same item (mixed affirm + deny).
+    mentions: list[FactorMention] = Field(default_factory=list)
 
 
 class ConditionRisk(BaseModel):
@@ -115,12 +134,12 @@ class GraphTraversalTrace(BaseModel):
     """Full traversal artifact for Graphs/app UI consumption."""
 
     trace_id: str
-    mode: Literal["traversal"] = "traversal"
+    mode: TraversalMode = "traversal"
     title: str
     graph_version: str = "red_flags/v1"
-    checklist_items: list[dict[str, str]] = Field(default_factory=list)
+    checklist_items: list[ChecklistItemDump] = Field(default_factory=list)
     matched_factors: list[str] = Field(default_factory=list)
-    unmatched_items: list[dict[str, str]] = Field(default_factory=list)
+    unmatched_items: list[ChecklistItemDump] = Field(default_factory=list)
     candidate_conditions: list[str] = Field(default_factory=list)
     condition_risks: list[ConditionRisk] = Field(default_factory=list)
     condition_traversals: list[ConditionTraversal] = Field(default_factory=list)

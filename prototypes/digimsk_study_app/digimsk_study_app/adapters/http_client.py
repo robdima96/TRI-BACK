@@ -81,6 +81,7 @@ async def call_chat_api(session_id: str, message: str) -> ChatTurnResult:
         questions_asked=int(data.get("questions_asked") or 0),
         coverage_ready=bool(data.get("coverage_ready")),
         graph_traversal=data.get("graph_traversal"),
+        intake_traversal=data.get("intake_traversal"),
         matched_factors=list(data.get("matched_factors") or []),
         candidate_conditions=list(data.get("candidate_conditions") or []),
         traversed_chunk_ids=list(data.get("traversed_chunk_ids") or []),

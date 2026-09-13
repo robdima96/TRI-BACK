@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+from app.schemas import ChecklistItemDump
 from app.services.graphrag.graph_client_protocol import PathSegment
 from app.services.graphrag.inference import get_condition_scorer
 from app.services.graphrag.schemas import (
@@ -120,7 +121,7 @@ def build_condition_traversals(
 
 def build_agent_provenance_trace(
     *,
-    checklist: list[dict[str, str]],
+    checklist: list[ChecklistItemDump],
     used_factors: list[str],
     used_conditions: list[str],
     factors_by_condition: dict[str, tuple[str, ...]],

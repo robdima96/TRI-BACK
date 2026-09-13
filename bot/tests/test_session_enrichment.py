@@ -9,6 +9,7 @@ from app.session_enrichment import (
     compact_graph_for_session,
     default_engagement,
     engagement_from_messages,
+    exposed_chat_graph_fields,
     slim_factor_matching_audit,
     split_checklist_by_source,
 )
@@ -160,6 +161,18 @@ def test_orchestrator_snapshot_includes_safety_fields():
     assert snap["escalated"] is True
     assert snap["safety_reason"] == "risk_policy"
     assert snap["coverage_ready"] is True
+    assert snap["factor_states"] == {}
+
+
+def test_orchestrator_snapshot_includes_factor_states():
+    snap = build_orchestrator_snapshot(
+        {
+            "question_mode": True,
+            "factor_states": {"Bladder dysfunction": "denied"},
+        },
+        turn_index=2,
+    )
+    assert snap["factor_states"] == {"Bladder dysfunction": "denied"}
 
 
 def test_disposition_skipped_on_question_mode():
@@ -237,6 +250,96 @@ def test_merge_appends_disposition_history():
     assert len(merged["disposition_history"]) == 1
     assert merged["matched_factors"] == ["Diabetes"]
     assert merged["graph_traversal"]["trace_id"] == "d1"
+
+
+def test_merge_appends_intake_history_and_preserves_on_disposition():
+    existing = {
+        "session_id": "s1",
+        "intake_history": [],
+        "orchestrator_history": [],
+        "factor_states": {"Neuro sensory deficit": "affirmed"},
+    }
+    merged = merge_session_fields(
+        existing,
+        {
+            "intake": {
+                "turn_index": 2,
+                "asked_factor": "Saddle anaesthesia",
+                "question_reason": "rank:t1:CES:Saddle anaesthesia",
+                "factor_states": {"Neuro sensory deficit": "affirmed"},
+                "intake_traversal": {"trace_id": "in1", "mode": "intake_gap"},
+            }
+        },
+    )
+    assert len(merged["intake_history"]) == 1
+    assert merged["intake_traversal"]["trace_id"] == "in1"
+
+    later = merge_session_fields(
+        merged,
+        {
+            "disposition": {
+                "turn_index": 4,
+                "matched_factors": ["Neuro sensory deficit"],
+                "graph_traversal": {"trace_id": "d1"},
+            },
+            "intake_traversal": None,
+        },
+    )
+    assert later["graph_traversal"]["trace_id"] == "d1"
+    assert later["intake_traversal"]["trace_id"] == "in1"
+    assert later["factor_states"]["Neuro sensory deficit"] == "affirmed"
+
+
+def test_merge_disposition_replaces_intake_snapshot():
+    existing = {
+        "session_id": "s1",
+        "intake_history": [
+            {
+                "turn_index": 2,
+                "intake_traversal": {"trace_id": "in1", "mode": "intake_gap"},
+            }
+        ],
+        "intake_traversal": {"trace_id": "in1", "mode": "intake_gap"},
+        "disposition_history": [],
+    }
+    merged = merge_session_fields(
+        existing,
+        {
+            "disposition": {
+                "turn_index": 4,
+                "matched_factors": ["Neuro sensory deficit"],
+                "graph_traversal": {"trace_id": "d1"},
+                "intake_traversal": {"trace_id": "final-path", "mode": "intake_gap"},
+            }
+        },
+    )
+    assert merged["graph_traversal"]["trace_id"] == "d1"
+    assert merged["intake_traversal"]["trace_id"] == "final-path"
+    assert merged["intake_history"][0]["intake_traversal"]["trace_id"] == "in1"
+
+
+def test_exposed_chat_graph_fields_hidden_on_question_turns():
+    graph, intake = exposed_chat_graph_fields(
+        {
+            "question_mode": True,
+            "graph_traversal": {"trace_id": "g1"},
+            "intake_traversal": {"trace_id": "in1"},
+        }
+    )
+    assert graph is None
+    assert intake is None
+
+
+def test_exposed_chat_graph_fields_on_disposition():
+    graph, intake = exposed_chat_graph_fields(
+        {
+            "question_mode": False,
+            "graph_traversal": {"trace_id": "g1"},
+            "intake_traversal": {"trace_id": "in1"},
+        }
+    )
+    assert graph == {"trace_id": "g1"}
+    assert intake == {"trace_id": "in1"}
 
 
 def test_merge_messages_preserves_feedback_and_message_id():

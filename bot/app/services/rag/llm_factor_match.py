@@ -245,6 +245,7 @@ def llm_match_unmatched_factors(
             factor_name=factor_name,
             match_method="llm_semantic",
             match_score=confidence,
+            polarity="affirmed",
         )
     _log.info(
         "llm factor match: %d candidates, %d accepted → %s",

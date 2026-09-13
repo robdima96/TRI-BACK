@@ -49,9 +49,11 @@ _GLINER_LABELS: dict[SlotName, frozenset[str]] = {
 }
 
 # Non-answers that should not close a clinical slot.
+# A bare "no" is a real answer to a factor question (see factor_answers) and a
+# non-answer to a slot question — keep that split here, not in a shared regex.
 _EMPTY_ANSWER = re.compile(
     r"^\s*(?:i\s+don'?t\s+know|idk|unsure|not\s+sure|n/?a|nothing|none|"
-    r"no\s+idea|\?+)\s*$",
+    r"no\s+idea|\?+|no|nope|nah)\s*$",
     re.I,
 )
 

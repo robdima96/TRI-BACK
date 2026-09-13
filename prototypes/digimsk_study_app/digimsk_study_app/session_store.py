@@ -35,6 +35,9 @@ _BOT_OWNED_KEYS = frozenset(
         "factor_matching_audit",
         "agent_trace",
         "graph_traversal",
+        "intake_traversal",
+        "intake_history",
+        "factor_states",
     }
 )
 

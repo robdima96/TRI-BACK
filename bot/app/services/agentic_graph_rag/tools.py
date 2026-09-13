@@ -18,7 +18,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from app.schemas import ChecklistItem, ChunkMatch
+from app.schemas import ChecklistItem, ChecklistItemDump, ChunkMatch
 from app.services.agentic_graph_rag.ontology import (
     RedFlagOntology,
     load_ontology,
@@ -42,7 +42,7 @@ class ToolContext:
     RAG evidence is retrieved lazily through tools selected by the agent.
     """
 
-    checklist: list[dict[str, str]]
+    checklist: list[ChecklistItemDump]
     chunk_matches: list[ChunkMatch]
     ontology: RedFlagOntology
     query: str = ""
@@ -99,11 +99,13 @@ def tool_get_matched_factors(ctx: ToolContext, **_: Any) -> ToolResult:
     from app.services.graphrag import match_checklist_to_factors
 
     matches = match_checklist_to_factors(ctx.checklist)
-    matched = [m.factor_name for m in matches if m.factor_name]
+    from app.services.rag.factor_matcher import affirmed_factor_names, match_is_affirmed
+
+    matched = affirmed_factor_names(matches)
     unmatched = [
         (m.checklist_item.get("text") or "")
         for m in matches
-        if not m.factor_name
+        if not match_is_affirmed(m)
     ]
     obs = {
         "matched_factors": matched,

@@ -17,6 +17,7 @@ from typing import Any
 from app.config import settings
 from app.session_enrichment import (
     DISPOSITION_SNAPSHOT_KEYS,
+    PRESERVE_IF_EMPTY_KEYS,
     default_session_fields,
     engagement_from_messages,
 )
@@ -179,6 +180,7 @@ def merge_session_fields(existing: dict[str, Any], fields: dict[str, Any]) -> di
 
     disposition = incoming.pop("disposition", None)
     orchestrator = incoming.pop("orchestrator", None)
+    intake = incoming.pop("intake", None)
 
     if "messages" in incoming:
         incoming["messages"] = merge_messages_preserving_study(
@@ -186,8 +188,13 @@ def merge_session_fields(existing: dict[str, Any], fields: dict[str, Any]) -> di
             incoming.get("messages"),
         )
 
-    # Never let callers null-out durable disposition snapshots.
-    for key in DISPOSITION_SNAPSHOT_KEYS:
+    if "factor_states" in incoming and isinstance(incoming.get("factor_states"), dict):
+        prior_states = merged.get("factor_states")
+        prior = prior_states if isinstance(prior_states, dict) else {}
+        incoming["factor_states"] = {**prior, **incoming["factor_states"]}
+
+    # Never let callers null-out durable graph snapshots.
+    for key in PRESERVE_IF_EMPTY_KEYS:
         if key not in incoming:
             continue
         value = incoming[key]
@@ -213,6 +220,20 @@ def merge_session_fields(existing: dict[str, Any], fields: dict[str, Any]) -> di
         for key in DISPOSITION_SNAPSHOT_KEYS:
             if key in disposition:
                 merged[key] = disposition[key]
+        if disposition.get("intake_traversal") not in (None, {}, []):
+            merged["intake_traversal"] = disposition["intake_traversal"]
+
+    if intake and isinstance(intake, dict):
+        merged["intake_history"] = _append_by_turn_index(
+            merged.get("intake_history"),
+            intake,
+        )
+        if intake.get("intake_traversal") not in (None, {}, []):
+            merged["intake_traversal"] = intake["intake_traversal"]
+        if isinstance(intake.get("factor_states"), dict) and intake["factor_states"]:
+            prior_states = merged.get("factor_states")
+            prior = prior_states if isinstance(prior_states, dict) else {}
+            merged["factor_states"] = {**prior, **intake["factor_states"]}
 
     return merged
 

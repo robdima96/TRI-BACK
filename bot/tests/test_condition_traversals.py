@@ -40,7 +40,44 @@ def test_score_conditions_orders_by_weighted_evidence():
     assert risks[0].path_count == 2
 
 
-def test_traverse_groups_steps_per_condition():
+def test_confirm_against_is_excluded_from_score():
+    segments = [
+        _segment(
+            factor="Neuro sensory deficit",
+            condition="CES",
+            relationship="CONFIRM_AGAINST",
+        ),
+        _segment(
+            factor="Fever",
+            condition="Infection",
+            relationship="SUGGESTIVE_OF",
+        ),
+    ]
+    risks = score_conditions(segments)
+    assert [r.condition for r in risks] == ["Infection"]
+    assert all(r.condition != "CES" for r in risks)
+
+
+def test_unilateral_sensory_does_not_rank_ces():
+    items = [
+        ChecklistItem(
+            text="tingling down my leg",
+            kind="symptom",
+            source="gliner",
+            label="symptom",
+        ),
+    ]
+    trace = traverse_from_checklist(items, trace_id="confirm-against-ces")
+    assert "Neuro sensory deficit" in trace.matched_factors
+    assert "CES" not in trace.candidate_conditions
+    assert any(
+        s.relationship == "CONFIRM_AGAINST" and s.condition == "CES"
+        for s in (
+            step
+            for step in trace.steps
+            if step.relationship
+        )
+    )
     items = [
         ChecklistItem(
             text="severe pain",

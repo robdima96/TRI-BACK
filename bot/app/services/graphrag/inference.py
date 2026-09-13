@@ -21,6 +21,19 @@ class ConditionScorer(Protocol):
     def score(self, segments: list[PathSegment]) -> list[ConditionRisk]: ...
 
 
+class _ExcludeConfirmAgainstScorer:
+    """Drop CONFIRM_AGAINST before any scorer, including a future Bayesian model."""
+
+    def __init__(self, inner: ConditionScorer) -> None:
+        self._inner = inner
+        self.name = inner.name
+
+    def score(self, segments: list[PathSegment]) -> list[ConditionRisk]:
+        from app.services.graphrag.condition_ranker import scoring_segments
+
+        return self._inner.score(scoring_segments(segments))
+
+
 class HeuristicConditionScorer:
     name = "heuristic"
 
@@ -51,7 +64,9 @@ def get_condition_scorer(name: str | None = None) -> ConditionScorer:
 
     selected = (name or settings.graph_inference).strip().lower()
     if selected == "heuristic":
-        return HeuristicConditionScorer()
-    if selected == "bayesian":
-        return BayesianConditionScorer()
-    raise ValueError(f"Unsupported graph inference backend: {selected!r}")
+        inner: ConditionScorer = HeuristicConditionScorer()
+    elif selected == "bayesian":
+        inner = BayesianConditionScorer()
+    else:
+        raise ValueError(f"Unsupported graph inference backend: {selected!r}")
+    return _ExcludeConfirmAgainstScorer(inner)

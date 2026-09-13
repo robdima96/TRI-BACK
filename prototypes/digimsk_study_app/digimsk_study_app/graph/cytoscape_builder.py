@@ -36,6 +36,12 @@ def format_step_summary(step: TraversalStep) -> str:
         return step.note or f"Evidence linked to {step.condition or 'path'}"
     if step.action == "aggregate_conditions":
         return step.note or "Ranked candidate conditions"
+    if step.action == "ask_factor" and step.factor:
+        return step.note or f"Asking about: {step.factor}"
+    if step.action == "deny_factor" and step.factor:
+        return step.note or f"Denied factor: {step.factor}"
+    if step.action == "graph_gap":
+        return step.note or "Intake question"
     return step.note or step.action
 
 
@@ -66,6 +72,9 @@ def build_cytoscape_elements(
     elements: list[dict[str, Any]] = []
 
     for node in nodes:
+        props = getattr(node, "properties", None) or {}
+        polarity = str(props.get("polarity") or "")
+        ask_target = bool(props.get("ask_target"))
         elements.append(
             {
                 "data": {
@@ -73,19 +82,25 @@ def build_cytoscape_elements(
                     "label": node.name,
                     "nodeType": node.label,
                     "highlighted": node.id in highlight_nodes,
+                    "polarity": polarity,
+                    "askTarget": ask_target,
+                    "dimmed": polarity == "denied",
                 }
             }
         )
 
     for edge in edges:
+        rel = getattr(edge, "type", "") or ""
         elements.append(
             {
                 "data": {
                     "id": edge.id,
                     "source": edge.source,
                     "target": edge.target,
-                    "label": edge.type,
+                    "label": rel,
+                    "edgeType": rel,
                     "highlighted": edge.id in highlight_edges,
+                    "confirmAgainst": rel == "CONFIRM_AGAINST",
                 }
             }
         )
@@ -119,10 +134,12 @@ def build_traversal_debug_payload(trace: GraphTraversalTrace | None) -> dict[str
     if trace is None:
         return {}
 
+    mode = getattr(trace, "mode", "traversal") or "traversal"
     if trace.condition_traversals:
         return {
             "title": trace.title,
             "traceId": trace.trace_id,
+            "mode": mode,
             "sharedSteps": [_step_payload(step) for step in trace.shared_steps],
             "conditions": [
                 build_condition_payload(traversal)
@@ -130,12 +147,22 @@ def build_traversal_debug_payload(trace: GraphTraversalTrace | None) -> dict[str
             ],
         }
 
+    shared = trace.shared_steps or trace.steps
     if not trace.nodes:
-        return {}
+        if not shared:
+            return {}
+        return {
+            "title": trace.title,
+            "traceId": trace.trace_id,
+            "mode": mode,
+            "sharedSteps": [_step_payload(step) for step in shared],
+            "conditions": [],
+        }
 
     return {
         "title": trace.title,
         "traceId": trace.trace_id,
+        "mode": mode,
         "sharedSteps": [_step_payload(step) for step in trace.steps],
         "conditions": [
             {
@@ -159,6 +186,40 @@ def build_traversal_debug_payload(trace: GraphTraversalTrace | None) -> dict[str
             for idx, name in enumerate(trace.candidate_conditions, start=1)
         ],
     }
+
+
+def arm3_keyed_payload(
+    *,
+    intake: GraphTraversalTrace | None,
+    disposition: GraphTraversalTrace | None,
+) -> dict[str, Any]:
+    """Keyed Arm-3 payload so the client can show intake, disposition, or both."""
+    intake_payload = build_traversal_debug_payload(intake)
+    disposition_payload = build_traversal_debug_payload(disposition)
+    if not intake_payload and not disposition_payload:
+        return {}
+    if intake_payload and disposition_payload:
+        mode = "both"
+    elif intake_payload:
+        mode = "intake_gap"
+    else:
+        mode = "traversal"
+    return {
+        "mode": mode,
+        "intake": intake_payload or None,
+        "disposition": disposition_payload or None,
+    }
+
+
+def arm3_keyed_json(
+    *,
+    intake: GraphTraversalTrace | None,
+    disposition: GraphTraversalTrace | None,
+) -> str | None:
+    payload = arm3_keyed_payload(intake=intake, disposition=disposition)
+    if not payload:
+        return None
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def cytoscape_json(trace: GraphTraversalTrace | None) -> str:

@@ -4,6 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
+# Explicit "not enough to advise" copy when intake ended with unanswered
+# time-critical CES / AAA / DVT neighbourhood. Used instead of an LLM draft
+# so the generator cannot dump self-care.
+INSUFFICIENT_INFO_TEXT = (
+    "I don't have enough information to advise on self-care or a likely cause. "
+    "Time-critical questions about serious causes of back and leg symptoms "
+    "remain unanswered. Please arrange in-person assessment now. If symptoms "
+    "are severe or getting worse, go to the emergency department or call "
+    "emergency services."
+)
+
 # Suggested minimum triage level when a condition ranks first (heuristic rules engine).
 _CONDITION_TRIAGE_LEVEL: dict[str, str] = {
     "CES": "emergency",
@@ -145,6 +156,7 @@ def build_disposition_brief(
     candidate_conditions: list[str] | None = None,
     matched_factors: list[str] | None = None,
     inference_mode: str = "deterministic",
+    question_reason: str | None = None,
 ) -> dict[str, Any]:
     """
     Build a machine-readable brief from graph traversal output and factor audit.
@@ -176,12 +188,22 @@ def build_disposition_brief(
                 levels.append(level)
     minimum_triage_level = _max_triage_level(*levels) if levels else "needs_assessment"
 
-    insufficient = bool(critical_unmatched) or (not primary and not (matched_factors or []))
+    time_critical_unknown = (question_reason or "") == "insufficient_info_time_critical"
+    insufficient = (
+        bool(critical_unmatched)
+        or time_critical_unknown
+        or (not primary and not (matched_factors or []))
+    )
 
     if insufficient:
         minimum_triage_level = _max_triage_level(minimum_triage_level, "needs_assessment")
 
     summary_parts: list[str] = []
+    if time_critical_unknown:
+        summary_parts.append(
+            "Intake ended with unanswered time-critical CES/AAA/DVT factors; "
+            "do not advise self-care or a mechanical cause."
+        )
     if primary:
         summary_parts.append(
             f"Graph rank #1 is {primary} (score {primary_score:.1f})."
@@ -206,6 +228,8 @@ def build_disposition_brief(
         "critical_unmatched_rows": critical_unmatched,
         "minimum_triage_level": minimum_triage_level,
         "insufficient_evidence": insufficient,
+        "time_critical_unknown": time_critical_unknown,
+        "decline_to_advise": time_critical_unknown,
         "authoritative_summary": " ".join(summary_parts),
     }
 
@@ -242,6 +266,15 @@ def format_brief_for_prompt(brief: dict[str, Any] | None) -> str:
         )
         lines.append(f"- Factor provenance: {prov}")
 
+    if brief.get("time_critical_unknown") or brief.get("decline_to_advise"):
+        lines.append(
+            "- Not enough information to advise: unanswered time-critical "
+            "CES/AAA/DVT questions remain. Do NOT recommend self-care or a "
+            "mechanical cause. Do not draft a clinical disposition. "
+            "Recommend in-person assessment now."
+        )
+        return "\n".join(lines)
+
     lines.extend(
         [
             "- You MUST explain the primary condition using the matched factors above.",
@@ -257,6 +290,13 @@ def format_brief_for_prompt(brief: dict[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def decline_to_advise_text(brief: dict[str, Any] | None) -> str | None:
+    """Canned insufficient-info response, or None when the LLM may still draft."""
+    if brief and (brief.get("time_critical_unknown") or brief.get("decline_to_advise")):
+        return INSUFFICIENT_INFO_TEXT
+    return None
+
+
 def build_disposition_brief_from_state(state: dict[str, Any]) -> dict[str, Any]:
     """Build a brief from orchestrator ``ChatState`` fields after graph traversal."""
     graph = state.get("graph_traversal")
@@ -270,4 +310,5 @@ def build_disposition_brief_from_state(state: dict[str, Any]) -> dict[str, Any]:
         candidate_conditions=state.get("candidate_conditions"),
         matched_factors=state.get("matched_factors"),
         inference_mode=inference,
+        question_reason=state.get("question_reason"),
     )

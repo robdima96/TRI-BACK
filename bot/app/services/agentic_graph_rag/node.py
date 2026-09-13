@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 
 from app.orchestrator.state import ChatState
+from app.schemas import ChecklistItemDump
 
 _log = logging.getLogger(__name__)
 
@@ -48,10 +49,18 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
         chunk_matches = list(raw)
     state["chunk_matches"] = [m.model_dump() for m in chunk_matches]
 
-    seeds = build_traversal_seeds(checklist=checklist, chunk_matches=chunk_matches)
-    from app.services.rag.factor_matcher import build_factor_matching_audit
+    seeds = build_traversal_seeds(
+        checklist=checklist,
+        chunk_matches=chunk_matches,
+        source_message=state.get("message") or state.get("message_normalized"),
+    )
+    from app.services.rag.factor_matcher import (
+        apply_factor_states,
+        build_factor_matching_audit,
+    )
 
     factor_audit = build_factor_matching_audit(seeds.factor_matches)
+    apply_factor_states(state, seeds.factor_matches)
     matched_factors = seeds.matched_factor_names
     ontology = load_ontology()
     touched_conditions = tally_touched_conditions(matched_factors, ontology)
@@ -67,6 +76,19 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
     state["factor_matching_audit"] = factor_audit
     intake = coverage_intake_summary(state.get("coverage") or {})
     history = conversation_history_before_last_user(state.get("messages") or [])
+
+    from app.orchestrator.question_planner import INSUFFICIENT_INFO_REASON
+
+    if state.get("question_reason") == INSUFFICIENT_INFO_REASON:
+        return _insufficient_info_disposition(
+            state=state,
+            checklist=checklist,
+            chunk_matches=chunk_matches,
+            factor_matches=list(seeds.factor_matches),
+            factor_audit=factor_audit,
+            matched_factors=matched_factors,
+            baseline_evidence=baseline_evidence,
+        )
 
     if not generator_model_configured():
         return _deterministic_fallback(
@@ -166,6 +188,7 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
         candidate_conditions=list(agent_trace.used_conditions),
         matched_factors=matched_factors,
         inference_mode=str(graph_payload.get("inference") or "agentic"),
+        question_reason=state.get("question_reason"),
     )
     return state
 
@@ -190,11 +213,69 @@ def _empty_trace_payload(
     return payload
 
 
+def _insufficient_info_disposition(
+    *,
+    state: ChatState,
+    checklist: list[ChecklistItemDump],
+    chunk_matches: list,
+    factor_matches: list,
+    factor_audit: dict,
+    matched_factors: list[str],
+    baseline_evidence: list,
+) -> ChatState:
+    """Skip the LLM when time-critical neighbourhood is still unknown."""
+    from app.config import settings
+    from app.services.disposition_brief import (
+        INSUFFICIENT_INFO_TEXT,
+        build_disposition_brief_from_state,
+    )
+    from app.services.rag.evidence_builder import build_generator_evidence
+
+    trace = None
+    if settings.graphrag_load:
+        from app.services.graphrag import traverse_from_turn
+
+        trace = traverse_from_turn(
+            checklist=checklist,
+            chunk_matches=chunk_matches if settings.rag_load else [],
+            factor_matches=factor_matches,
+            title=f"Chat turn (insufficient info): {state.get('session_id', '')}",
+        )
+    if trace is not None:
+        state["matched_factors"] = list(trace.matched_factors)
+        state["candidate_conditions"] = list(trace.candidate_conditions)
+        payload = trace.model_dump()
+        state["evidence"] = build_generator_evidence(
+            trace=trace,
+            chunk_matches=chunk_matches if settings.rag_load else None,
+        )
+    else:
+        payload = _empty_trace_payload(
+            session_id=str(state.get("session_id", "")),
+            matched_factors=matched_factors,
+        )
+        state["evidence"] = baseline_evidence
+    payload["factor_matching"] = factor_audit
+    payload["inference"] = "insufficient_info"
+    state["graph_traversal"] = payload
+    state["factor_matching_audit"] = factor_audit
+    brief = build_disposition_brief_from_state(state)
+    state["disposition_brief"] = brief
+    state["draft_response"] = INSUFFICIENT_INFO_TEXT
+    state["generator_failed"] = False
+    state["agent_trace"] = {
+        "status": "skipped",
+        "stop_reason": "insufficient_info_time_critical",
+        "fallback_used": False,
+    }
+    return state
+
+
 def _deterministic_fallback(
     *,
     state: ChatState,
     query: str,
-    checklist: list[dict[str, str]],
+    checklist: list[ChecklistItemDump],
     chunk_matches: list,
     factor_matches: list,
     factor_audit: dict,

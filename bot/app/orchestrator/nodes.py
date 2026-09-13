@@ -16,9 +16,11 @@ from app.orchestrator.coverage import (
 
 from app.orchestrator.messages import conversation_history_before_last_user
 
-from app.orchestrator.question_planner import plan_next_question
+from app.orchestrator.question_planner import plan_forced_factor_question, plan_next_question
 
 from app.orchestrator.slot_answers import credit_asked_slot_answer
+
+from app.orchestrator.factor_answers import credit_asked_factor_answer
 
 from app.orchestrator.state import ChatState
 
@@ -120,24 +122,28 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
     turn_index = len(extraction_history) + 1
     latest_message = state.get("message_normalized", "")
     last_asked = state.get("last_asked_slot")
+    asked_factor = state.get("asked_factor")
 
-    # Deterministic credit for direct answers to the prior intake question
-    # (e.g. user replies "Exercise" after a palliative ask). Runs before the
-    # LLM enricher so a failed Vertex turn cannot leave the slot open.
-    slot_credit = credit_asked_slot_answer(
-        message=latest_message,
-        last_asked_slot=last_asked,
-        checklist=encoder_merged,
-    )
-    if slot_credit:
-        encoder_merged = merge_checklist_items(encoder_merged, slot_credit)
-        state["clinical_checklist"] = encoder_merged
+    # Deterministic credit for the prior question. Factor answers must not
+    # fall through to slot credit (a bare "no" would otherwise fill palliative).
+    if asked_factor:
+        last_asked = None
+    else:
+        slot_credit = credit_asked_slot_answer(
+            message=latest_message,
+            last_asked_slot=last_asked,
+            checklist=encoder_merged,
+        )
+        if slot_credit:
+            encoder_merged = merge_checklist_items(encoder_merged, slot_credit)
+            state["clinical_checklist"] = encoder_merged
 
     enrichment = propose_checklist_enrichment(
         checklist=encoder_merged,
         conversation_history=history,
         latest_user_message=latest_message,
         last_asked_slot=last_asked,
+        last_asked_factor=asked_factor,
         comorbidities_acknowledged=bool(state.get("comorbidities_acknowledged")),
         session_id=state.get("session_id", ""),
         turn_index=turn_index,
@@ -159,6 +165,17 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
 
     if enrichment.comorbidities_acknowledged:
         state["comorbidities_acknowledged"] = True
+
+    from app.services.rag.factor_matcher import update_factor_states_from_checklist
+
+    update_factor_states_from_checklist(state, skip_llm=True)
+    if asked_factor:
+        # Explicit yes/no/unknown for the asked factor wins over matcher noise.
+        state["factor_states"] = credit_asked_factor_answer(
+            message=latest_message,
+            asked_factor=asked_factor,
+            factor_states=state.get("factor_states"),
+        )
 
     # Stash the co-generated next question for the planner (one LLM call per turn).
     state["pending_intake_question"] = enrichment.next_question
@@ -229,7 +246,32 @@ def plan_question_node(state: ChatState) -> ChatState:
 
     history = conversation_history_before_last_user(msgs)
 
-    q_mode, question, reason, slot, active_id = plan_next_question(
+    from app.config import settings
+
+    force = (state.get("force_factor_ask") or "").strip() or (
+        settings.force_factor_ask or ""
+    )
+    forced = plan_forced_factor_question(
+        force,
+        pending_question=state.get("pending_intake_question"),
+    ) if force else None
+    if forced:
+        question, reason, factor_name = forced
+        state["force_factor_ask"] = None
+        state["pending_intake_question"] = None
+        state["pending_intake_slot"] = None
+        state["question_mode"] = True
+        state["next_question"] = question
+        state["question_reason"] = reason
+        state["slot_being_asked"] = None
+        state["asked_factor"] = factor_name
+        if state.get("risk_hits"):
+            state["question_mode"] = False
+            state["draft_response"] = ""
+            state["asked_factor"] = None
+        return state
+
+    planned = plan_next_question(
 
         coverage,
 
@@ -249,25 +291,37 @@ def plan_question_node(state: ChatState) -> ChatState:
 
         pending_slot=state.get("pending_intake_slot"),
 
+        factor_states=state.get("factor_states"),
+
+        matched_factors=state.get("matched_factors"),
+
+        last_rank_topic=state.get("last_rank_topic"),
+
+        last_rank_tier=state.get("last_rank_tier"),
+
     )
 
     # Consumed; clear so a later disposition path cannot reuse a stale draft.
     state["pending_intake_question"] = None
     state["pending_intake_slot"] = None
 
-    state["question_mode"] = q_mode
+    state["question_mode"] = planned.question_mode
 
-    state["next_question"] = question
+    state["next_question"] = planned.next_question
 
-    state["question_reason"] = reason
+    state["question_reason"] = planned.question_reason
 
-    state["slot_being_asked"] = slot
+    state["slot_being_asked"] = planned.slot
+    state["asked_factor"] = planned.asked_factor
+    if planned.question_mode:
+        state["last_rank_topic"] = planned.rank_topic
+        state["last_rank_tier"] = planned.rank_tier
 
-    if active_id and coverage:
+    if planned.active_symptom_id and coverage:
 
         coverage = dict(coverage)
 
-        coverage["active_symptom_id"] = active_id
+        coverage["active_symptom_id"] = planned.active_symptom_id
 
         state["coverage"] = coverage  # type: ignore[assignment]
 
@@ -276,6 +330,7 @@ def plan_question_node(state: ChatState) -> ChatState:
         state["question_mode"] = False
 
         state["draft_response"] = ""
+        state["asked_factor"] = None
 
     return state
 
@@ -302,6 +357,16 @@ def generate_question_node(state: ChatState) -> ChatState:
     if state.get("slot_being_asked"):
 
         state["last_asked_slot"] = state["slot_being_asked"]
+        state["asked_factor"] = None
+
+    elif state.get("asked_factor"):
+
+        # Park the prior slot so the next message is not credited to it.
+        state["last_asked_slot"] = None
+
+    else:
+
+        state["last_asked_slot"] = None
 
     state["evidence"] = []
 
@@ -311,6 +376,7 @@ def generate_question_node(state: ChatState) -> ChatState:
 
     # Clear in-memory LangGraph state for this question turn. Session JSON
     # merge preserves prior disposition_history / latest disposition snapshots.
+    # factor_states is session memory and must survive question turns.
     state["graph_traversal"] = None
 
     state["matched_factors"] = []
@@ -322,6 +388,16 @@ def generate_question_node(state: ChatState) -> ChatState:
     state["factor_matching_audit"] = None
 
     state["agent_trace"] = None
+
+    from app.config import settings
+
+    if settings.graphrag_load:
+        from app.services.graphrag.intake_traversal import intake_trace_from_state
+
+        intake = intake_trace_from_state(state)
+        state["intake_traversal"] = intake.model_dump()
+    else:
+        state["intake_traversal"] = None
 
     return state
 
@@ -380,11 +456,16 @@ def graph_traversal_node(state: ChatState) -> ChatState:
     seeds = build_traversal_seeds(
         checklist=state.get("clinical_checklist") or [],
         chunk_matches=chunk_matches,
+        source_message=state.get("message") or state.get("message_normalized"),
     )
 
-    from app.services.rag.factor_matcher import build_factor_matching_audit
+    from app.services.rag.factor_matcher import (
+        apply_factor_states,
+        build_factor_matching_audit,
+    )
 
     factor_audit = build_factor_matching_audit(seeds.factor_matches)
+    apply_factor_states(state, seeds.factor_matches)
     _log.info(
         "factor_matching_audit: matched=%s gaps=%s methods=%s",
         factor_audit["summary"]["matched_factors"],
@@ -503,6 +584,14 @@ def policy_gate_node(state: ChatState) -> ChatState:
 
 def finalize_response_node(state: ChatState) -> dict:
 
-    return {"messages": [AIMessage(content=state["final_response"])]}
+    out: dict = {"messages": [AIMessage(content=state["final_response"])]}
+    if not state.get("question_mode"):
+        from app.config import settings
+
+        if settings.graphrag_load:
+            from app.services.graphrag.intake_traversal import final_intake_trace_from_state
+
+            out["intake_traversal"] = final_intake_trace_from_state(state).model_dump()
+    return out
 
 

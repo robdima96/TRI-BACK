@@ -11,7 +11,12 @@ from app.orchestrator.checkpointing import close_checkpointer, get_checkpointer
 from app.orchestrator.graph import build_chat_graph
 from app.orchestrator.messages import transcript_from_messages
 from app.schemas import ChatRequest, ChatResponse
-from app.session_enrichment import build_disposition_record, build_orchestrator_snapshot
+from app.session_enrichment import (
+    build_disposition_record,
+    build_intake_record,
+    build_orchestrator_snapshot,
+    exposed_chat_graph_fields,
+)
 from app.session_store import save_session
 from app.services.public_host.api_auth import (
     enforce_chat_rate_limit,
@@ -82,10 +87,11 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
         or 1
     )
     transcript = transcript_from_messages(state["messages"])
-    graph_trace = state.get("graph_traversal")
+    graph_trace, intake_trace = exposed_chat_graph_fields(state)
     factor_audit = state.get("factor_matching_audit")
     orchestrator = build_orchestrator_snapshot(state, turn_index=turn_index)
     disposition = build_disposition_record(state, turn_index=turn_index)
+    intake = build_intake_record(state, turn_index=turn_index)
 
     # Disposition fields are only passed when this turn produced a disposition
     # record; merge_session_fields preserves prior disposition_* on question turns.
@@ -94,9 +100,12 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
         "messages": transcript,
         "extraction_history": extraction_history,
         "orchestrator": orchestrator,
+        "factor_states": dict(state.get("factor_states") or {}),
     }
     if disposition is not None:
         save_kwargs["disposition"] = disposition
+    if intake is not None:
+        save_kwargs["intake"] = intake
     save_session(sid, **save_kwargs)
 
     coverage = state.get("coverage") or {}
@@ -110,6 +119,7 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
         questions_asked=int(state.get("questions_asked", 0)),
         coverage_ready=bool(coverage.get("ready_for_disposition")),
         graph_traversal=graph_trace,
+        intake_traversal=intake_trace,
         matched_factors=list(state.get("matched_factors") or []),
         candidate_conditions=list(state.get("candidate_conditions") or []),
         traversed_chunk_ids=list(state.get("traversed_chunk_ids") or []),

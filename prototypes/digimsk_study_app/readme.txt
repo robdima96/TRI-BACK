@@ -14,21 +14,57 @@ Pages:  /        login
 
 HOW TO RUN LOCALLY
 ------------------
-Prerequisites: bot already running on http://127.0.0.1:8001 (see bot/readme.txt).
-Python 3.11+, Node.js 18+ (Reflex frontend toolchain).
+Two PowerShell windows. Bot first, then the study UI.
 
-  cd prototypes/digimsk_study_app
+Do not put the bot on 8000. Reflex WebSocket must own 8000; the bot stays on 8001.
+Open http://localhost:3000 (not 3001).
+
+Terminal 1 — bot:
+
+  cd "C:\ROBS STUFF\UBC Postdoctoral Fellowship\DigiMSKbot\bot"
+  .\.venv\Scripts\Activate.ps1
+  uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+
+Wait until http://127.0.0.1:8001/ready is up (warmup can take 20-40s).
+Start uvicorn from the bot/ folder (not the repo root) so reload does not
+pick up study-app files.
+
+Terminal 2 — study UI:
+
+  cd "C:\ROBS STUFF\UBC Postdoctoral Fellowship\DigiMSKbot\prototypes\digimsk_study_app"
+  .\.venv\Scripts\Activate.ps1
+  python scripts/run_local.py --kill-stale
+
+--kill-stale frees leftover Reflex processes on 3000/8000 so the WebSocket
+does not jump onto 8001 (that 403's against the bot). The launcher also
+restores missing .web template files.
+
+Same launcher from repo root:
+
+  python prototypes/digimsk_study_app/scripts/run_local.py --kill-stale
+
+Expected ports:
+  UI                 http://localhost:3000
+  Reflex WebSocket   http://127.0.0.1:8000
+  Bot API            http://127.0.0.1:8001
+
+First-time only (venv + roster/login accounts), then run_local.py as above:
+
+  cd "C:\ROBS STUFF\UBC Postdoctoral Fellowship\DigiMSKbot\prototypes\digimsk_study_app"
   python -m venv .venv
   .\.venv\Scripts\Activate.ps1
   pip install -r requirements.txt
   python scripts/generate_roster.py
   python scripts/init_db.py
   python scripts/seed_users.py --roster data/study_roster.csv
-  # Optional: .env with CHATBOT_BASE_URL=http://127.0.0.1:8001
-  reflex run
 
-Open:  http://localhost:3000
-  (Reflex backend WebSocket uses port 8000 — do not put the bot on 8000.)
+Optional: .env with CHATBOT_BASE_URL=http://127.0.0.1:8001
+
+Do not use this launcher for Cloud Run. Public hosting still uses
+bot/app/services/public_host/cloud_run/scripts/entrypoint_study.sh.
+
+Do not use this launcher for Cloud Run. Public hosting still uses
+bot/app/services/public_host/cloud_run/scripts/entrypoint_study.sh.
 
 
 LOGIN

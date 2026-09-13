@@ -23,6 +23,8 @@ def test_build_elements_is_structural_only():
     assert data["label"] == "Non-specific Mechanical Cause"
     assert data["nodeType"] == "Condition"
     assert data["highlighted"] is True
+    assert data["dimmed"] is False
+    assert data["askTarget"] is False
     assert "size" not in data
     assert "textMaxWidth" not in data
     assert "color" not in data

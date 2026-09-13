@@ -628,8 +628,10 @@ def _build_enrichment_messages(
     last_asked_slot: SlotName | None,
     comorbidities_acknowledged: bool,
     last_assistant_message: str = "",
+    last_asked_factor: str | None = None,
 ) -> list[dict[str, str]]:
     slot_hint = last_asked_slot or "(none)"
+    factor_hint = last_asked_factor or "(none)"
     gap_summary = _coverage_gap_summary(
         checklist=checklist,
         comorbidities_acknowledged=comorbidities_acknowledged,
@@ -654,6 +656,10 @@ def _build_enrichment_messages(
         "Volunteered facts (critical):\n"
         "- Last intake slot asked is a HINT about what the assistant was seeking, NOT a "
         "limit on what you may add or edit.\n"
+        "- If a graph factor was asked (Last graph factor asked is not (none)), the "
+        "patient's yes / no / not sure answers THAT factor only. Do not treat a bare "
+        "no as filling an HPI slot (palliative, provocative, quality, etc.). Do not "
+        "add a checklist row for a denied factor.\n"
         "- Pattern extractors and GliNER often miss or mislabel facts. If the patient "
         "clearly stated something clinically relevant in the last exchange and it is "
         "not already on the checklist with the correct kind/label, you MUST add or "
@@ -707,9 +713,11 @@ def _build_enrichment_messages(
         "Rules for next_intake (the follow-up question):\n"
         "- After imagining your checklist_operations applied, pick the single highest-"
         "priority still-missing slot and write ONE plain, conversational question for it.\n"
-        "- Slot priority order: age → sex → symptom_anchor → symptom_quality → "
-        "symptom_severity → symptom_duration → provocative → palliative → "
-        "comorbidities.\n"
+        "- Slot priority order: symptom_anchor → age → sex → comorbidities → "
+        "symptom_quality → symptom_severity → provocative → palliative → "
+        "symptom_duration.\n"
+        "- This order is a hint. The planner may ask a graph-adjacent red-flag "
+        "factor instead; still draft the next floor slot so a fallback exists.\n"
         "- Allowed slot values: age | sex | comorbidities | symptom_anchor | "
         "symptom_duration | symptom_severity | symptom_quality | provocative | "
         "palliative.\n"
@@ -720,6 +728,7 @@ def _build_enrichment_messages(
         "- If coverage would be complete after your updates (ready for disposition), "
         "set next_intake to null.\n\n"
         f"Last intake slot asked by assistant: {slot_hint}\n"
+        f"Last graph factor asked by assistant: {factor_hint}\n"
         f"Coverage before enrichment:\n{gap_summary}\n\n"
         f"Existing checklist (modify/delete by id in brackets; numbers are display-only):\n"
         f"{_format_checklist_block(checklist)}\n\n"
@@ -750,6 +759,7 @@ def propose_checklist_enrichment(
     conversation_history: list[dict[str, str]] | None = None,
     latest_user_message: str,
     last_asked_slot: SlotName | None = None,
+    last_asked_factor: str | None = None,
     comorbidities_acknowledged: bool = False,
     session_id: str = "",
     turn_index: int = 0,
@@ -779,6 +789,7 @@ def propose_checklist_enrichment(
             last_asked_slot=last_asked_slot,
             comorbidities_acknowledged=comorbidities_acknowledged,
             last_assistant_message=assistant_msg,
+            last_asked_factor=last_asked_factor,
         )
         raw = generate_from_messages(
             messages,

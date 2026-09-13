@@ -1,6 +1,7 @@
 """Presentation adapter routing tests."""
 
 import asyncio
+import json
 
 from digimsk_study_app.adapters.base import ChatTurnResult
 from digimsk_study_app.adapters.presentation import (
@@ -335,3 +336,186 @@ def test_arm3_gets_graph_not_reasoning(monkeypatch):
     assert result.reasoning_text is None
     assert result.has_graph is True
     assert result.graph_json
+    payload = json.loads(result.graph_json)
+    assert payload["mode"] in {"traversal", "both"}
+    assert payload["disposition"]
+    assert payload["disposition"]["conditions"][0]["condition"] == "AAA"
+
+
+def test_arm3_question_turn_hides_intake_slice(monkeypatch):
+    async def fake_chat(_session_id: str, _message: str) -> ChatTurnResult:
+        return ChatTurnResult(
+            session_id="s1",
+            response="Have you noticed numbness around the groin?",
+            question_mode=True,
+            intake_traversal={
+                "trace_id": "in1",
+                "mode": "intake_gap",
+                "title": "Intake",
+                "matched_factors": ["Neuro sensory deficit"],
+                "candidate_conditions": ["CES"],
+                "shared_steps": [
+                    {
+                        "step": 1,
+                        "action": "ask_factor",
+                        "factor": "Saddle anaesthesia",
+                        "note": "rank:t1:CES:Saddle anaesthesia",
+                    }
+                ],
+                "condition_traversals": [
+                    {
+                        "condition": "CES",
+                        "risk_score": 0.0,
+                        "rank": 1,
+                        "path_count": 1,
+                        "supporting_factors": ["Saddle anaesthesia"],
+                        "steps": [],
+                        "nodes": [
+                            {
+                                "id": "n1",
+                                "elementId": "n1",
+                                "label": "Factor",
+                                "name": "Saddle anaesthesia",
+                                "properties": {
+                                    "ask_target": True,
+                                    "polarity": "unknown",
+                                },
+                            }
+                        ],
+                        "edges": [],
+                        "highlight": {"node_ids": ["n1"], "edge_ids": []},
+                    }
+                ],
+                "steps": [],
+                "highlight": {"node_ids": ["n1"], "edge_ids": []},
+                "nodes": [
+                    {
+                        "id": "n1",
+                        "elementId": "n1",
+                        "label": "Factor",
+                        "name": "Saddle anaesthesia",
+                        "properties": {"ask_target": True, "polarity": "unknown"},
+                    }
+                ],
+                "edges": [],
+            },
+        )
+
+    monkeypatch.setattr(
+        "digimsk_study_app.adapters.presentation.call_chat_api",
+        fake_chat,
+    )
+    result = asyncio.run(PresentationAdapter(3).send_message("s1", "hi"))
+    assert result.has_graph is False
+    assert result.graph_json is None
+
+
+def test_arm3_disposition_shows_question_path_and_advice(monkeypatch):
+    async def fake_chat(_session_id: str, _message: str) -> ChatTurnResult:
+        return ChatTurnResult(
+            session_id="s1",
+            response="Please attend your nearest emergency department.",
+            question_mode=False,
+            intake_traversal={
+                "trace_id": "in-final",
+                "mode": "intake_gap",
+                "title": "Intake path",
+                "matched_factors": ["Neuro sensory deficit"],
+                "candidate_conditions": ["CES"],
+                "shared_steps": [
+                    {
+                        "step": 1,
+                        "action": "match_factor",
+                        "factor": "Neuro sensory deficit",
+                        "note": "Affirmed factor 'Neuro sensory deficit'",
+                    }
+                ],
+                "condition_traversals": [
+                    {
+                        "condition": "CES",
+                        "risk_score": 0.0,
+                        "rank": 1,
+                        "path_count": 1,
+                        "supporting_factors": ["Neuro sensory deficit"],
+                        "steps": [],
+                        "nodes": [
+                            {
+                                "id": "n1",
+                                "elementId": "n1",
+                                "label": "Factor",
+                                "name": "Neuro sensory deficit",
+                                "properties": {
+                                    "ask_target": False,
+                                    "polarity": "affirmed",
+                                },
+                            }
+                        ],
+                        "edges": [],
+                        "highlight": {"node_ids": ["n1"], "edge_ids": []},
+                    }
+                ],
+                "steps": [],
+                "highlight": {"node_ids": ["n1"], "edge_ids": []},
+                "nodes": [
+                    {
+                        "id": "n1",
+                        "elementId": "n1",
+                        "label": "Factor",
+                        "name": "Neuro sensory deficit",
+                        "properties": {"ask_target": False, "polarity": "affirmed"},
+                    }
+                ],
+                "edges": [],
+            },
+            graph_traversal={
+                "trace_id": "t1",
+                "title": "Traversal",
+                "matched_factors": ["Male sex"],
+                "candidate_conditions": ["AAA"],
+                "shared_steps": [],
+                "condition_traversals": [
+                    {
+                        "condition": "AAA",
+                        "risk_score": 1.0,
+                        "rank": 1,
+                        "path_count": 1,
+                        "supporting_factors": ["Male sex"],
+                        "steps": [],
+                        "nodes": [
+                            {
+                                "id": "n2",
+                                "elementId": "n2",
+                                "label": "Factor",
+                                "name": "Male sex",
+                            }
+                        ],
+                        "edges": [],
+                        "highlight": {"node_ids": ["n2"], "edge_ids": []},
+                    }
+                ],
+                "steps": [],
+                "highlight": {"node_ids": [], "edge_ids": []},
+                "nodes": [
+                    {
+                        "id": "n2",
+                        "elementId": "n2",
+                        "label": "Factor",
+                        "name": "Male sex",
+                    }
+                ],
+                "edges": [],
+            },
+        )
+
+    monkeypatch.setattr(
+        "digimsk_study_app.adapters.presentation.call_chat_api",
+        fake_chat,
+    )
+    result = asyncio.run(PresentationAdapter(3).send_message("s1", "hi"))
+    assert result.has_graph is True
+    payload = json.loads(result.graph_json)
+    assert payload["mode"] == "both"
+    assert payload["intake"]
+    assert payload["disposition"]
+    assert payload["intake"]["conditions"][0]["condition"] == "CES"
+    assert payload["disposition"]["conditions"][0]["condition"] == "AAA"

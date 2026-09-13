@@ -237,6 +237,12 @@ def generate_response(
     disposition_brief: dict[str, Any] | None = None,
 ) -> str:
     """Generate a draft with the configured backend, or a system-failure stub."""
+    from app.services.disposition_brief import decline_to_advise_text
+
+    canned = decline_to_advise_text(disposition_brief)
+    if canned:
+        return canned
+
     if not generator_model_configured():
         return _generator_unavailable_stub(query, evidence, conversation_history)
 

@@ -1,6 +1,8 @@
 """Graph package exports."""
 
 from digimsk_study_app.graph.cytoscape_builder import (
+    arm3_keyed_json,
+    arm3_keyed_payload,
     build_cytoscape_elements,
     build_traversal_debug_payload,
     cytoscape_json,
@@ -13,6 +15,8 @@ from digimsk_study_app.graph.traversal_client import BotTraversalClient
 __all__ = [
     "BotTraversalClient",
     "GraphTraversalTrace",
+    "arm3_keyed_json",
+    "arm3_keyed_payload",
     "build_cytoscape_elements",
     "build_traversal_debug_payload",
     "cytoscape_json",

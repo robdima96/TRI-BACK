@@ -4,7 +4,7 @@ from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
 
 from app.orchestrator.intake_models import CoverageReport, SlotName, SymptomInstance
-from app.schemas import Evidence
+from app.schemas import ChecklistItemDump, Evidence
 
 # Checklist key tuple persisted in symptom_slot_assignments (text, kind, source, label).
 ChecklistKeyTuple = tuple[str, str, str, str]
@@ -19,12 +19,12 @@ class ChatState(TypedDict):
     message: str
     message_normalized: str
     # Orchestrator checklist history (encoder + pattern/NER extraction)
-    clinical_checklist: list[dict[str, str]]
+    clinical_checklist: list[ChecklistItemDump]
     # Per-turn pattern / GliNER / safety / LLM extraction snapshots
     extraction_history: NotRequired[list[dict]]
     # Transient per-turn fields (set in encode_input, consumed in enrich_checklist)
-    turn_start_checklist: NotRequired[list[dict[str, str]]]
-    encoder_turn_items: NotRequired[list[dict[str, str]]]
+    turn_start_checklist: NotRequired[list[ChecklistItemDump]]
+    encoder_turn_items: NotRequired[list[ChecklistItemDump]]
     # Named policy ids from :data:`app.services.policy.RISK_CATALOG`
     risk_hits: list[str]
     encoder_entities: list[dict[str, str]]
@@ -48,6 +48,13 @@ class ChatState(TypedDict):
     questions_asked: NotRequired[int]
     last_asked_slot: NotRequired[SlotName | None]
     slot_being_asked: NotRequired[SlotName | None]
+    # Canonical Factor name last asked (parallel to last_asked_slot). None on slot turns.
+    asked_factor: NotRequired[str | None]
+    # Coherence guard: previous ranker topic + tier (survives question turns).
+    last_rank_topic: NotRequired[str | None]
+    last_rank_tier: NotRequired[int | None]
+    # Test/debug hook: force the next question to be this Factor (consumed once).
+    force_factor_ask: NotRequired[str | None]
     # Draft question from the combined enrich+question LLM call (consumed by planner).
     pending_intake_question: NotRequired[str | None]
     pending_intake_slot: NotRequired[SlotName | None]
@@ -55,7 +62,15 @@ class ChatState(TypedDict):
     # --- graph traversal (local v1 CSV) ---
     chunk_matches: NotRequired[list[dict[str, str | float]]]
     graph_traversal: NotRequired[dict | None]
+    # Arm-3 View B: planner slice on question turns; finalize overwrites with
+    # the accumulated interview path at disposition. Separate from
+    # graph_traversal so neither field clobbers the other.
+    intake_traversal: NotRequired[dict | None]
     matched_factors: NotRequired[list[str]]
+    # Canonical Factor name -> unknown|affirmed|denied. Absent key == unknown.
+    # Separate from ChecklistItem so denied/affirmed rows do not collide on
+    # content_dedupe_key. Denied factors must not appear in matched_factors.
+    factor_states: NotRequired[dict[str, str]]
     candidate_conditions: NotRequired[list[str]]
     traversed_chunk_ids: NotRequired[list[str]]
     # Per-item factor matcher decisions + coverage gaps (also nested under graph_traversal).

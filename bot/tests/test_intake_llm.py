@@ -23,7 +23,7 @@ def _coverage(**kwargs) -> CoverageReport:
     return base
 
 
-def test_select_defers_comorbidities_while_symptom_slots_missing():
+def test_select_promotes_comorbidities_over_symptom_slots():
     cov = _coverage(
         symptom_instances=[
             {"symptom_id": "s1", "display_name": "low back pain", "checklist_keys": []}
@@ -34,8 +34,7 @@ def test_select_defers_comorbidities_while_symptom_slots_missing():
         ],
     )
     slot, sid = select_next_missing_slot(cov, comorbidities_acknowledged=False)
-    assert slot == "symptom_duration"
-    assert sid == "s1"
+    assert slot == "comorbidities"
 
 
 @patch("app.services.intake_llm.generate_from_messages")

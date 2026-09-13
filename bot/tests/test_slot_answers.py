@@ -42,6 +42,17 @@ def test_skips_empty_non_answers():
     )
 
 
+def test_skips_bare_no_on_slot_questions():
+    assert (
+        credit_asked_slot_answer(
+            message="no",
+            last_asked_slot="palliative",
+            checklist=[],
+        )
+        == []
+    )
+
+
 def test_credited_row_satisfies_coverage():
     base = [
         {"text": "40", "kind": "demographic", "source": "pattern", "label": "age"},

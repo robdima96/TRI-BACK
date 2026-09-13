@@ -17,6 +17,7 @@ class ChatTurnResult:
     questions_asked: int = 0
     coverage_ready: bool = False
     graph_traversal: dict[str, Any] | None = None
+    intake_traversal: dict[str, Any] | None = None
     matched_factors: list[str] = field(default_factory=list)
     candidate_conditions: list[str] = field(default_factory=list)
     traversed_chunk_ids: list[str] = field(default_factory=list)

@@ -2,6 +2,9 @@ from pydantic import BaseModel, Field
 
 # Pydantic BaseModel classes that describe the expected data shape of API requests and responses
 
+# ChecklistItem.model_dump() — string fields plus bool flags such as ``confirmed``.
+ChecklistItemDump = dict[str, str | bool]
+
 class Evidence(BaseModel):
     source: str
     snippet: str
@@ -65,6 +68,7 @@ class ChatResponse(BaseModel):
     questions_asked: int = 0
     coverage_ready: bool = False
     graph_traversal: dict | None = None
+    intake_traversal: dict | None = None
     matched_factors: list[str] = Field(default_factory=list)
     candidate_conditions: list[str] = Field(default_factory=list)
     traversed_chunk_ids: list[str] = Field(default_factory=list)

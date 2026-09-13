@@ -20,6 +20,25 @@ DISPOSITION_SNAPSHOT_KEYS: tuple[str, ...] = (
     "graph_traversal",
 )
 
+# Question-turn graph payload. Empty incoming values must not wipe a prior slice.
+INTAKE_SNAPSHOT_KEYS: tuple[str, ...] = ("intake_traversal",)
+
+PRESERVE_IF_EMPTY_KEYS: tuple[str, ...] = DISPOSITION_SNAPSHOT_KEYS + INTAKE_SNAPSHOT_KEYS
+
+
+def exposed_chat_graph_fields(
+    state: dict[str, Any],
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Participant-facing graph payloads. Hidden on question turns."""
+    if bool(state.get("question_mode")):
+        return None, None
+    graph = state.get("graph_traversal")
+    intake = state.get("intake_traversal")
+    return (
+        graph if isinstance(graph, dict) else None,
+        intake if isinstance(intake, dict) else None,
+    )
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
@@ -252,10 +271,19 @@ def build_orchestrator_snapshot(state: dict[str, Any], *, turn_index: int) -> di
         "questions_asked": int(state.get("questions_asked") or 0),
         "question_reason": state.get("question_reason"),
         "slot_being_asked": state.get("slot_being_asked"),
+        "asked_factor": state.get("asked_factor"),
+        "last_rank_topic": state.get("last_rank_topic"),
+        "last_rank_tier": state.get("last_rank_tier"),
         "coverage_ready": bool(coverage.get("ready_for_disposition")),
         "coverage": slim_coverage(coverage if isinstance(coverage, dict) else None),
         "generator_failed": bool(state.get("generator_failed")),
         "comorbidities_acknowledged": bool(state.get("comorbidities_acknowledged")),
+        "factor_states": dict(state.get("factor_states") or {}),
+        "intake_traversal": compact_graph_for_session(
+            state.get("intake_traversal") if isinstance(state.get("intake_traversal"), dict) else None
+        )
+        if bool(state.get("question_mode"))
+        else None,
     }
 
 
@@ -333,11 +361,38 @@ def build_disposition_record(
         "agent_trace": agent,
         "disposition_brief": state.get("disposition_brief"),
         "graph_traversal": compact_graph_for_session(graph if isinstance(graph, dict) else None),
+        "intake_traversal": compact_graph_for_session(
+            state.get("intake_traversal") if isinstance(state.get("intake_traversal"), dict) else None
+        ),
         "evidence": evidence,
         "final_response": state.get("final_response"),
         "escalated": bool(state.get("escalated")),
         "safety_reason": state.get("safety_reason"),
         "risk_hits": list(state.get("risk_hits") or []),
+    }
+
+
+def build_intake_record(
+    state: dict[str, Any],
+    *,
+    turn_index: int,
+) -> dict[str, Any] | None:
+    """Append-only planner slice when this turn asked a question."""
+    if not bool(state.get("question_mode")):
+        return None
+    intake = state.get("intake_traversal")
+    if not (intake or state.get("asked_factor") or state.get("question_reason")):
+        return None
+    return {
+        "turn_index": turn_index,
+        "timestamp": _now_iso(),
+        "question_reason": state.get("question_reason"),
+        "asked_factor": state.get("asked_factor"),
+        "slot_being_asked": state.get("slot_being_asked"),
+        "factor_states": dict(state.get("factor_states") or {}),
+        "intake_traversal": compact_graph_for_session(
+            intake if isinstance(intake, dict) else None
+        ),
     }
 
 
@@ -351,10 +406,13 @@ def default_session_fields(session_id: str) -> dict[str, Any]:
         "orchestrator": None,
         "orchestrator_history": [],
         "disposition_history": [],
+        "intake_history": [],
         "matched_factors": [],
+        "factor_states": {},
         "candidate_conditions": [],
         "traversed_chunk_ids": [],
         "factor_matching_audit": None,
         "agent_trace": None,
         "graph_traversal": None,
+        "intake_traversal": None,
     }

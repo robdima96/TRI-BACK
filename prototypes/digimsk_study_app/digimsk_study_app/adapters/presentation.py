@@ -6,7 +6,8 @@ import re
 
 from digimsk_study_app.adapters.base import ChatTurnResult
 from digimsk_study_app.adapters.http_client import call_chat_api
-from digimsk_study_app.graph import BotTraversalClient, reasoning_text, traversal_debug_json
+from digimsk_study_app.graph import BotTraversalClient, reasoning_text
+from digimsk_study_app.graph.cytoscape_builder import arm3_keyed_json
 from digimsk_study_app.models.chat_types import filter_display_citations
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
@@ -53,13 +54,14 @@ class PresentationAdapter:
             result.has_graph = False
         elif self.group_id == 3:
             result.reasoning_text = None
-            if trace:
-                payload = traversal_debug_json(trace)
-                result.graph_json = payload if payload and payload != "{}" else None
-                result.has_graph = bool(result.graph_json)
-            else:
+            if result.question_mode:
                 result.graph_json = None
                 result.has_graph = False
+            else:
+                intake_trace = self._traversal.intake_from_chat_response(result)
+                payload = arm3_keyed_json(intake=intake_trace, disposition=trace)
+                result.graph_json = payload
+                result.has_graph = bool(payload)
         else:
             result.reasoning_text = None
             result.graph_json = None

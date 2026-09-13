@@ -81,6 +81,26 @@ def test_format_brief_for_prompt_includes_authoritative_instructions():
     assert "Do NOT base disposition primarily on a lower-ranked condition" in text
 
 
+def test_build_disposition_brief_time_critical_unknown_is_not_self_care():
+    from app.orchestrator.question_planner import INSUFFICIENT_INFO_REASON
+
+    brief = build_disposition_brief(
+        graph_traversal={
+            "condition_risks": [
+                {"condition": "Non-specific Mechanical Cause", "risk_score": 2.0, "path_count": 1},
+            ],
+        },
+        factor_matching_audit={"matched": [], "unmatched": []},
+        matched_factors=["Neuro sensory deficit"],
+        question_reason=INSUFFICIENT_INFO_REASON,
+    )
+    assert brief["insufficient_evidence"] is True
+    assert brief["time_critical_unknown"] is True
+    text = format_brief_for_prompt(brief)
+    assert "Not enough information to advise" in text
+    assert "Do NOT recommend self-care" in text
+
+
 def test_build_disposition_brief_from_state():
     state = {
         "graph_traversal": {

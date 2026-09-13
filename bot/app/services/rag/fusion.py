@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.schemas import ChecklistItem, ChunkMatch
+from app.schemas import ChecklistItem, ChecklistItemDump, ChunkMatch
 from app.services.graphrag.schemas import FactorMatch, GraphTraversalTrace
-from app.services.rag.factor_matcher import match_checklist_to_factors
+from app.services.rag.factor_matcher import affirmed_factor_names, match_checklist_to_factors
 
 
 @dataclass
@@ -16,13 +16,7 @@ class TraversalSeeds:
 
     @property
     def matched_factor_names(self) -> list[str]:
-        seen: set[str] = set()
-        out: list[str] = []
-        for m in self.factor_matches:
-            if m.factor_name and m.factor_name not in seen:
-                seen.add(m.factor_name)
-                out.append(m.factor_name)
-        return out
+        return affirmed_factor_names(self.factor_matches)
 
     @property
     def chunk_ids(self) -> list[str]:
@@ -48,9 +42,10 @@ class TraversalSeeds:
 
 
 def build_traversal_seeds(
-    checklist: list[ChecklistItem] | list[dict[str, str]],
+    checklist: list[ChecklistItem] | list[ChecklistItemDump],
     *,
     chunk_matches: list[ChunkMatch] | None = None,
+    source_message: str | None = None,
 ) -> TraversalSeeds:
     """Graph path: factor matches + optional RAG chunk seeds (from retrieve_evidence_node)."""
     parsed: list[ChecklistItem] = []
@@ -60,7 +55,9 @@ def build_traversal_seeds(
         else:
             parsed.append(ChecklistItem.model_validate(row))
 
-    factor_matches = match_checklist_to_factors(parsed)
+    factor_matches = match_checklist_to_factors(
+        parsed, source_message=source_message
+    )
     return TraversalSeeds(
         factor_matches=factor_matches,
         chunk_matches=list(chunk_matches or []),

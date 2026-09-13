@@ -32,6 +32,7 @@ os.environ["DIGIMSK_LLM_FACTOR_MATCH"] = "0"
 
 # Public-host API key must not break local chat route tests.
 os.environ.pop("DIGIMSK_BOT_API_KEY", None)
+os.environ.pop("DIGIMSK_FORCE_FACTOR_ASK", None)
 
 
 @pytest.fixture(autouse=True)
@@ -40,6 +41,13 @@ def clear_bot_api_key_default(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.config import settings
 
     monkeypatch.setattr(settings, "bot_api_key", None)
+
+
+@pytest.fixture(autouse=True)
+def clear_force_factor_ask(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "force_factor_ask", None)
 
 
 @pytest.fixture(autouse=True)
