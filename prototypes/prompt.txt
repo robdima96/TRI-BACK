@@ -1,0 +1,22 @@
+"I need you to act as a senior full-stack developer. Please architect a Python-based web application (using the Reflex framework) that will be hosted locally. The app requires the following specific functionality:
+
+1. Authentication & User Management:
+Implement a secure login page.
+Admin Account: username 'admin', password 'digimsk' (hardcoded for simplicity, but please structure it for easy migration to a secure database later).
+User Accounts: A backend list or SQLite database storing 90 unique user credentials.
+Access Control: Create a 'used' flag in the user database. Users are restricted to one session (the admin can toggle this flag to reset access).
+Role-Based Routing: Upon login, identify the user type. Admins get an overview dashboard; standard users are directed to their assigned chatbot interface.
+
+2. Chatbot Scaffolding:
+The app must support 3 distinct versions of a chatbot, within the same UI.
+Users are assigned to one of three groups (30 users per group). Use a mapping in the database to route the user to their specific chatbot backend endpoint upon login.
+Build the UI components for a professional, clean chatbot interface (input box, message history).
+
+3. Interface & Visualization:
+The UI must be capable of rendering both standard text and dynamic content while looking consistent between all 3 versions. 
+Include a placeholder integration for Cytoscape.js. The UI should be able to update and display interactive knowledge graphs based on chatbot responses within the chat window- do not create a dedicated pane.
+
+4. Project Structure:
+Please provide the code organization for the application.
+Include clear instructions on how to define the user state, handle session tokens, and implement the logic for the 'one-time use' restriction.
+Please write the code to be modular so I can easily swap in my pre-developed chatbot logic later. Use a SQLite database for managing the users and their session state."

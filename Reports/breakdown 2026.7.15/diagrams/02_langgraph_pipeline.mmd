@@ -1,0 +1,55 @@
+%% DigiMSK chatbot — architecture parts (high-level), left-to-right
+%% Modes remain ask / advise / escalate; this view shows who owns the work.
+%% Wrap long labels with <br/> so nodes stay roughly square (avoid wide rectangles).
+flowchart LR
+  MSG["Person sends a message<br/><br/>Study chat UI →<br/>POST /api/v1/chat<br/>(FastAPI in main.py)<br/><br/>Request carries<br/>session_id + message;<br/>chat_graph.invoke<br/>runs one turn"]
+  OUT["Reply on screen<br/>Study arms change<br/>display only"]
+
+  subgraph ENC["ENCODER"]
+    direction TB
+    ENC_D["Turns each message into a<br/>structured clinical checklist.<br/><br/>• Normalize user text<br/>• Extract facts (patterns,<br/>  safety phrases, GliNER)<br/>• Flag high-risk wording<br/>• Build query embedding<br/>  when RAG is on<br/>• Optionally propose checklist<br/>  enrichments (code approves)"]
+    ENC_S["SCRIPTS<br/><br/>• preprocess.py<br/>• encoder.py<br/>• gliner_ner.py<br/>• rag/embeddings.py<br/>• intake_enricher.py"]
+    ENC_D --- ENC_S
+  end
+
+  subgraph ORCH["ORCHESTRATOR"]
+    direction TB
+    ORCH_D["Runs the LangGraph turn and<br/>chooses what happens next.<br/><br/>• Merge checklist updates<br/>• Credit answers to the<br/>  last question asked<br/>• Score information coverage<br/>• Route: question / advise /<br/>  escalate<br/>• Apply fixed urgent-care copy<br/>  on escalate / safety gate<br/>• SQLite checkpoints for<br/>  mid-conversation resume"]
+    ORCH_S["SCRIPTS<br/><br/>• graph.py<br/>• nodes.py<br/>• checklist.py<br/>• coverage.py<br/>• question_planner.py<br/>• slot_answers.py<br/>• policy.py<br/>• checkpointing.py"]
+    ORCH_D --- ORCH_S
+  end
+
+  subgraph SESS["SESSION LOGGING"]
+    direction TB
+    SESS_D["Writes a local JSON audit<br/>snapshot after every turn.<br/><br/>• Checklist snapshot<br/>• Trimmed chat transcript<br/>• Extraction history<br/>• Engagement stats<br/>• Hashed sess_*.json files<br/>• Study app may keep its<br/>  own copies separately"]
+    SESS_S["SCRIPTS<br/><br/>• session_store.py"]
+    SESS_D --- SESS_S
+  end
+
+  DISK[("💾 Local machine<br/>bot session folder<br/>sess_*.json")]
+
+  subgraph RAG["RAG / GraphRAG"]
+    direction TB
+    RAG_D["Finds local evidence used<br/>only when advising.<br/><br/>• Semantic chunk search<br/>  in the document library<br/>• Optional red-flag /<br/>  condition graph walk<br/>• Fuse hits into an<br/>  evidence bundle<br/>• No open-internet search"]
+    RAG_S["SCRIPTS<br/><br/>• rag/chunk_retrieval.py<br/>• rag/fusion.py<br/>• rag/evidence_builder.py<br/>• graphrag/"]
+    RAG_D --- RAG_S
+  end
+
+  subgraph GEN["GENERATOR"]
+    direction TB
+    GEN_D["Produces the wording the<br/>person reads for questions<br/>or disposition advice.<br/><br/>• Build prompt from checklist<br/>  and (when advising) evidence<br/>• Phrase one follow-up<br/>• Draft triage recommendation<br/>• Call Vertex Gemini or<br/>  optional local backend<br/>• Does not route, retrieve,<br/>  or bypass safety"]
+    GEN_S["SCRIPTS<br/><br/>• generator.py<br/>• intake_llm.py<br/>• generator_backends.py<br/>• vertex_auth.py"]
+    GEN_D --- GEN_S
+  end
+
+  MSG --> ENC --> ORCH
+
+  ORCH --> SESS
+  SESS -->|"save JSON →"| DISK
+
+  ORCH -->|Ready to advise<br/>DISPOSITION| RAG
+  ORCH -->|Not enough info<br/>QUESTION| GEN
+  ORCH -->|High-risk<br/>ESCALATE| OUT
+
+  RAG --> GEN
+  GEN --> OUT

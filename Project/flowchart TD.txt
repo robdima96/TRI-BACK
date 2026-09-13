@@ -1,0 +1,17 @@
+flowchart TD
+    START([START]) --> preprocess[preprocess_input]
+    preprocess --> ingest[ingest_input]
+    ingest --> encode[encode_input]
+    encode --> eval[evaluate_coverage]
+    eval --> plan[plan_question]
+    plan --> safety{safety_gate:\nrisk_hits?}
+    safety -->|yes| policy_escalate[policy_gate\nescalation copy]
+    safety -->|no| qmode{question_mode\nAND questions_asked < max?}
+    qmode -->|yes| gen_q[generate_question]
+    qmode -->|no| retrieve[retrieve_evidence]
+    retrieve --> gen_draft[generate_draft]
+    gen_draft --> policy[policy_gate]
+    gen_q --> finalize[finalize_response]
+    policy_escalate --> finalize
+    policy --> finalize
+    finalize --> END([END])

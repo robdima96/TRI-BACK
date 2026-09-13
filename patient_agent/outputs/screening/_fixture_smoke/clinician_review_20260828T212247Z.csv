@@ -1,0 +1,2 @@
+source_id,stem_hash,split,auto_red_flag_family,lexicon_terms,token_count,has_agentclinic_osce,question,answer,clinician_include,clinician_grid,clinician_notes
+keep_sciatica,d29042a4933b7be4,jsonl,malignancy,low_back|lumbar|cauda_equina|disc_herniation|back_pain,36,False,"A 26-year-old woman presents with sudden-onset lower back pain radiating down the side of her leg into her foot after exercising at the gym. She denies fever, weight loss, and changes in bowel or bladder function.",B,,,

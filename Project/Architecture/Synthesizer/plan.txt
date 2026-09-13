@@ -1,0 +1,34 @@
+﻿Component: Synthesizer Module
+Source: synthesizer.png
+
+Core function:
+- Fuse upstream representations using cross-modal attention.
+- Combine signals through Q/K/V attention interactions.
+
+Planned models/approach:
+- Multi-head attention-based fusion layer.
+- Feature engineering pipeline around attention outputs.
+
+Data (from draft):
+- Upstream embeddings from other pipeline modules.
+
+Tools (from draft):
+- PyTorch.
+- TensorFlow.
+
+Compute (from draft):
+- Moderate GPU usage.
+
+Enhancements added:
+- Define strict tensor I/O contracts across all upstream/downstream modules.
+- Add confidence-weighted fusion and contradiction-resolution logic.
+- Define training objective for alignment with safety and factuality constraints.
+- Add ablation studies versus simpler late-fusion baselines.
+- Specify fallback behavior when one upstream signal is missing or low confidence.
+
+Cross-cutting requirements:
+- Clinical safety boundaries and mandatory human handoff triggers.
+- Unified evaluation framework (technical, clinical, and safety metrics).
+- Privacy/compliance controls (retention limits, access control, auditability).
+- Deployment SLOs and cost envelope tracking.
+- Red-team tests for contradictory signals and unsafe synthesis outcomes.

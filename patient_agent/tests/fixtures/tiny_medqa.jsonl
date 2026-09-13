@@ -1,0 +1,4 @@
+{"id": "drop_anatomy", "question": "The lumbar plexus is formed by which ventral rami?", "options": {"A": "T12-L4", "B": "L1-L4"}, "answer": "A"}
+{"id": "drop_lp", "question": "Which of the following is a contraindication to lumbar puncture in a suspected CNS infection?", "options": {"A": "Fever", "B": "Papilledema"}, "answer": "B"}
+{"id": "drop_cervical", "question": "A 40-year-old man presents with neck pain after a rear-end collision. Which structure is most likely injured?", "options": {"A": "ACL", "B": "Nuchal ligament"}, "answer": "B"}
+{"id": "keep_sciatica", "question": "A 26-year-old woman presents with sudden-onset lower back pain radiating down the side of her leg into her foot after exercising at the gym. She denies fever, weight loss, and changes in bowel or bladder function.", "options": {"A": "Cauda equina syndrome", "B": "Lumbar disc herniation"}, "answer": "B"}

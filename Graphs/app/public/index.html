@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DigiMSK Red Flags Graph</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1>DigiMSK Red Flags Graph</h1>
+        <span class="badge" id="graph-mode">loading…</span>
+      </div>
+      <div class="topbar-right">
+        <span class="status" id="graph-stats"></span>
+        <button id="btn-logout" class="btn btn-ghost" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <section class="panel">
+          <h2>View</h2>
+          <div class="button-row">
+            <button id="btn-full-graph" class="btn btn-primary" type="button">
+              Full graph
+            </button>
+            <button id="btn-fit" class="btn btn-secondary" type="button">Fit view</button>
+          </div>
+          <div class="button-row">
+            <button id="btn-zoom-in" class="btn btn-secondary" type="button">Zoom +</button>
+            <button id="btn-zoom-out" class="btn btn-secondary" type="button">Zoom −</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Node types</h2>
+          <div id="label-filters" class="checkbox-list"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Relationships</h2>
+          <div id="rel-filters" class="checkbox-list scrollable"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Focus node</h2>
+          <input
+            id="node-search"
+            type="search"
+            placeholder="e.g. AAA, Fracture, Fever"
+            list="node-options"
+          />
+          <datalist id="node-options"></datalist>
+          <div class="button-row">
+            <button id="btn-apply-filters" class="btn btn-primary" type="button">
+              Apply filters
+            </button>
+            <button id="btn-clear-filters" class="btn btn-secondary" type="button">
+              Clear
+            </button>
+          </div>
+        </section>
+      </aside>
+
+      <main class="graph-wrap">
+        <div id="cy"></div>
+        <div id="graph-loading" class="overlay" hidden>Loading graph…</div>
+        <div id="graph-error" class="overlay error-overlay" hidden></div>
+      </main>
+
+      <aside class="details">
+        <section class="panel legend">
+          <h2>Legend</h2>
+          <ul class="legend-types">
+            <li><span class="swatch factor"></span> Factor — symptoms &amp; traits</li>
+            <li><span class="swatch condition"></span> Condition — red-flag diagnosis</li>
+            <li><span class="swatch chunk"></span> Chunk — evidence &amp; metadata</li>
+          </ul>
+
+          <div id="legend-details" class="legend-details">
+            <p id="legend-empty" class="muted">Click a node or relationship to see details.</p>
+            <div id="legend-content" hidden>
+              <p class="detail-type" id="legend-detail-type"></p>
+              <h3 id="legend-detail-title"></h3>
+              <div id="legend-detail-body"></div>
+              <dl id="legend-detail-props" class="detail-list"></dl>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <script src="https://unpkg.com/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
+    <script src="/js/digimsk_cytoscape.js"></script>
+    <script src="/js/graph.js"></script>
+  </body>
+</html>

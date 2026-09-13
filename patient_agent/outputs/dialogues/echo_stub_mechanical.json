@@ -1,0 +1,29 @@
+{
+  "session_id": "pa_ba2b6a9724ca",
+  "case_id": "lbp_osce_41ba672b",
+  "source_id": "awinml/medqa:train:9814",
+  "backend": "echo",
+  "card_path": "outputs\\cards\\20260828T212558Z\\lbp_osce_41ba672b.json",
+  "messages": [
+    {
+      "role": "patient",
+      "text": "A 42-year-old man who recently immigrated from Mexico presents to the clinic with fever, a productive cough streaked with blood, back pain, and night sweats.",
+      "flags": []
+    },
+    {
+      "role": "chatbot",
+      "text": "How long has this been going on?",
+      "question_mode": true
+    },
+    {
+      "role": "patient",
+      "text": "I'm not sure — nobody's told me that."
+    }
+  ],
+  "gates": {
+    "n_turns": 2,
+    "n_flagged": 0,
+    "flags": [],
+    "pass": true
+  }
+}

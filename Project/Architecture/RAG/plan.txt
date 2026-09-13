@@ -1,0 +1,35 @@
+Component: RAG Database
+Source: RAG.png
+
+Purpose:
+- Retrieve authoritative clinical guidance passages for grounded generation.
+- Serve tagged/vectorized evidence with strict source attribution.
+
+Data design:
+- Curated corpus from expert clinical guidelines and trusted authorities.
+- Mandatory metadata schema: source authority, publication date, version, clinical domain, jurisdiction, evidence level.
+- Deterministic chunking strategy to preserve clinical context and citation fidelity.
+- Source freshness controls: update cadence and re-embedding SLA for revised guidance.
+
+Retrieval and indexing:
+- Tagging + vector indexing for semantic retrieval.
+- Hybrid retrieval support (vector + keyword/metadata filters) for precision-sensitive questions.
+- Contradiction and stale-source checks across overlapping guideline versions.
+
+Tools:
+- LangChain orchestration layer.
+- Pinecone or Weaviate as vector store (implementation choice per scale/cost constraints).
+
+Compute:
+- Scales with corpus size, embedding model dimensionality, and re-index frequency.
+- Budget model should include ingestion, embedding refreshes, and query-time retrieval latency.
+
+Quality and evaluation:
+- Retrieval quality metrics: precision@k, recall@k, groundedness, citation coverage.
+- Clinical quality checks: recommendation consistency, contraindication detection, escalation trigger accuracy.
+- Safety quality checks: irrelevant citation detection, citation mismatch detection, retrieval poisoning resilience.
+
+Cross-cutting controls:
+- Clinical safety boundaries and mandatory human handoff triggers.
+- Privacy/compliance guardrails: retention limits, access controls, audit logs.
+- Deployment SLOs: latency, availability, cost envelope, and incident response thresholds.

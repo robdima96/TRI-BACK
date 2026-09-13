@@ -1,0 +1,11 @@
+stored in state history for each unique session_id
+Each item must be populated- conversation cannot end until all fields are checked
+
+loc
+symptoms
+pain_severity
+pain_quality
+pain_onset
+injury_mechanism
+medication_status
+

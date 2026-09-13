@@ -1,0 +1,25 @@
+## Verification
+
+**This requires a re-run, not a re-read.** The frozen transcripts were produced by the current bot, so a new CES question cannot appear in them. Re-run the patient agent against the modified bot on the same locked cards, then diff old vs new per case.
+
+Sensitivity:
+
+- Actor discloses neurologic symptoms and Hidden does **not** list CES in `must_elicit` → the new transcript contains a graph-grounded CES item with `question_reason` like `rank:t1:CES:Saddle anaesthesia`.
+
+Specificity:
+
+- Actor never mentions neuro → no CES question at all, only the floor.
+- Report the **distribution** of graph questions per session, not the mean. A long tail means the neighbourhood is too permissive — check whether demographics leaked in as seeds.
+
+Floor integrity:
+
+- No case finishes with the floor incomplete because graph questions consumed the budget. Track floor-completion rate before vs after.
+- Confirm `symptom_duration` moves later in transcripts without ever being dropped.
+
+Coherence:
+
+- Count topic switches per session before and after. If switches rise sharply, the hysteresis rule is too weak.
+
+Safety:
+
+- Phase 1 denial fixtures still pass. This phase makes red-flag vocabulary far more common in conversation, so it is the first phase that genuinely stresses them.

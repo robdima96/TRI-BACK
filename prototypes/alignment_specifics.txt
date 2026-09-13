@@ -1,0 +1,153 @@
+DigiMSK Study App — Alignment Specifics
+========================================
+
+This document lists concrete details that must be explicit in the build prompt (or
+confirmed with the requester) so generated code matches research intent. It was
+derived by comparing prototypes/prompt.txt against the existing DigiMSKbot repo.
+
+Run `python improve_prompt.py` to regenerate the gap analysis from prompt.txt.
+
+
+1. INTEGRATION WITH EXISTING CODEBASE
+-------------------------------------
+
+MUST specify:
+  - Chatbot backend already exists at bot/ (FastAPI + LangGraph); front end calls
+    POST /api/v1/chat — do not rebuild orchestration.
+  - Request/response contract from bot/app/schemas.py:
+      ChatRequest:  { session_id, message }
+      ChatResponse: { session_id, response, citations, escalated, safety_reason,
+                      question_mode, questions_asked, coverage_ready }
+  - New app directory: prototypes/digimsk_study_app/ (isolated from bot/).
+  - Run order: uvicorn bot first, then reflex run.
+
+RISK if omitted:
+  - Developer rebuilds chatbot from scratch or uses wrong API shape.
+  - Session IDs won't align with LangGraph thread_id checkpoints.
+
+
+2. EXPERIMENTAL ARMS (THREE GROUPS)
+-----------------------------------
+
+MUST specify:
+  - 90 users, 30 per group; group_id stored in SQLite.
+  - What each arm actually means (names + backend URL or feature flag):
+      Arm 1: baseline chatbot
+      Arm 2: chatbot that outputs chain of thought responses
+      Arm 3: chatbot with graph-enhanced responses (visible graph_trace)
+  - Adapter pattern: ChatbotAdapter protocol + factor by group_id.
+  - Participants do not see arm labels
+
+RISK if omitted:
+  - "Three chatbots" interpreted as three separate UIs instead of one UI +
+    three backends.
+  - Arm 3 left undefined; routing logic invents incompatible endpoints.
+
+
+3. ONE-TIME USE ("used" FLAG)
+-----------------------------
+
+MUST specify exact trigger:
+  - Recommended default: lock on FIRST SUCCESSFUL LOGIN.
+  - Alternative: lock on "End session", after N turns, or idle timeout.
+  - Block message text when locked.
+  - Admin reset: single action, audited.
+
+RISK if omitted:
+  - Ambiguous whether "one session" means one login, one conversation, or one
+    message — breaks study protocol.
+
+
+4. INLINE GRAPH VISUALIZATION (CYTOSCAPE)
+-----------------------------------------
+
+MUST specify:
+  - Graphs render INSIDE chat message stream — no dedicated side pane.
+  - JSON contract matches bot/app/services/graphrag/schemas.py and
+    Graphs/app/lib/graphApi.js (node/edge fields, Factor|Condition|Chunk labels).
+  - Highlight sets for traversal steps (node_ids, edge_ids).
+  - Mock/stub graph for offline UI testing without Neo4j.
+  - Graceful fallback if graph JSON missing (text-only, no crash).
+
+RISK if omitted:
+  - Separate graph explorer page built instead of inline chat embedding.
+  - Incompatible graph schema; Cytoscape component unusable with real backend.
+
+
+5. AUTHENTICATION DETAILS
+-------------------------
+
+MUST specify:
+  - Admin: username admin, password digimsk — still hashed at rest.
+  - Participants: 90 seeded accounts, random passwords, one-time CSV export.
+  - Generic login failure message (no username enumeration).
+  - Session mechanism (signed cookie / Reflex session state).
+  - Password generation + seed script (scripts/seed_users.py).
+
+RISK if omitted:
+  - Plaintext passwords in DB; credentials logged insecurely.
+  - Hardcoded admin with no migration path.
+
+
+6. ADMIN DASHBOARD SCOPE
+------------------------
+
+MUST specify:
+  - User table: username, group, used flag, login timestamps.
+  - Reset used flag per user (with confirmation).
+  - Group counts (30/30/30).
+  - Optional: transcript view/export — not full Neo4j admin.
+
+RISK if omitted:
+  - Over-built admin UI or missing reset functionality study staff need.
+
+
+7. CHAT UI BEHAVIOUR
+--------------------
+
+MUST specify:
+  - Shared components across all arms (input, history, loading, citations).
+  - Escalation banner when escalated=true (clinical safety).
+  - session_id format and persistence strategy.
+  - Local transcript logging in SQLite for research export.
+  - Disclaimer: not for emergency use.
+
+RISK if omitted:
+  - Escalation hidden; safety pathway fails in UI.
+  - No local audit trail for study analysis.
+
+
+8. PROJECT STRUCTURE AND DELIVERABLES
+-------------------------------------
+
+MUST specify:
+  - Directory tree (pages, components, adapters, auth, db, scripts).
+  - requirements.txt, rxconfig.py, README with setup steps.
+  - Unit tests for routing and used-flag logic at minimum.
+  - data/.gitignore for digimsk.db and participant_credentials.csv.
+
+RISK if omitted:
+  - Monolithic single file; hard to swap chatbot adapters later.
+
+
+9. NON-GOALS AND SCOPE BOUNDARIES
+---------------------------------
+
+MUST specify what NOT to build:
+  - No OAuth, email flows, cloud deploy (document only).
+  - No full graph explorer replica from Graphs/app/.
+
+RISK if omitted:
+  - Scope creep into production auth or backend refactors.
+
+
+10. OPEN DECISIONS TO CONFIRM WITH REQUESTER
+--------------------------------------------
+
+Before or during build, confirm:
+  [ ] Exact Arm 3 chatbot difference (prompt? model? graph on/off?)
+  [ ] Blinding: hide arm label from participants? (default: yes)
+  [ ] Used-flag trigger (default: first login)
+  [ ] Allow session resume after disconnect before lock?
+  [ ] Username format (participant_001 vs study IDs from REDCap)
+  [ ] Whether to expose citation snippets to participants

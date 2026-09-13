@@ -1,0 +1,58 @@
+{
+  "case_id": "lbp_osce_723347b2",
+  "source_corpus": "medqa_us",
+  "source_id": "gbaker:train:2245",
+  "stem_hash": "723347b2f34a8ee7",
+  "conversion": "stub_from_stem_needs_clinician_rewrite",
+  "Patient_Actor": {
+    "demographics": "47-year-old female",
+    "opening_complaint": "A 47-year-old female comes to the emergency department because of increasing back pain for the past 2 weeks.",
+    "history": "A 47-year-old female comes to the emergency department because of increasing back pain for the past 2 weeks. She is unable to perform her daily chores. One month ago, she fell and hurt her back while working outside in the garden. The pain subsided with over-the-counter acetaminophen. She underwent a left mastectomy 1 year ago for breast cancer. She has type 2 diabetes mellitus. Current medications include metformin, sitagliptin, and a multivitamin. She appears uncomfortable. Her temperature is 38.9°C (102.0°F), pulse is 101/min, and blood pressure is 110/80 mm Hg. Examination of the back shows thoracic vertebral tenderness. She has mild stiffness on neck flexion. Muscle strength is decreased in the lower extremities. Deep tendon reflexes are 2+ bilaterally. Sensation to pain, fine touch, temperature, and proprioception is intact. Her hemoglobin concentration is 13.1 g/dL and leukocyte count is 19,300/mm3. Which of the following is the most appropriate next step in management?",
+    "symptoms": {
+      "primary": "low back pain (from stem)",
+      "secondary": []
+    },
+    "intake": {
+      "duration": "not specified on source stem — treat as unknown if asked",
+      "severity_0_10": null,
+      "severity_note": "not specified on source stem — treat as unknown if asked",
+      "quality": "not specified on source stem — treat as unknown if asked",
+      "provocative": "not specified on source stem — treat as unknown if asked",
+      "palliative": "not specified on source stem — treat as unknown if asked",
+      "comorbidities": "not specified on source stem — treat as unknown if asked"
+    },
+    "red_flag_self_report": {
+      "trauma": "not specified — treat as unknown if asked",
+      "leg_weakness": "not specified — treat as unknown if asked",
+      "saddle_numbness": "not specified — treat as unknown if asked",
+      "bladder_bowel": "not specified — treat as unknown if asked",
+      "fever": "not specified — treat as unknown if asked",
+      "unexplained_weight_loss": "not specified — treat as unknown if asked",
+      "night_pain_waking": "not specified — treat as unknown if asked"
+    },
+    "past_medical_history": "not specified on source stem",
+    "social_history": "not specified on source stem",
+    "review_of_systems": "not specified on source stem",
+    "unknowns": [
+      "imaging results",
+      "laboratory results",
+      "physical exam findings the patient would not know",
+      "any fact not written on this card"
+    ],
+    "persona": {
+      "personality": "neutral",
+      "language_proficiency": "advanced",
+      "medical_history_recall": "high_recall",
+      "cognitive_confusion": "normal"
+    }
+  },
+  "Hidden": {
+    "reference_disposition": "clinician to assign after review",
+    "reference_labels": [],
+    "must_elicit": [
+      "duration",
+      "severity",
+      "what makes it worse/better"
+    ]
+  }
+}

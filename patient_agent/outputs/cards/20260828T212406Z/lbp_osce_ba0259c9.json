@@ -1,0 +1,58 @@
+{
+  "case_id": "lbp_osce_ba0259c9",
+  "source_corpus": "medqa_us",
+  "source_id": "gbaker:train:8655",
+  "stem_hash": "ba0259c9172130aa",
+  "conversion": "stub_from_stem_needs_clinician_rewrite",
+  "Patient_Actor": {
+    "demographics": "42-year-old man",
+    "opening_complaint": "A 42-year-old man comes to the physician because of severe epigastric pain for a week.",
+    "history": "A 42-year-old man comes to the physician because of severe epigastric pain for a week. The pain is constant and he describes it as 6 out of 10 in intensity. The pain radiates to his back and is worse after meals. He has had several episodes of nausea and vomiting during this period. He has taken ibuprofen for multiple similar episodes of pain during the past 6 months. He also has had a 5.4-kg (12-lb) weight loss over the past 4 months. He has a 12-year history of drinking 3 to 4 pints of rum daily. He has been hospitalized three times for severe abdominal pain in the past 3 years. He appears ill. His temperature is 37°C (98.6°F), pulse is 87/min, and blood pressure is 110/70 mm Hg. There is severe epigastric tenderness to palpation. Bowel sounds are normal. Cardiopulmonary examination shows no abnormalities. Laboratory studies show:\nHemoglobin 13.6 g/dL\nLeukocyte count 7,800/mm3\nSerum\nGlucose 106 mg/dL\nCreatinine 1.1 mg/dL\nAmylase 150 U/L\nA CT of the abdomen is shown. Which of the following is the most appropriate long-term management for this patient?\"",
+    "symptoms": {
+      "primary": "low back pain (from stem)",
+      "secondary": []
+    },
+    "intake": {
+      "duration": "not specified on source stem — treat as unknown if asked",
+      "severity_0_10": null,
+      "severity_note": "not specified on source stem — treat as unknown if asked",
+      "quality": "not specified on source stem — treat as unknown if asked",
+      "provocative": "not specified on source stem — treat as unknown if asked",
+      "palliative": "not specified on source stem — treat as unknown if asked",
+      "comorbidities": "not specified on source stem — treat as unknown if asked"
+    },
+    "red_flag_self_report": {
+      "trauma": "not specified — treat as unknown if asked",
+      "leg_weakness": "not specified — treat as unknown if asked",
+      "saddle_numbness": "not specified — treat as unknown if asked",
+      "bladder_bowel": "not specified — treat as unknown if asked",
+      "fever": "not specified — treat as unknown if asked",
+      "unexplained_weight_loss": "mentioned in stem — disclose only if asked",
+      "night_pain_waking": "not specified — treat as unknown if asked"
+    },
+    "past_medical_history": "not specified on source stem",
+    "social_history": "not specified on source stem",
+    "review_of_systems": "not specified on source stem",
+    "unknowns": [
+      "imaging results",
+      "laboratory results",
+      "physical exam findings the patient would not know",
+      "any fact not written on this card"
+    ],
+    "persona": {
+      "personality": "neutral",
+      "language_proficiency": "advanced",
+      "medical_history_recall": "high_recall",
+      "cognitive_confusion": "normal"
+    }
+  },
+  "Hidden": {
+    "reference_disposition": "clinician to assign after review",
+    "reference_labels": [],
+    "must_elicit": [
+      "duration",
+      "severity",
+      "what makes it worse/better"
+    ]
+  }
+}

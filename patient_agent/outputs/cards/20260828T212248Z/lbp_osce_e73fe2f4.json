@@ -1,0 +1,60 @@
+{
+  "case_id": "lbp_osce_e73fe2f4",
+  "source_corpus": "medqa_us",
+  "source_id": "agentclinic_medqa:19",
+  "stem_hash": "e73fe2f4738caf82",
+  "Patient_Actor": {
+    "demographics": "26-year-old woman",
+    "opening_complaint": "The patient reports exercising in the gym several hours ago when she suddenly felt a sharp pain in her lower back.",
+    "history": "The patient reports exercising in the gym several hours ago when she suddenly felt a sharp pain in her lower back. She describes the pain as radiating down the side of her leg and into her foot.",
+    "symptoms": {
+      "primary": "Sharp lower back pain radiating to the leg and foot",
+      "secondary": [
+        "Pain worsens with movement",
+        "The onset of pain while exercising"
+      ]
+    },
+    "intake": {
+      "duration": "not specified on source stem — treat as unknown if asked",
+      "severity_0_10": null,
+      "severity_note": "not specified on source stem — treat as unknown if asked",
+      "quality": "Sharp lower back pain radiating to the leg and foot",
+      "provocative": "not specified on source stem — treat as unknown if asked",
+      "palliative": "not specified on source stem — treat as unknown if asked",
+      "comorbidities": "No significant past medical history. No prior episodes of similar pain."
+    },
+    "red_flag_self_report": {
+      "trauma": "not specified — treat as unknown if asked",
+      "leg_weakness": "not specified — treat as unknown if asked",
+      "saddle_numbness": "no",
+      "bladder_bowel": "no",
+      "fever": "no",
+      "unexplained_weight_loss": "mentioned in stem — disclose only if asked",
+      "night_pain_waking": "not specified — treat as unknown if asked"
+    },
+    "past_medical_history": "No significant past medical history. No prior episodes of similar pain.",
+    "social_history": "Non-smoker, rarely drinks alcohol. Regular gym-goer.",
+    "review_of_systems": "Denies fever, weight loss, changes in bowel or bladder function.",
+    "unknowns": [
+      "imaging results",
+      "laboratory results",
+      "physical exam findings the patient would not know",
+      "any fact not written on this card"
+    ],
+    "persona": {
+      "personality": "neutral",
+      "language_proficiency": "advanced",
+      "medical_history_recall": "high_recall",
+      "cognitive_confusion": "normal"
+    }
+  },
+  "Hidden": {
+    "reference_disposition": "clinician to assign after review",
+    "reference_labels": [],
+    "must_elicit": [
+      "duration",
+      "severity",
+      "what makes it worse/better"
+    ]
+  }
+}

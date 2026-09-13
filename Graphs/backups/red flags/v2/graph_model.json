@@ -1,0 +1,106 @@
+{
+  "name": "red_flags",
+  "version": "v1",
+  "description": "Low-back red flags knowledge graph for DigiMSK triage (screening, discrimination, disposition)",
+  "verified": true,
+
+  "nodes": [
+    {
+      "label": "Factor",
+      "key": "name",
+      "sources": ["source_nodes", "path"],
+      "role": "Symptoms, traits, and mediating clinical concepts. path mediators share this label."
+    },
+    {
+      "label": "Condition",
+      "key": "name",
+      "sources": ["parent_id"],
+      "role": "Red-flag diagnoses (Fracture, Malignancy, Infection, CES, AAA, DVT)"
+    },
+    {
+      "label": "Chunk",
+      "key": "chunk_id",
+      "sources": ["each CSV row"],
+      "properties": [
+        "chunk_string",
+        "source_rank",
+        "edges",
+        "path_type",
+        "path",
+        "is_specific",
+        "is_guideline",
+        "evidence",
+        "evidence_level",
+        "loc"
+      ],
+      "role": "Evidence text and metadata; loc stored as property only (not a graph node)"
+    }
+  ],
+
+  "relationships": [
+    {
+      "type": "RISK_FACTOR_FOR | SUGGESTIVE_OF | ASSOCIATED_WITH | TRIGGER_FOR | ...",
+      "from": "Factor",
+      "to": "Condition",
+      "when": "path_type is direct or both",
+      "properties": ["path_type", "via_mediation", "chunk_id"]
+    },
+    {
+      "type": "dynamic from edges column",
+      "from": "Factor (source_nodes)",
+      "to": "Factor (path mediator)",
+      "when": "path_type is mediated or both, and path is not empty",
+      "properties": ["path_type", "via_mediation", "chunk_id"]
+    },
+    {
+      "type": "CONTRIBUTES_TO",
+      "from": "Factor (path mediator)",
+      "to": "Condition",
+      "when": "path_type is mediated or both, and path is not empty",
+      "properties": ["path_type", "chunk_id"]
+    },
+    {
+      "type": "DESCRIBES",
+      "from": "Chunk",
+      "to": "Factor"
+    },
+    {
+      "type": "APPLIES_TO",
+      "from": "Chunk",
+      "to": "Condition"
+    }
+  ],
+
+  "path_types": {
+    "direct": "Factor -[edges]-> Condition",
+    "mediated": "Factor -[edges]-> Factor(path) -[CONTRIBUTES_TO]-> Condition",
+    "both": "Creates direct and mediated edges"
+  },
+
+  "csv_columns": {
+    "chunk_id": "Chunk.chunk_id",
+    "chunk_string": "Chunk.chunk_string",
+    "source": "Chunk.source_rank",
+    "loc": "Chunk.loc (property only)",
+    "parent_id": "Condition.name",
+    "source_nodes": "Factor.name",
+    "edges": "relationship type (sanitized to SCREAMING_SNAKE_CASE)",
+    "path_type": "direct | mediated | both",
+    "path": "mediator Factor.name when not '-'",
+    "is_specific": "Chunk.is_specific",
+    "is_guideline": "Chunk.is_guideline",
+    "evidence": "Chunk.evidence",
+    "evidence_level": "Chunk.evidence_level"
+  },
+
+  "constraints": [
+    "CREATE CONSTRAINT factor_name IF NOT EXISTS FOR (n:Factor) REQUIRE n.name IS UNIQUE",
+    "CREATE CONSTRAINT condition_name IF NOT EXISTS FOR (n:Condition) REQUIRE n.name IS UNIQUE",
+    "CREATE CONSTRAINT chunk_id IF NOT EXISTS FOR (n:Chunk) REQUIRE n.chunk_id IS UNIQUE",
+    "CREATE INDEX chunk_specific IF NOT EXISTS FOR (c:Chunk) ON (c.is_specific)"
+  ],
+
+  "excluded_from_graph": [
+    "BodyLocation nodes (loc is Chunk property only)"
+  ]
+}

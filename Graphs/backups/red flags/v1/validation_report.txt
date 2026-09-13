@@ -1,0 +1,18 @@
+﻿CSV: C:\ROBS STUFF\UBC Postdoctoral Fellowship\DigiMSKbot\bot\Knowledge Base\Red Flags\chunks\manual\red_flags_manual_failsafe.csv
+  rows: 66
+  unique Factor names (source_nodes + path): 48
+  path mediators: 8
+    also appear as source_nodes: ['Cardiovascular disease', 'Corticosteroids', 'Endothelial injury', 'Hypercoagulability', 'Osteoporosis', 'Recent trauma', 'Venous stasis']
+    mediator-only (not a source_nodes value): ['Immunosuppresion']
+  mediated/both rows creating Factor chains: 17
+  conditions: {'Fracture': 18, 'Malignancy': 11, 'Infection': 12, 'CES': 5, 'AAA': 8, 'DVT': 12}
+  relationship types: {'RISK_FACTOR_FOR': 36, 'TRIGGER_FOR': 1, 'SUGGESTIVE_OF': 26, 'ASSOCIATED_WITH': 3}
+  path types: {'both': 3, 'direct': 49, 'mediated': 14}
+  cypher statements generated: 66
+
+Sample mediated chains (source -> path -> condition):
+  Age over 50 -[RISK_FACTOR_FOR]-> Osteoporosis -[CONTRIBUTES_TO]-> Fracture
+  Bruising -[SUGGESTIVE_OF]-> Recent trauma -[CONTRIBUTES_TO]-> Fracture
+  Female sex -[RISK_FACTOR_FOR]-> Osteoporosis -[CONTRIBUTES_TO]-> Fracture
+  Corticosteroids -[ASSOCIATED_WITH]-> Osteoporosis -[CONTRIBUTES_TO]-> Fracture
+  Alcohol -[RISK_FACTOR_FOR]-> Osteoporosis -[CONTRIBUTES_TO]-> Fracture

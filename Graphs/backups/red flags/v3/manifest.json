@@ -1,0 +1,47 @@
+{
+  "name": "red_flags",
+  "version": "v3",
+  "description": "DigiMSK low-back red flags knowledge graph (v3) promoted from red_flags_manual_v3_2026.9.9.csv",
+  "created_at": "2026-09-10T17:54:04Z",
+  "verified": false,
+  "files": {
+    "source_csv": "source/red_flags_manual_v3_2026.9.9.csv",
+    "import_cypher": "import.cypher",
+    "schema": "schema.cypher",
+    "queries": "queries.cypher",
+    "graph_model": "graph_model.json",
+    "inventory": "inventory.json",
+    "validation_report": "validation_report.txt"
+  },
+  "restore": {
+    "python": "cd Graphs && python import_red_flags.py --csv \"backups/red flags/v3/source/red_flags_manual_v3_2026.9.9.csv\" --wipe",
+    "browser": "Open import.cypher in Neo4j Browser and run",
+    "export_cypher_regenerate": "cd Graphs && python export_cypher.py --csv \"backups/red flags/v3/source/red_flags_manual_v3_2026.9.9.csv\" --output \"backups/red flags/v3/import.cypher\" --wipe"
+  },
+  "stats": {
+    "factors": 58,
+    "conditions": 7,
+    "chunks": 86,
+    "relationship_types": {
+      "RISK_FACTOR_FOR": 38,
+      "TRIGGER_FOR": 3,
+      "SUGGESTIVE_OF": 32,
+      "ASSOCIATED_WITH": 8,
+      "CONFIRM_AGAINST": 5
+    },
+    "path_types": {
+      "both": 4,
+      "direct": 65,
+      "mediated": 17
+    },
+    "conditions_breakdown": {
+      "Fracture": 18,
+      "Malignancy": 11,
+      "Infection": 15,
+      "CES": 7,
+      "AAA": 9,
+      "DVT": 13,
+      "Non-specific Mechanical Cause": 13
+    }
+  }
+}

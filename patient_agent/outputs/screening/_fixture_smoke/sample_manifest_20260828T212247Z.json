@@ -1,0 +1,17 @@
+{
+  "run_id": "20260828T212247Z",
+  "seed": 42,
+  "n": 1,
+  "note": "Provisional pre-clinician sample. IDs and hashes only; stems live in clinician_review CSV.",
+  "items": [
+    {
+      "case_id": "lbp_osce_d29042a4",
+      "source_id": "keep_sciatica",
+      "stem_hash": "d29042a4933b7be4",
+      "split": "jsonl",
+      "auto_red_flag_family": "malignancy",
+      "has_agentclinic_osce": false,
+      "conversion": "stub_from_stem_needs_clinician_rewrite"
+    }
+  ]
+}

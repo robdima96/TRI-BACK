@@ -1,0 +1,29 @@
+{
+  "session_id": "pa_55f9257d20dd",
+  "case_id": "lbp_osce_e73fe2f4",
+  "source_id": "agentclinic_medqa:19",
+  "backend": "echo",
+  "card_path": "C:\\ROBS STUFF\\UBC Postdoctoral Fellowship\\DigiMSKbot\\patient_agent\\outputs\\cards\\20260828T212355Z\\lbp_osce_e73fe2f4.json",
+  "messages": [
+    {
+      "role": "patient",
+      "text": "The patient reports exercising in the gym several hours ago when she suddenly felt a sharp pain in her lower back.",
+      "flags": []
+    },
+    {
+      "role": "chatbot",
+      "text": "How long has this been going on?",
+      "question_mode": true
+    },
+    {
+      "role": "patient",
+      "text": "I'm not sure — nobody's told me that."
+    }
+  ],
+  "gates": {
+    "n_turns": 2,
+    "n_flagged": 0,
+    "flags": [],
+    "pass": true
+  }
+}

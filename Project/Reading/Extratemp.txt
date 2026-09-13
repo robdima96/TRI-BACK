@@ -1,0 +1,612 @@
+  *
+
+
+        A Survey of Available Corpora for Building Data-Driven Dialogue
+        Systems
+
+    Item Type 	Preprint
+    Author 	Iulian Vlad Serban
+    Author 	Ryan Lowe
+    Author 	Peter Henderson
+    Author 	Laurent Charlin
+    Author 	Joelle Pineau
+    Abstract 	During the past decade, several areas of speech and
+    language understanding have witnessed substantial breakthroughs from
+    the use of data-driven models. In the area of dialogue systems, the
+    trend is less obvious, and most practical systems are still built
+    through significant engineering and expert knowledge. Nevertheless,
+    several recent results suggest that data-driven approaches are
+    feasible and quite promising. To facilitate research in this area,
+    we have carried out a wide survey of publicly available datasets
+    suitable for data-driven learning of dialogue systems. We discuss
+    important characteristics of these datasets, how they can be used to
+    learn diverse dialogue strategies, and their other potential uses.
+    We also examine methods for transfer learning between datasets and
+    the use of external knowledge. Finally, we discuss appropriate
+    choice of evaluation metrics for the learning objective.
+    Date 	2017-03-21
+    Library Catalog 	arXiv.org
+    URL 	http://arxiv.org/abs/1512.05742 <http://arxiv.org/abs/1512.05742>
+    Accessed 	4/11/2026, 5:08:04 PM
+    Extra 	arXiv:1512.05742 [cs]
+    DOI 	10.48550/arXiv.1512.05742
+    <http://doi.org/10.48550/arXiv.1512.05742>
+    Repository 	arXiv
+    Archive ID 	arXiv:1512.05742
+    Date Added 	4/11/2026, 5:08:04 PM
+    Modified 	4/11/2026, 5:08:04 PM
+
+
+          Tags:
+
+      o Computer Science - Artificial Intelligence
+      o Computer Science - Computation and Language
+      o Computer Science - Human-Computer Interaction
+      o Computer Science - Machine Learning
+      o Statistics - Machine Learning
+
+
+          Notes:
+
+      o
+        Comment: 56 pages including references and appendix, 5 tables
+        and 1 figure; Under review for the Dialogue & Discourse journal.
+        Update: paper has been rewritten and now includes several new
+        datasets
+
+
+          Attachments
+
+      o Preprint PDF
+      o Snapshot
+  *
+
+
+        A Survey on Dialogue Systems: Recent Advances and New Frontiers
+
+    Item Type 	Journal Article
+    Author 	Hongshen Chen
+    Author 	Xiaorui Liu
+    Author 	Dawei Yin
+    Author 	Jiliang Tang
+    Abstract 	Dialogue systems have attracted more and more attention.
+    Recent advances on dialogue systems are overwhelmingly contributed
+    by deep learning techniques, which have been employed to enhance a
+    wide range of big data applications such as computer vision, natural
+    language processing, and recommender systems. For dialogue systems,
+    deep learning can leverage a massive amount of data to learn
+    meaningful feature representations and response generation
+    strategies, while requiring a minimum amount of hand-crafting. In
+    this article, we give an overview to these recent advances on
+    dialogue systems from various perspectives and discuss some possible
+    research directions. In particular, we generally divide existing
+    dialogue systems into task-oriented and nontask- oriented models,
+    then detail how deep learning techniques help them with
+    representative algorithms and finally discuss some appealing
+    research directions that can bring the dialogue system research into
+    a new frontier
+    Date 	November 21, 2017
+    Short Title 	A Survey on Dialogue Systems
+    Library Catalog 	ACM Digital Library
+    URL 	https://dl.acm.org/doi/10.1145/3166054.3166058
+    <https://dl.acm.org/doi/10.1145/3166054.3166058>
+    Accessed 	4/11/2026, 5:08:59 PM
+    Volume 	19
+    Pages 	25–35
+    Publication 	SIGKDD Explor. Newsl.
+    DOI 	10.1145/3166054.3166058 <http://doi.org/10.1145/3166054.3166058>
+    Issue 	2
+    ISSN 	1931-0145
+    Date Added 	4/11/2026, 5:08:59 PM
+    Modified 	4/11/2026, 5:08:59 PM
+
+
+          Attachments
+
+      o Full Text PDF
+  *
+
+
+        Chatbots: History, technology, and applications
+
+    Item Type 	Journal Article
+    Author 	Eleni Adamopoulou
+    Author 	Lefteris Moussiades
+    Abstract 	This literature review presents the History, Technology,
+    and Applications of Natural Dialog Systems or simply chatbots. It
+    aims to organize critical information that is a necessary background
+    for further research activity in the field of chatbots. More
+    specifically, while giving the historical evolution, from the
+    generative idea to the present day, we point out possible weaknesses
+    of each stage. After we present a complete categorization system, we
+    analyze the two essential implementation technologies, namely, the
+    pattern matching approach and machine learning. Moreover, we compose
+    a general architectural design that gathers critical details, and we
+    highlight crucial issues to take into account before system design.
+    Furthermore, we present chatbots applications and industrial use
+    cases while we point out the risks of using chatbots and suggest
+    ways to mitigate them. Finally, we conclude by stating our view
+    regarding the direction of technology so that chatbots will become
+    really smart.
+    Date 	2020-12-15
+    Short Title 	Chatbots
+    Library Catalog 	ScienceDirect
+    URL
+    https://www.sciencedirect.com/science/article/pii/S2666827020300062
+    <https://www.sciencedirect.com/science/article/pii/S2666827020300062>
+    Accessed 	4/11/2026, 5:03:13 PM
+    Volume 	2
+    Pages 	100006
+    Publication 	Machine Learning with Applications
+    DOI 	10.1016/j.mlwa.2020.100006
+    <http://doi.org/10.1016/j.mlwa.2020.100006>
+    Journal Abbr 	Machine Learning with Applications
+    ISSN 	2666-8270
+    Date Added 	4/11/2026, 5:03:13 PM
+    Modified 	4/11/2026, 5:03:13 PM
+
+
+          Tags:
+
+      o Chatbot
+      o Human–computer interaction
+      o Machine learning
+      o Natural dialog interfaces
+      o Natural language processing
+      o Pattern matching
+  *
+
+
+        Evaluation framework for conversational agents with artificial
+        intelligence in health interventions: a systematic scoping review
+
+    Item Type 	Journal Article
+    Author 	Hang Ding
+    Author 	Joshua Simmich
+    Author 	Atiyeh Vaezipour
+    Author 	Nicole Andrews
+    Author 	Trevor Russell
+    Abstract 	AbstractObjectives. Conversational agents (CAs) with
+    emerging artificial intelligence present new opportunities to assist
+    in health interventions but are d
+    Date 	2024/02/16
+    Language 	en
+    Short Title 	Evaluation framework for conversational agents with
+    artificial intelligence in health interventions
+    Library Catalog 	academic.oup.com
+    URL 	https://dx.doi.org/10.1093/jamia/ocad222
+    <https://dx.doi.org/10.1093/jamia/ocad222>
+    Accessed 	4/11/2026, 5:12:46 PM
+    Volume 	31
+    Publisher 	Oxford Academic
+    Pages 	746-761
+    Publication 	Journal of the American Medical Informatics Association
+    DOI 	10.1093/jamia/ocad222 <http://doi.org/10.1093/jamia/ocad222>
+    Issue 	3
+    Journal Abbr 	J Am Med Inform Assoc
+    PMID 	38070173
+    Date Added 	4/11/2026, 5:12:46 PM
+    Modified 	4/11/2026, 5:12:46 PM
+
+
+          Attachments
+
+      o PubMed entry
+  *
+
+
+        From Eliza to XiaoIce: Challenges and Opportunities with Social
+        Chatbots
+
+    Item Type 	Journal Article
+    Author 	Heung-Yeung Shum
+    Author 	Xiao-Dong He
+    Author 	Di Li
+    Abstract 	Conversational systems have come a long way since their
+    inception in the 1960s. After decades of research and development,
+    we have seen progress from Eliza and Parry in the 1960s and 1970s,
+    to task-completion systems as in the Defense Advanced Research
+    Projects Agency (DARPA) communicator program in the 2000s, to
+    intelligent personal assistants such as Siri, in the 2010s, to
+    today‘s social chatbots like XiaoIce. Social chatbots’ appeal lies
+    not only in their ability to respond to users‘ diverse requests, but
+    also in being able to establish an emotional connection with users.
+    The latter is done by satisfying users’ need for communication,
+    affection, as well as social belonging. To further the advancement
+    and adoption of social chatbots, their design must focus on user
+    engagement and take both intellectual quotient (IQ) and emotional
+    quotient (EQ) into account. Users should want to engage with a
+    social chatbot; as such, we define the success metric for social
+    chatbots as conversation-turns per session (CPS). Using XiaoIce as
+    an illustrative example, we discuss key technologies in building
+    social chatbots from core chat to visual awareness to skills. We
+    also show how XiaoIce can dynamically recognize emotion and engage
+    the user throughout long conversations with appropriate
+    interpersonal responses. As we become the first generation of humans
+    ever living with artificial intelligenc (AI), we have a
+    responsibility to design social chatbots to be both useful and
+    empathetic, so they will become ubiquitous and help society as a whole.
+    Date 	2018-01
+    Short Title 	From Eliza to XiaoIce
+    Library Catalog 	IEEE Xplore
+    URL 	https://ieeexplore.ieee.org/abstract/document/11289728
+    <https://ieeexplore.ieee.org/abstract/document/11289728>
+    Accessed 	4/11/2026, 5:10:45 PM
+    Volume 	19
+    Pages 	10-26
+    Publication 	Frontiers of Information Technology & Electronic
+    Engineering
+    DOI 	10.1631/FITEE.1700826 <http://doi.org/10.1631/FITEE.1700826>
+    Issue 	1
+    ISSN 	2095-9230
+    Date Added 	4/11/2026, 5:10:45 PM
+    Modified 	4/11/2026, 5:10:45 PM
+
+
+          Tags:
+
+      o Artificial intelligence
+      o Buildings
+      o Chatbots
+      o Conversational system
+      o Emotion recognition
+      o Intelligent personal assistant
+      o Measurement
+      o Research and development
+      o Social Chatbot
+      o Virtual assistants
+      o Visualization
+      o XiaoIce
+
+
+          Attachments
+
+      o Full Text PDF
+  *
+
+
+        Overview of Chatbots with special emphasis on artificial
+        intelligence-enabled ChatGPT in medical science
+
+    Item Type 	Journal Article
+    Author 	Chiranjib Chakraborty
+    Author 	Soumen Pal
+    Author 	Manojit Bhattacharya
+    Author 	Snehasish Dash
+    Author 	Sang-Soo Lee
+    Abstract 	The release of ChatGPT has initiated new thinking about
+    AI-based Chatbot and its application and has drawn huge public
+    attention worldwide. Researchers and doctors have started thinking
+    about the promise and application of AI-related large language
+    models in medicine during the past few months. Here, the
+    comprehensive review highlighted the overview of Chatbot and ChatGPT
+    and their current role in medicine.Firstly, we discussed the general
+    idea of Chatbots, evolution, architecture, and medical use.Secondly,
+    we discussed ChatGPT, where we illustrated its application in
+    medicine, architecture and training methods, medical diagnosis and
+    treatment, other research ethical issues, and a comparison of
+    ChatGPT with other NLP models. The article also discussed the
+    limitations and prospects of ChatGPT. In the future, these large
+    language models and ChatGPT will have immense promise in healthcare.
+    However, more research is needed in this direction.
+    Date 	2023-10-31
+    Language 	English
+    Library Catalog 	Frontiers
+    URL
+    https://www.frontiersin.org/journals/artificial-intelligence/articles/10.3389/frai.2023.1237704/full <https://www.frontiersin.org/journals/artificial-intelligence/articles/10.3389/frai.2023.1237704/full>
+    Accessed 	4/11/2026, 5:00:50 PM
+    Volume 	6
+    Publisher 	Frontiers
+    Publication 	Frontiers in Artificial Intelligence
+    DOI 	10.3389/frai.2023.1237704
+    <http://doi.org/10.3389/frai.2023.1237704>
+    Journal Abbr 	Front. Artif. Intell.
+    ISSN 	2624-8212
+    Date Added 	4/11/2026, 5:00:50 PM
+    Modified 	4/11/2026, 5:00:50 PM
+
+
+          Tags:
+
+      o AI
+      o Chatbot
+      o ChatGPT
+      o Large language models
+      o medical use
+
+
+          Attachments
+
+      o Full Text PDF
+  *
+
+
+        Rasa: Open Source Language Understanding and Dialogue Management
+
+    Item Type 	Web Page
+    Author 	Tom Bocklisch
+    Author 	Joey Faulkner
+    Author 	Nick Pawlowski
+    Author 	Alan Nichol
+    Abstract 	We introduce a pair of tools, Rasa NLU and Rasa Core,
+    which are open source python libraries for building conversational
+    software. Their purpose is to make machine-learning based dialogue
+    management and language understanding accessible to non-specialist
+    software developers. In terms of design philosophy, we aim for ease
+    of use, and bootstrapping from minimal (or no) initial training
+    data. Both packages are extensively documented and ship with a
+    comprehensive suite of tests. The code is available at
+    https://github.com/RasaHQ/
+    Date 	2017/12/14
+    Language 	en
+    Short Title 	Rasa
+    URL 	https://arxiv.org/abs/1712.05181v2
+    <https://arxiv.org/abs/1712.05181v2>
+    Accessed 	4/11/2026, 5:04:29 PM
+    Website Title 	arXiv.org
+    Date Added 	4/11/2026, 5:04:29 PM
+    Modified 	4/11/2026, 5:04:29 PM
+
+
+          Attachments
+
+      o Full Text PDF
+  *
+
+
+        Spoken dialogue technology: enabling the conversational user
+        interface
+
+    Item Type 	Journal Article
+    Author 	Michael F. McTear
+    Abstract 	Spoken dialogue systems allow users to interact with
+    computer-based applications such as databases and expert systems by
+    using natural spoken language. The origins of spoken dialogue
+    systems can be traced back to Artificial Intelligence research in
+    the 1950s concerned with developing conversational interfaces.
+    However, it is only within the last decade or so, with major
+    advances in speech technology, that large-scale working systems have
+    been developed and, in some cases, introduced into commercial
+    environments. As a result many major telecommunications and software
+    companies have become aware of the potential for spoken dialogue
+    technology to provide solutions in newly developing areas such as
+    computer-telephony integration. Voice portals, which provide a
+    speech-based interface between a telephone user and Web-based
+    services, are the most recent application of spoken dialogue
+    technology. This article describes the main components of the
+    technology---speech recognition, language understanding, dialogue
+    management, communication with an external source such as a
+    database, language generation, speech synthesis---and shows how
+    these component technologies can be integrated into a spoken
+    dialogue system. The article describes in detail the methods that
+    have been adopted in some well-known dialogue systems, explores
+    different system architectures, considers issues of specification,
+    design, and evaluation, reviews some currently available dialogue
+    development toolkits, and outlines prospects for future development.
+    Date 	March 1, 2002
+    Short Title 	Spoken dialogue technology
+    Library Catalog 	ACM Digital Library
+    URL 	https://dl.acm.org/doi/10.1145/505282.505285
+    <https://dl.acm.org/doi/10.1145/505282.505285>
+    Accessed 	4/11/2026, 5:07:44 PM
+    Volume 	34
+    Pages 	90–169
+    Publication 	ACM Comput. Surv.
+    DOI 	10.1145/505282.505285 <http://doi.org/10.1145/505282.505285>
+    Issue 	1
+    ISSN 	0360-0300
+    Date Added 	4/11/2026, 5:07:44 PM
+    Modified 	4/11/2026, 5:07:44 PM
+
+
+          Attachments
+
+      o Full Text PDF
+  *
+
+
+        Standardizing and Scaffolding Health Care AI-Chatbot Evaluation:
+        Systematic Review
+
+    Item Type 	Journal Article
+    Author 	Yining Hua
+    Author 	Winna Xia
+    Author 	David Bates
+    Author 	George Luke Hartstein
+    Author 	Hyungjin Tom Kim
+    Author 	Michael Li
+    Author 	Benjamin W. Nelson
+    Author 	Charles Stromeyer Iv
+    Author 	Darlene King
+    Author 	Jina Suh
+    Author 	Li Zhou
+    Author 	John Torous
+    Abstract 	Background: Health care chatbots are rapidly
+    proliferating, while generative artificial intelligence (AI)
+    outpaces existing evaluation standards. Objective: We aimed to
+    develop a structured, stakeholder-informed framework to standardize
+    evaluation of health care chatbots. Methods: PRISMA (Preferred
+    Reporting Items for Systematic reviews and Meta-Analyses)–guided
+    searches across multiple databases identified 266 records; 152 were
+    screened, 21 full texts were assessed, and 11 frameworks were
+    included. We extracted 356 questions (refined to 271 by
+    deduplication and relevance review), mapped items to Coalition for
+    Health AI constructs, and organized them with iterative input from
+    clinicians, patients, developers, epidemiologists, and policymakers.
+    Results: We developed the Health Care AI Chatbot Evaluation
+    Framework (HAICEF), a hierarchical framework with 3 priority domains
+    (safety, privacy, and fairness; trustworthiness and usefulness; and
+    design and operational effectiveness) and 18 second-level and 60
+    third-level constructs covering 271 questions. Emphasis includes
+    data provenance and harm control; Health Insurance Portability and
+    Accountability Act/General Data Protection Regulation–aligned
+    privacy and security; bias management; and reliability,
+    transparency, and workflow integration. Question distribution across
+    domains is as follows: design and operational effectiveness, 40%;
+    trustworthiness and usefulness, 39%; and safety, privacy and
+    fairness, 21%. The framework accommodates both patient-facing and
+    back-office use cases. Conclusions: HAICEF provides an adaptable
+    scaffold for standardized evaluation and responsible implementation
+    of health care chatbots. Planned next steps include prospective
+    validation across settings and a Delphi consensus to extend
+    accountability and accessibility assurances.
+    Date 	2025-11-07
+    Language 	EN
+    Short Title 	Standardizing and Scaffolding Health Care AI-Chatbot
+    Evaluation
+    Library Catalog 	ai.jmir.org
+    URL 	https://ai.jmir.org/2025/1/e69006
+    <https://ai.jmir.org/2025/1/e69006>
+    Accessed 	4/11/2026, 5:11:56 PM
+    Volume 	4
+    Publisher 	JMIR Publications Inc., Toronto, Canada
+    Pages 	e69006
+    Publication 	JMIR AI
+    DOI 	10.2196/69006 <http://doi.org/10.2196/69006>
+    Issue 	1
+    Date Added 	4/11/2026, 5:11:56 PM
+    Modified 	4/11/2026, 5:11:56 PM
+
+
+          Attachments
+
+      o Snapshot
+  *
+
+
+        Technical Aspects of Developing Chatbots for Medical
+        Applications: Scoping Review
+
+    Item Type 	Journal Article
+    Author 	Zeineb Safi
+    Author 	Alaa Abd-Alrazaq
+    Author 	Mohamed Khalifa
+    Author 	Mowafa Househ
+    Abstract 	Background: Chatbots are applications that can conduct
+    natural language conversations with users. In the medical field,
+    chatbots have been developed and used to serve different purposes.
+    They provide patients with timely information that can be critical
+    in some scenarios, such as access to mental health resources. Since
+    the development of the first chatbot, ELIZA, in the late 1960s, much
+    effort has followed to produce chatbots for various health purposes
+    developed in different ways. Objective: This study aimed to explore
+    the technical aspects and development methodologies associated with
+    chatbots used in the medical field to explain the best methods of
+    development and support chatbot development researchers on their
+    future work. Methods: We searched for relevant articles in 8
+    literature databases (IEEE, ACM, Springer, ScienceDirect, Embase,
+    MEDLINE, PsycINFO, and Google Scholar). We also performed forward
+    and backward reference checking of the selected articles. Study
+    selection was performed by one reviewer, and 50% of the selected
+    studies were randomly checked by a second reviewer. A narrative
+    approach was used for result synthesis. Chatbots were classified
+    based on the different technical aspects of their development. The
+    main chatbot components were identified in addition to the different
+    techniques for implementing each module. Results: The original
+    search returned 2481 publications, of which we identified 45 studies
+    that matched our inclusion and exclusion criteria. The most common
+    language of communication between users and chatbots was English
+    (n=23). We identified 4 main modules: text understanding module,
+    dialog management module, database layer, and text generation
+    module. The most common technique for developing text understanding
+    and dialogue management is the pattern matching method (n=18 and
+    n=25, respectively). The most common text generation is fixed output
+    (n=36). Very few studies relied on generating original output. Most
+    studies kept a medical knowledge base to be used by the chatbot for
+    different purposes throughout the conversations. A few studies kept
+    conversation scripts and collected user data and previous
+    conversations. Conclusions: Many chatbots have been developed for
+    medical use, at an increasing rate. There is a recent, apparent
+    shift in adopting machine learning–based approaches for developing
+    chatbot systems. Further research can be conducted to link clinical
+    outcomes to different chatbot development techniques and technical
+    characteristics.
+    Date 	2020-12-18
+    Language 	EN
+    Short Title 	Technical Aspects of Developing Chatbots for Medical
+    Applications
+    Library Catalog 	www.jmir.org
+    URL 	https://www.jmir.org/2020/12/e19127
+    <https://www.jmir.org/2020/12/e19127>
+    Accessed 	4/11/2026, 5:02:56 PM
+    Volume 	22
+    Publisher 	JMIR Publications Inc., Toronto, Canada
+    Pages 	e19127
+    Publication 	Journal of Medical Internet Research
+    DOI 	10.2196/19127 <http://doi.org/10.2196/19127>
+    Issue 	12
+    Date Added 	4/11/2026, 5:02:56 PM
+    Modified 	4/11/2026, 5:02:56 PM
+
+
+          Attachments
+
+      o Full Text
+      o Snapshot
+  *
+
+
+        Technical Metrics Used to Evaluate Health Care Chatbots: Scoping
+        Review
+
+    Item Type 	Journal Article
+    Author 	Alaa Abd-Alrazaq
+    Author 	Zeineb Safi
+    Author 	Mohannad Alajlani
+    Author 	Jim Warren
+    Author 	Mowafa Househ
+    Author 	Kerstin Denecke
+    Abstract 	Background: Dialog agents (chatbots) have a long history
+    of application in health care, where they have been used for tasks
+    such as supporting patient self-management and providing counseling.
+    Their use is expected to grow with increasing demands on health
+    systems and improving artificial intelligence (AI) capability.
+    Approaches to the evaluation of health care chatbots, however,
+    appear to be diverse and haphazard, resulting in a potential barrier
+    to the advancement of the field. Objective: This study aims to
+    identify the technical (nonclinical) metrics used by previous
+    studies to evaluate health care chatbots. Methods: Studies were
+    identified by searching 7 bibliographic databases (eg, MEDLINE and
+    PsycINFO) in addition to conducting backward and forward reference
+    list checking of the included studies and relevant reviews. The
+    studies were independently selected by two reviewers who then
+    extracted data from the included studies. Extracted data were
+    synthesized narratively by grouping the identified metrics into
+    categories based on the aspect of chatbots that the metrics
+    evaluated. Results: Of the 1498 citations retrieved, 65 studies were
+    included in this review. Chatbots were evaluated using 27 technical
+    metrics, which were related to chatbots as a whole (eg, usability,
+    classifier performance, speed), response generation (eg,
+    comprehensibility, realism, repetitiveness), response understanding
+    (eg, chatbot understanding as assessed by users, word error rate,
+    concept error rate), and esthetics (eg, appearance of the virtual
+    agent, background color, and content). Conclusions: The technical
+    metrics of health chatbot studies were diverse, with survey designs
+    and global usability metrics dominating. The lack of standardization
+    and paucity of objective measures make it difficult to compare the
+    performance of health chatbots and could inhibit advancement of the
+    field. We suggest that researchers more frequently include metrics
+    computed from conversation logs. In addition, we recommend the
+    development of a framework of technical metrics with recommendations
+    for specific circumstances for their inclusion in chatbot studies.
+    Date 	2020-06-05
+    Language 	EN
+    Short Title 	Technical Metrics Used to Evaluate Health Care Chatbots
+    Library Catalog 	www.jmir.org
+    URL 	https://www.jmir.org/2020/6/e18301
+    <https://www.jmir.org/2020/6/e18301>
+    Accessed 	4/11/2026, 5:12:24 PM
+    Volume 	22
+    Publisher 	JMIR Publications Inc., Toronto, Canada
+    Pages 	e18301
+    Publication 	Journal of Medical Internet Research
+    DOI 	10.2196/18301 <http://doi.org/10.2196/18301>
+    Issue 	6
+    Date Added 	4/11/2026, 5:12:24 PM
+    Modified 	4/11/2026, 5:12:24 PM
+
+
+          Attachments
+
+      o Full Text
+
