@@ -58,7 +58,7 @@ def _warmup_gliner() -> None:
 
 def _warmup_rag_embedding() -> None:
     if not settings.rag_load:
-        _log.info("warmup: RAG embedding skipped (DIGIMSK_RAG=0)")
+        _log.info("warmup: RAG embedding skipped (TRI_BACK_RAG=0)")
         return
     try:
         from app.services.rag.embeddings import (
@@ -77,7 +77,7 @@ def _warmup_rag_embedding() -> None:
 
 def _warmup_lexical_index() -> None:
     if not settings.rag_load:
-        _log.info("warmup: lexical Chroma index skipped (DIGIMSK_RAG=0)")
+        _log.info("warmup: lexical Chroma index skipped (TRI_BACK_RAG=0)")
         return
     try:
         from app.services.rag.chunk_retrieval import warm_lexical_doc_index

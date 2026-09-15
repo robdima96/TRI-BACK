@@ -260,8 +260,17 @@ def save_session(session_id: str, **fields: Any) -> None:
         )
 
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(path)
+    data = json.dumps(existing, ensure_ascii=False, indent=2)
+    tmp.write_text(data, encoding="utf-8")
+    try:
+        tmp.replace(path)
+    except OSError:
+        # GCS FUSE often cannot rename; write in place instead.
+        path.write_text(data, encoding="utf-8")
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def list_session_files(*, root: Path | None = None) -> list[dict[str, Any]]:

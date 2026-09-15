@@ -6,18 +6,20 @@ The encoder builds a **clinical checklist** from three layers:
 |-------|--------|--------|-----|
 | Regex / demographics | `pattern` | `app/services/encoder.py` | — |
 | Safety phrases | `safety_phrase` | `app/services/policy.py` | — |
-| GliNER spans | `gliner` | `app/services/gliner_ner.py` | `DIGIMSK_GLINER_MODEL_DIR`, `DIGIMSK_LOAD_GLINER`, `DIGIMSK_LOAD_NER` |
+| GliNER spans | `gliner` | `app/services/gliner_ner.py` | `TRI_BACK_GLINER_MODEL_DIR`, `TRI_BACK_LOAD_GLINER`, `TRI_BACK_LOAD_NER` |
 
 **RAG embeddings** (Chroma ingest + retrieval) use a separate model:
 
 | Role | Default path | Env |
 |------|--------------|-----|
-| Sentence embeddings | `E:\DigiMSKbot\Clinical_sBERT` | `DIGIMSK_ENCODER_DIR`, `DIGIMSK_RAG_EMBEDDING_BACKEND`, `DIGIMSK_ENCODER_DIM` |
-| Span NER | `E:\DigiMSKbot\GliNER-BioMed` | `DIGIMSK_GLINER_MODEL_DIR` |
+| Sentence embeddings | `E:\TRI-BACK\Clinical_sBERT` (fallback `E:\DigiMSKbot\…`) | `TRI_BACK_ENCODER_DIR`, `TRI_BACK_RAG_EMBEDDING_BACKEND`, `TRI_BACK_ENCODER_DIM` |
+| Span NER | `E:\TRI-BACK\GliNER-BioMed` (fallback `E:\DigiMSKbot\…`) | `TRI_BACK_GLINER_MODEL_DIR` |
 
 Production loads Clinical_sBERT with `sentence_transformers` (`encode()` + optional L2 normalize).
-GliNER-BioMed is **not** used for vectors unless you set `DIGIMSK_RAG_EMBEDDING_BACKEND=hf_mean_pool`
-and point `DIGIMSK_ENCODER_DIR` at a Hugging Face / GliNER backbone folder.
+GliNER-BioMed is **not** used for vectors unless you set `TRI_BACK_RAG_EMBEDDING_BACKEND=hf_mean_pool`
+and point `TRI_BACK_ENCODER_DIR` at a Hugging Face / GliNER backbone folder.
+
+Legacy `DIGIMSK_*` names still resolve.
 
 After changing the RAG model, empty Chroma and re-ingest:
 
@@ -33,13 +35,13 @@ python scripts/ingest_chunks.py --sub-collection red_flags --chunks-csv "Knowled
 
 ## GliNER span NER
 
-Span NER uses the GliNER zero-shot model in `DIGIMSK_GLINER_MODEL_DIR` (default: `GliNER-BioMed`). The bundle must include `gliner_config.json`.
+Span NER uses the GliNER zero-shot model in `TRI_BACK_GLINER_MODEL_DIR` (default: `GliNER-BioMed`). The bundle must include `gliner_config.json`.
 
 Install GliNER: `pip install -e ".[gliner]"`.
 
-- `DIGIMSK_LOAD_NER=1` — enable span NER
-- `DIGIMSK_LOAD_GLINER=1` — load the GliNER model (disable for pattern/safety-only runs)
-- `DIGIMSK_GLINER_NER_THRESHOLD` — span confidence threshold (default `0.5`)
+- `TRI_BACK_LOAD_NER=1` — enable span NER
+- `TRI_BACK_LOAD_GLINER=1` — load the GliNER model (disable for pattern/safety-only runs)
+- `TRI_BACK_GLINER_NER_THRESHOLD` — span confidence threshold (default `0.5`)
 
 ## RAG retrieval flow
 

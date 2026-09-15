@@ -259,7 +259,7 @@ def tool_search_evidence(ctx: ToolContext, query: str | None = None, **_: Any) -
             name="search_evidence",
             ok=False,
             error="rag disabled",
-            observation="Chroma RAG is disabled (DIGIMSK_RAG=0); use graph tools instead.",
+            observation="Chroma RAG is disabled (TRI_BACK_RAG=0); use graph tools instead.",
         )
 
     matches = retrieve_rag_chunk_matches(q, None, ctx.checklist, top_k=5)

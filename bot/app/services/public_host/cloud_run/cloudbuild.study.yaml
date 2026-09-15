@@ -1,13 +1,16 @@
-# Build, push, and deploy digimsk-study on Cloud Run (image update only — keeps env/mounts).
+# Build, push, and deploy tri-back-study on Cloud Run (image update only — keeps env/mounts).
 # Manual: gcloud builds submit --config bot/app/services/public_host/cloud_run/cloudbuild.study.yaml .
-# Auto: Cloud Build trigger digimsk-study-deploy on push to main (study-related paths).
+# Auto: Cloud Build trigger tri-back-study-deploy on push to main (study-related paths).
+#
+# After the first tri-back-study deploy, set _PUBLIC_BASE_URL (and _SERVICE) to the
+# new run.app hostname. The baked frontend URL must match or WebSockets break.
+# Keep the old digimsk-study service until smoke tests pass.
 
 substitutions:
   _REGION: us-central1
-  _REPO: digimsk
-  _SERVICE: digimsk-study
+  _REPO: tri-back
+  _SERVICE: tri-back-study
   _PUBLIC_BASE_URL: https://tri-back-study-PLACEHOLDER.us-central1.run.app
-  # Overridden by trigger to $COMMIT_SHA when present.
   _TAG: latest
 
 options:
@@ -25,22 +28,22 @@ steps:
       - --build-arg
       - PUBLIC_BASE_URL=${_PUBLIC_BASE_URL}
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study:${_TAG}
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-study:${_TAG}
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study:latest
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-study:latest
       - .
 
   - name: gcr.io/cloud-builders/docker
     id: push-study-tag
     args:
       - push
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study:${_TAG}
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-study:${_TAG}
 
   - name: gcr.io/cloud-builders/docker
     id: push-study-latest
     args:
       - push
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study:latest
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-study:latest
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: deploy-study
@@ -52,9 +55,9 @@ steps:
       - ${_SERVICE}
       - --project=$PROJECT_ID
       - --region=${_REGION}
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study:${_TAG}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-study:${_TAG}
       - --quiet
 
 images:
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study:${_TAG}
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study:latest
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-study:${_TAG}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-study:latest

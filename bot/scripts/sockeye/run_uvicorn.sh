@@ -12,5 +12,5 @@ fi
 source .venv/bin/activate
 
 export PORT="${PORT:-8000}"
-echo "DigiMSKbot: uvicorn host=0.0.0.0 port=${PORT} cwd=${BOT_ROOT}"
+echo "TRI-BACK: uvicorn host=0.0.0.0 port=${PORT} cwd=${BOT_ROOT}"
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT}"

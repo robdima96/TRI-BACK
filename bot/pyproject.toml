@@ -1,7 +1,7 @@
 [project]
-name = "digimskbot-skeleton"
-version = "0.1.0"
-description = "Month 1 scaffold for DigiMSKbot backend."
+name = "tri-back"
+version = "0.1.1"
+description = "TRI-BACK musculoskeletal triage chatbot backend (formerly DigiMSK)."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

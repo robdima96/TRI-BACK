@@ -94,7 +94,7 @@ def main() -> int:
     from app.services.rag.embeddings import rag_embedding_model_configured
 
     if not settings.rag_load:
-        sys.stderr.write("RAG is disabled (set DIGIMSK_LOAD_RAG=1).\n")
+        sys.stderr.write("RAG is disabled (set TRI_BACK_LOAD_RAG=1).\n")
         return 1
     if not rag_embedding_model_configured():
         sys.stderr.write(

@@ -1,31 +1,33 @@
-# DigiMSK bot for Cloud Run — code + deps only; GliNER/graph/sessions via GCS mount.
-# Build from the DigiMSK monorepo root (parent of bot/):
-#   docker build -f bot/app/services/public_host/cloud_run/Dockerfile.bot -t digimsk-bot .
+# TRI-BACK bot for Cloud Run — code + deps only; GliNER/graph/sessions via GCS mount.
+# Build from the TRI-BACK monorepo root (parent of bot/):
+#   docker build -f bot/app/services/public_host/cloud_run/Dockerfile.bot -t tri-back-bot .
+#
+# Override: .\scripts\deploy_bot.ps1 -Service digimskbot  (old Cloud Run name)
 
 FROM python:3.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    DIGIMSK_RAG=0 \
-    DIGIMSK_GRAPH_RAG=1 \
-    DIGIMSK_LOAD_RAG=0 \
-    DIGIMSK_GENERATOR_BACKEND=vertex \
-    DIGIMSK_GLINER_MODEL_DIR=/mnt/digimsk/models/gliner \
-    DIGIMSK_GRAPH_CSV=/mnt/digimsk/graph/v2/red_flags_manual_v2.csv \
-    DIGIMSK_GRAPH_INVENTORY=/mnt/digimsk/graph/v2/inventory.json \
-    DIGIMSK_SESSION_STORE_DIR=/mnt/digimsk/sessions \
-    DIGIMSK_CHECKPOINT_SQLITE=/tmp/langgraph_checkpoints.sqlite
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+    TRI_BACK_RAG=0 \
+    TRI_BACK_GRAPH_RAG=1 \
+    TRI_BACK_LOAD_RAG=0 \
+    TRI_BACK_GENERATOR_BACKEND=vertex \
+    TRI_BACK_GLINER_MODEL_DIR=/mnt/tri-back/models/gliner \
+    TRI_BACK_GRAPH_CSV=/mnt/tri-back/graph/v4/red_flags_edges_v4_2026.9.10.csv \
+    TRI_BACK_GRAPH_FACTORS=/mnt/tri-back/graph/v4/red_flags_factors_v4_2026.9.10.csv \
+    TRI_BACK_GRAPH_INVENTORY=/mnt/tri-back/graph/v4/red_flags_inventory_v4_2026.9.10.json \
+    TRI_BACK_SESSION_STORE_DIR=/mnt/tri-back/sessions \
+    TRI_BACK_CHECKPOINT_SQLITE=/tmp/langgraph_checkpoints.sqlite
 
 WORKDIR /app
 
 COPY bot/pyproject.toml bot/README.md bot/readme.txt ./
 COPY bot/app ./app
-RUN pip install --upgrade pip \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --upgrade pip \
     && pip install -e ".[generator-api,gliner]"
 
 ENV PORT=8080

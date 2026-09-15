@@ -6,33 +6,44 @@ import os
 import pytest
 
 
+def _force_env(suffix: str, value: str) -> None:
+    os.environ[f"TRI_BACK_{suffix}"] = value
+    os.environ[f"DIGIMSK_{suffix}"] = value
+
+
+def _pop_env(suffix: str) -> None:
+    os.environ.pop(f"TRI_BACK_{suffix}", None)
+    os.environ.pop(f"DIGIMSK_{suffix}", None)
+
+
+os.environ.setdefault("TRI_BACK_CHROMA_PATH", ".chroma_pytest")
 os.environ.setdefault("DIGIMSK_CHROMA_PATH", ".chroma_pytest")
 
-# Prefer DIGIMSK_RAG over the legacy DIGIMSK_LOAD_RAG alias; force both so a
-# developer .env with DIGIMSK_RAG=0 cannot disable retrieval under pytest.
-os.environ["DIGIMSK_RAG"] = "1"
-os.environ["DIGIMSK_LOAD_RAG"] = "1"
+# Force both prefixes so a developer .env cannot disable retrieval under pytest.
+_force_env("RAG", "1")
+_force_env("LOAD_RAG", "1")
 
 # Prevent pytest from probing real Windows model paths if .env overrides.
-os.environ["DIGIMSK_ENCODER_DIR"] = "__pytest_no_encoder__"
-os.environ["DIGIMSK_GLINER_MODEL_DIR"] = "__pytest_no_gliner__"
+_force_env("ENCODER_DIR", "__pytest_no_encoder__")
+_force_env("GLINER_MODEL_DIR", "__pytest_no_gliner__")
 
-os.environ["DIGIMSK_LOAD_NER"] = "0"
-os.environ["DIGIMSK_LOAD_GLINER"] = "0"
+_force_env("LOAD_NER", "0")
+_force_env("LOAD_GLINER", "0")
 
-os.environ["DIGIMSK_GENERATOR_DIR"] = "__pytest_no_generator__"
-os.environ["DIGIMSK_GENERATOR_BACKEND"] = "local"
+_force_env("GENERATOR_DIR", "__pytest_no_generator__")
+_force_env("GENERATOR_BACKEND", "local")
 os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
 
 # Deterministic disposition in unit tests unless a test opts into agentic.
+os.environ.setdefault("TRI_BACK_DISPOSITION_MODE", "deterministic")
 os.environ.setdefault("DIGIMSK_DISPOSITION_MODE", "deterministic")
 
 # Deterministic factor matching unless a test opts into the LLM cross-check.
-os.environ["DIGIMSK_LLM_FACTOR_MATCH"] = "0"
+_force_env("LLM_FACTOR_MATCH", "0")
 
 # Public-host API key must not break local chat route tests.
-os.environ.pop("DIGIMSK_BOT_API_KEY", None)
-os.environ.pop("DIGIMSK_FORCE_FACTOR_ASK", None)
+_pop_env("BOT_API_KEY")
+_pop_env("FORCE_FACTOR_ASK")
 
 
 @pytest.fixture(autouse=True)

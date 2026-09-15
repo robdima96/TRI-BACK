@@ -1,6 +1,6 @@
-# GCS bucket layout for DigiMSK Cloud Run
+# GCS bucket layout for TRI-BACK Cloud Run
 
-Default bucket name (override with `DIGIMSK_GCS_BUCKET`):
+The **bucket name cannot be renamed**. Keep:
 
 ```text
 digimsk-cloudrun-<PROJECT_ID>
@@ -8,11 +8,15 @@ digimsk-cloudrun-<PROJECT_ID>
 
 Example: `digimsk-cloudrun-YOUR_GCP_PROJECT`
 
-Cloud Run mounts the **entire bucket** at:
+Override with `TRI_BACK_GCS_BUCKET` (legacy `DIGIMSK_GCS_BUCKET`).
+
+New Cloud Run services mount the **entire bucket** at:
 
 ```text
-/mnt/digimsk
+/mnt/tri-back
 ```
+
+Legacy `digimskbot` / `digimsk-study` still mount the same objects at `/mnt/digimsk` until those services are deleted.
 
 (`readonly=false` so `sessions/` is writable; model/graph trees should be treated as read-mostly.)
 
@@ -23,10 +27,14 @@ gs://<bucket>/
   models/
     gliner/                 # full GliNER-BioMed tree (config, weights, …)
   graph/
-    v2/
-      red_flags_manual_v2.csv   # from Graphs/backups/red flags/v2/source/
-      inventory.json            # from Graphs/backups/red flags/v2/
-  sessions/                 # bot DIGIMSK_SESSION_STORE_DIR + study DIGIMSK_SESSIONS_DIR
+    v4/
+      red_flags_edges_v4_2026.9.10.csv
+      red_flags_factors_v4_2026.9.10.csv
+      red_flags_inventory_v4_2026.9.10.json
+    v2/                     # leftover from earlier deploys; not used by tri-back
+  sessions/                 # bot TRI_BACK_SESSION_STORE_DIR + study sessions dir
+  study/
+    digimsk.db              # existing SQLite object name (keep)
   checkpoints/              # optional; prefer local /tmp until SQLite-on-FUSE is validated
 ```
 
@@ -34,11 +42,14 @@ gs://<bucket>/
 
 | Env var | Container path |
 |---------|----------------|
-| `DIGIMSK_GLINER_MODEL_DIR` | `/mnt/digimsk/models/gliner` |
-| `DIGIMSK_GRAPH_CSV` | `/mnt/digimsk/graph/v2/red_flags_manual_v2.csv` |
-| `DIGIMSK_GRAPH_INVENTORY` | `/mnt/digimsk/graph/v2/inventory.json` |
-| `DIGIMSK_SESSION_STORE_DIR` | `/mnt/digimsk/sessions` |
-| `DIGIMSK_CHECKPOINT_SQLITE` | `/tmp/langgraph_checkpoints.sqlite` (v1 default; requires **max-instances=1**) |
+| `TRI_BACK_GLINER_MODEL_DIR` | `/mnt/tri-back/models/gliner` |
+| `TRI_BACK_GRAPH_CSV` | `/mnt/tri-back/graph/v4/red_flags_edges_v4_2026.9.10.csv` |
+| `TRI_BACK_GRAPH_FACTORS` | `/mnt/tri-back/graph/v4/red_flags_factors_v4_2026.9.10.csv` |
+| `TRI_BACK_GRAPH_INVENTORY` | `/mnt/tri-back/graph/v4/red_flags_inventory_v4_2026.9.10.json` |
+| `TRI_BACK_SESSION_STORE_DIR` | `/mnt/tri-back/sessions` |
+| `TRI_BACK_CHECKPOINT_SQLITE` | `/tmp/langgraph_checkpoints.sqlite` (v1 default; requires **max-instances=1**) |
+
+(`DIGIMSK_*` aliases still read; old services used `/mnt/digimsk/...`.)
 
 ## IAM
 

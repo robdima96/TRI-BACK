@@ -105,7 +105,7 @@ def _cmd_counts(chroma_path: str | None) -> int:
     from app.config import settings
 
     if not settings.rag_load:
-        logging.error("RAG is disabled (set DIGIMSK_LOAD_RAG=1).")
+        logging.error("RAG is disabled (set TRI_BACK_LOAD_RAG=1).")
         return 2
 
     persist = Path(settings.chroma_persist_path).resolve()

@@ -1,7 +1,7 @@
 """Deterministic intake ranker: one queue of floor slots + eligible graph factors.
 
 Re-ranked every turn. The queue reorders; it does not enumerate the graph.
-Seeds are clinical findings only — demographics do not open neighbourhood.
+Affirmed factors in ``NON_SEED_FACTORS`` do not open one-hop neighbourhood.
 """
 
 from __future__ import annotations
@@ -19,9 +19,20 @@ from app.services.rag.factor_polarity import (
 
 Kind = Literal["slot", "factor"]
 
-DEMOGRAPHIC_SEED_FACTORS: frozenset[str] = frozenset(
-    {"Age over 50", "Male sex", "Female sex"}
+# Affirmed factors that must not open one-hop graph questions.
+# They still count as matched for disposition; they just do not seed new asks.
+# Edit this list — names must match the v4 factor sheet exactly.
+NON_SEED_FACTORS: tuple[str, ...] = (
+    "Age over 50",
+    "Male sex",
+    "Female sex",
+    "Hypertension",
+    "Severe pain",
+    "Diabetes",
+    "Smoking"
 )
+# Backward-compatible alias for the same exclusion set.
+DEMOGRAPHIC_SEED_FACTORS: frozenset[str] = frozenset(NON_SEED_FACTORS)
 
 TIME_CRITICAL_CONDITIONS: tuple[str, ...] = ("CES", "AAA", "DVT")
 OTHER_HIGH_ACUITY_CONDITIONS: tuple[str, ...] = (
@@ -125,7 +136,11 @@ def clinical_finding_seeds(
     *,
     ontology: RedFlagOntology | None = None,
 ) -> tuple[str, ...]:
-    """Affirmed factors that may open one-hop neighbourhood (no demographics)."""
+    """Affirmed factors that may open one-hop neighbourhood.
+
+    ``NON_SEED_FACTORS`` (demographics, hypertension, severe pain, …) are
+    excluded: they remain matched for disposition but do not open new asks.
+    """
     ont = ontology or load_ontology()
     names: list[str] = []
     seen: set[str] = set()
@@ -134,7 +149,7 @@ def clinical_finding_seeds(
         canonical = _canonical_factor(raw, ont)
         if not canonical or canonical in seen:
             return
-        if canonical in DEMOGRAPHIC_SEED_FACTORS:
+        if canonical in NON_SEED_FACTORS:
             return
         polarity = _state_of(factor_states, canonical)
         if polarity == FACTOR_STATE_DENIED:

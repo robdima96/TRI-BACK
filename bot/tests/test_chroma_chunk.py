@@ -121,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
     from app.config import settings
 
     if not settings.rag_load:
-        logging.error("RAG is disabled (set DIGIMSK_LOAD_RAG=1).")
+        logging.error("RAG is disabled (set TRI_BACK_LOAD_RAG=1).")
         return 2
 
     chunk_id = args.chunk_id.strip()

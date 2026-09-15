@@ -6,7 +6,7 @@ from app.config import settings
 from app.orchestrator.intake_models import CoverageReport
 from app.orchestrator.question_planner import plan_next_question
 from app.orchestrator.relevance_ranker import (
-    DEMOGRAPHIC_SEED_FACTORS,
+    NON_SEED_FACTORS,
     TIER_SYMPTOM_SLOTS,
     TIER_TIME_CRITICAL,
     apply_coherence_guard,
@@ -57,9 +57,11 @@ def test_tingling_opens_ces_neighbourhood():
     assert "Age over 50" not in neighbours
 
 
-def test_demographics_do_not_seed_neighbourhood():
+def test_non_seed_factors_do_not_open_neighbourhood():
     ont = load_ontology()
-    for name in DEMOGRAPHIC_SEED_FACTORS:
+    assert "Hypertension" in NON_SEED_FACTORS
+    assert "Severe pain" in NON_SEED_FACTORS
+    for name in NON_SEED_FACTORS:
         seeds = clinical_finding_seeds({name: "affirmed"}, ontology=ont)
         assert seeds == ()
         neighbours = eligible_neighbour_factors({name: "affirmed"}, ontology=ont)
@@ -192,6 +194,52 @@ def test_hysteresis_keeps_symptom_topic_over_mechanical_factors():
         last_tier=TIER_SYMPTOM_SLOTS,
     )
     assert chosen is quality
+
+
+def test_hypertension_does_not_open_dvt_or_aaa_questions():
+    ont = load_ontology()
+    neighbours = eligible_neighbour_factors(
+        {
+            "Age over 50": "affirmed",
+            "Male sex": "affirmed",
+            "Hypertension": "affirmed",
+            "Severe pain": "affirmed",
+        },
+        ontology=ont,
+    )
+    assert neighbours == ()
+    assert "Previous DVT" not in neighbours
+    assert "Family history of AAA" not in neighbours
+
+
+def test_abdominal_pain_still_seeds_aaa_when_hypertension_is_also_affirmed():
+    ont = load_ontology()
+    neighbours = eligible_neighbour_factors(
+        {
+            "Hypertension": "affirmed",
+            "Abdominal pain": "affirmed",
+        },
+        ontology=ont,
+    )
+    assert "Family history of AAA" in neighbours
+    assert "Cardiovascular disease" in neighbours
+
+
+def test_six_of_ten_and_denied_abdominal_pain_do_not_open_aaa():
+    ont = load_ontology()
+    neighbours = eligible_neighbour_factors(
+        {
+            "Age over 50": "affirmed",
+            "Male sex": "affirmed",
+            "Severe pain": "denied",
+            "Abdominal pain": "denied",
+            "Prolonged sitting aggravates": "affirmed",
+        },
+        ontology=ont,
+    )
+    assert "Family history of AAA" not in neighbours
+    assert "Cardiovascular disease" not in neighbours
+    assert "Previous DVT" not in neighbours
 
 
 def test_non_askable_never_emitted():

@@ -1,56 +1,58 @@
-# Deploy digimsk-bot to Cloud Run with GCS volume at /mnt/digimsk.
+# Deploy tri-back to Cloud Run with GCS volume at /mnt/tri-back.
 # Prerequisites: image in Artifact Registry; bucket populated via upload_gcs_assets.ps1
 #
 # Usage:
 #   .\bot\app\services\public_host\cloud_run\scripts\deploy_bot.ps1
-#   .\bot\app\services\public_host\cloud_run\scripts\deploy_bot.ps1 -Image "us-central1-docker.pkg.dev/.../digimsk-bot:latest"
+#   .\bot\app\services\public_host\cloud_run\scripts\deploy_bot.ps1 -Service digimskbot
+#   .\bot\app\services\public_host\cloud_run\scripts\deploy_bot.ps1 -Image "us-central1-docker.pkg.dev/.../tri-back-bot:latest"
 
 param(
-  [string]$ProjectId = $(if ($env:DIGIMSK_GCP_PROJECT) { $env:DIGIMSK_GCP_PROJECT } else { "YOUR_GCP_PROJECT" }),
+  [string]$ProjectId = $(if ($env:TRI_BACK_GCP_PROJECT) { $env:TRI_BACK_GCP_PROJECT } elseif ($env:DIGIMSK_GCP_PROJECT) { $env:DIGIMSK_GCP_PROJECT } else { "YOUR_GCP_PROJECT" }),
   [string]$Region = "us-central1",
-  [string]$Service = "digimskbot",
-  [string]$Bucket = $(if ($env:DIGIMSK_GCS_BUCKET) { $env:DIGIMSK_GCS_BUCKET } else { "digimsk-cloudrun-$ProjectId" }),
+  [string]$Service = "tri-back",
+  [string]$Bucket = $(if ($env:TRI_BACK_GCS_BUCKET) { $env:TRI_BACK_GCS_BUCKET } elseif ($env:DIGIMSK_GCS_BUCKET) { $env:DIGIMSK_GCS_BUCKET } else { "digimsk-cloudrun-$ProjectId" }),
   [string]$Image = "",
   [string]$Memory = "8Gi",
   [string]$Cpu = "4",
   [int]$MaxInstances = 1,
   [int]$MinInstances = 0,
-  [string]$BotApiKey = $(if ($env:DIGIMSK_BOT_API_KEY) { $env:DIGIMSK_BOT_API_KEY } else { "" })
+  [string]$BotApiKey = $(if ($env:TRI_BACK_BOT_API_KEY) { $env:TRI_BACK_BOT_API_KEY } elseif ($env:DIGIMSK_BOT_API_KEY) { $env:DIGIMSK_BOT_API_KEY } else { "" }),
+  [string]$ServiceAccount = "runtime-sa@$ProjectId.iam.gserviceaccount.com"
 )
 
 $ErrorActionPreference = "Stop"
 
 if (-not $Image) {
-  $Image = "$Region-docker.pkg.dev/$ProjectId/digimsk/digimsk-bot:latest"
+  $Image = "$Region-docker.pkg.dev/$ProjectId/tri-back/tri-back-bot:latest"
 }
 
 Write-Host "Deploying $Service"
 Write-Host "  image:  $Image"
-Write-Host "  bucket: gs://$Bucket -> /mnt/digimsk"
+Write-Host "  bucket: gs://$Bucket -> /mnt/tri-back"
 Write-Host "  max-instances: $MaxInstances  min-instances: $MinInstances"
+Write-Host "  (override -Service digimskbot to refresh the old Cloud Run name)"
 
 $envVars = @(
-  "DIGIMSK_RAG=0",
-  "DIGIMSK_GRAPH_RAG=1",
-  "DIGIMSK_LOAD_RAG=0",
-  "DIGIMSK_GENERATOR_BACKEND=vertex",
-  "DIGIMSK_VERTEX_PROJECT_ID=$ProjectId",
-  "DIGIMSK_VERTEX_LOCATION=$Region",
-  "DIGIMSK_GLINER_MODEL_DIR=/mnt/digimsk/models/gliner",
-  "DIGIMSK_GRAPH_CSV=/mnt/digimsk/graph/v2/red_flags_manual_v2.csv",
-  "DIGIMSK_GRAPH_INVENTORY=/mnt/digimsk/graph/v2/inventory.json",
-  "DIGIMSK_SESSION_STORE_DIR=/mnt/digimsk/sessions",
-  "DIGIMSK_CHECKPOINT_SQLITE=/tmp/langgraph_checkpoints.sqlite",
-  "DIGIMSK_LOAD_GLINER=1",
-  "DIGIMSK_LOAD_NER=1"
+  "TRI_BACK_RAG=0",
+  "TRI_BACK_GRAPH_RAG=1",
+  "TRI_BACK_LOAD_RAG=0",
+  "TRI_BACK_GENERATOR_BACKEND=vertex",
+  "TRI_BACK_VERTEX_PROJECT_ID=$ProjectId",
+  "TRI_BACK_VERTEX_LOCATION=$Region",
+  "TRI_BACK_GLINER_MODEL_DIR=/mnt/tri-back/models/gliner",
+  "TRI_BACK_GRAPH_CSV=/mnt/tri-back/graph/v4/red_flags_edges_v4_2026.9.10.csv",
+  "TRI_BACK_GRAPH_FACTORS=/mnt/tri-back/graph/v4/red_flags_factors_v4_2026.9.10.csv",
+  "TRI_BACK_GRAPH_INVENTORY=/mnt/tri-back/graph/v4/red_flags_inventory_v4_2026.9.10.json",
+  "TRI_BACK_SESSION_STORE_DIR=/mnt/tri-back/sessions",
+  "TRI_BACK_CHECKPOINT_SQLITE=/tmp/langgraph_checkpoints.sqlite",
+  "TRI_BACK_LOAD_GLINER=1",
+  "TRI_BACK_LOAD_NER=1"
 ) -join ","
 
 if ($BotApiKey) {
-  $envVars = "$envVars,DIGIMSK_BOT_API_KEY=$BotApiKey"
+  $envVars = "$envVars,TRI_BACK_BOT_API_KEY=$BotApiKey"
 }
 
-# Single-container shorthand: mount-path on --add-volume
-# https://cloud.google.com/run/docs/configuring/services/cloud-storage-volume-mounts
 $deployArgs = @(
   "run", "deploy", $Service,
   "--project=$ProjectId",
@@ -62,8 +64,9 @@ $deployArgs = @(
   "--min-instances=$MinInstances",
   "--timeout=3600",
   "--no-allow-unauthenticated",
-  "--add-volume=name=digimsk-gcs,type=cloud-storage,bucket=$Bucket",
-  "--add-volume-mount=volume=digimsk-gcs,mount-path=/mnt/digimsk",
+  "--service-account=$ServiceAccount",
+  "--add-volume=name=tri-back-gcs,type=cloud-storage,bucket=$Bucket",
+  "--add-volume-mount=volume=tri-back-gcs,mount-path=/mnt/tri-back",
   "--set-env-vars=$envVars"
 )
 

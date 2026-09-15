@@ -17,6 +17,7 @@ from app.services.graphrag.schemas import FactorMatch, FactorMention
 from app.services.rag.factor_patterns import (
     _age_implies_over_50,
     _norm,
+    _severity_implies_not_severe,
     _severity_implies_severe,
     _sex_factor,
     build_factor_patterns,
@@ -220,10 +221,19 @@ def _match_item_to_factor(
     hits: list[_Hit] = []
     seen: set[tuple[str, str]] = set()
 
-    def _add(factor: str, method: str, score: float, start: int, end: int) -> None:
-        polarity = _polarity_at(text, start, end, source_message)
-        if polarity == FACTOR_STATE_UNKNOWN:
+    def _add(
+        factor: str,
+        method: str,
+        score: float,
+        start: int,
+        end: int,
+        *,
+        polarity: FactorPolarity | None = None,
+    ) -> None:
+        resolved = polarity or _polarity_at(text, start, end, source_message)
+        if resolved == FACTOR_STATE_UNKNOWN:
             return
+        polarity = resolved
         key = (factor, polarity)
         if key in seen:
             return
@@ -252,9 +262,27 @@ def _match_item_to_factor(
         )
 
     if item.kind == "severity" and item.label == "symptom_severity":
-        if _severity_implies_severe(text) and "Severe pain" in factor_set:
-            _add("Severe pain", "checklist_kind", 1.0, 0, len(text))
-            return _match_from_hits(dumped, hits)
+        if "Severe pain" in factor_set:
+            if _severity_implies_severe(text):
+                _add(
+                    "Severe pain",
+                    "checklist_kind",
+                    1.0,
+                    0,
+                    len(text),
+                    polarity=FACTOR_STATE_AFFIRMED,
+                )
+                return _match_from_hits(dumped, hits)
+            if _severity_implies_not_severe(text):
+                _add(
+                    "Severe pain",
+                    "checklist_kind",
+                    1.0,
+                    0,
+                    len(text),
+                    polarity=FACTOR_STATE_DENIED,
+                )
+                return _match_from_hits(dumped, hits)
         return FactorMatch(
             checklist_item=dumped,
             factor_name=None,

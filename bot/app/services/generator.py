@@ -91,7 +91,7 @@ def generator_status_detail() -> str:
         return f"no safetensors under {settings.generator_model_dir}"
     if backend == "vertex":
         if not (settings.vertex_project_id and settings.vertex_location):
-            return "DIGIMSK_VERTEX_PROJECT_ID or DIGIMSK_VERTEX_LOCATION not set"
+            return "TRI_BACK_VERTEX_PROJECT_ID or TRI_BACK_VERTEX_LOCATION not set"
         adc_ok, adc_detail = vertex_adc_status()
         base = (
             f"vertex: {settings.generator_model} @ "
@@ -159,7 +159,7 @@ def generate_from_messages(
             temperature=temperature,
         )
     raise RuntimeError(
-        f"unsupported DIGIMSK_GENERATOR_BACKEND: {backend!r} "
+        f"unsupported TRI_BACK_GENERATOR_BACKEND: {backend!r} "
         "(supported: local, vertex)"
     )
 

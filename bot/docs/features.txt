@@ -1,4 +1,4 @@
-DigiMSK Chatbot — Feature Implementation List
+TRI-BACK Chatbot — Feature Implementation List
 ================================================
 
 1. Rate limiting

@@ -125,6 +125,21 @@ def test_comorbidity_none_acknowledged():
     assert "comorbidities" not in {m["slot"] for m in report["missing_slots"]}
 
 
+def test_gliner_hurts_plus_back_display_name():
+    checklist = [
+        _row("back", "ner_entity", "body part", "gliner"),
+        _row("hurts", "ner_entity", "symptom", "gliner"),
+    ]
+    report, _, _ = evaluate_checklist_coverage(checklist=checklist)
+    assert report["symptom_instances"][0]["display_name"] == "back pain"
+
+
+def test_gliner_hurts_alone_becomes_pain():
+    checklist = [_row("hurts", "ner_entity", "symptom", "gliner")]
+    report, _, _ = evaluate_checklist_coverage(checklist=checklist)
+    assert report["symptom_instances"][0]["display_name"] == "pain"
+
+
 def test_consolidate_multiple_symptom_spans_to_one_instance():
     checklist = [
         _row("pain", "ner_entity", "symptom", "gliner"),

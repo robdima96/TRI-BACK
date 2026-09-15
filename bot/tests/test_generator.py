@@ -59,7 +59,7 @@ def test_generate_from_messages_routes_to_vertex(mock_vertex, vertex_settings):
 
 def test_generate_from_messages_rejects_unknown_backend(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(settings, "generator_backend", "legacy-remote")
-    with pytest.raises(RuntimeError, match="unsupported DIGIMSK_GENERATOR_BACKEND"):
+    with pytest.raises(RuntimeError, match="unsupported TRI_BACK_GENERATOR_BACKEND"):
         generate_from_messages(
             [{"role": "user", "content": "hello"}],
             max_new_tokens=16,

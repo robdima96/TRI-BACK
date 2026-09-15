@@ -2,10 +2,10 @@
 
 Extraction layers: pattern rules and ``safety_phrase`` substring matching
 (:mod:`app.services.policy`), plus zero-shot span NER via GliNER-BioMed
-(:mod:`app.services.gliner_ner`, ``DIGIMSK_LOAD_NER``).
+(:mod:`app.services.gliner_ner`, ``TRI_BACK_LOAD_NER``).
 
 RAG query embeddings use ``settings.encoder_model_dir`` (Clinical_sBERT via
-``sentence_transformers`` by default; see ``DIGIMSK_RAG_EMBEDDING_BACKEND``).
+``sentence_transformers`` by default; see ``TRI_BACK_RAG_EMBEDDING_BACKEND``).
 """
 
 from __future__ import annotations
@@ -518,7 +518,7 @@ def encoder_status_detail() -> str:
 
     parts: list[str] = []
     if not settings.rag_load:
-        parts.append("RAG embedding skipped (DIGIMSK_RAG=0)")
+        parts.append("RAG embedding skipped (TRI_BACK_RAG=0)")
     elif rag_embedding_model_configured():
         parts.append("embedding ok")
     else:
@@ -538,9 +538,9 @@ def encoder_status_detail() -> str:
         else:
             parts.append(f"GliNER failed to load from {gliner_model_dir()}")
     elif settings.ner_load:
-        parts.append("GliNER skipped (DIGIMSK_LOAD_GLINER=0)")
+        parts.append("GliNER skipped (TRI_BACK_LOAD_GLINER=0)")
     else:
-        parts.append("NER skipped (DIGIMSK_LOAD_NER=0)")
+        parts.append("NER skipped (TRI_BACK_LOAD_NER=0)")
 
     return "; ".join(parts)
 

@@ -1,4 +1,4 @@
-# DigiMSK monorepo
+# TRI-BACK monorepo (formerly DigiMSK)
 
 # Secrets & environments
 .env
@@ -22,11 +22,11 @@ bot/.tmp_*/
 bot/Embeddings test/
 
 # Study app
-prototypes/digimsk_study_app/.web/
-prototypes/digimsk_study_app/.states/
-prototypes/digimsk_study_app/**/*.db
-prototypes/digimsk_study_app/data/participant_credentials.csv
-prototypes/digimsk_study_app/.venv/
+prototypes/tri_back_study_app/.web/
+prototypes/tri_back_study_app/.states/
+prototypes/tri_back_study_app/**/*.db
+prototypes/tri_back_study_app/data/participant_credentials.csv
+prototypes/tri_back_study_app/.venv/
 
 # Scratch / binaries (ask before forcing PDFs into git)
 **/*.pdf

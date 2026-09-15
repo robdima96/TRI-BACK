@@ -1,0 +1,34 @@
+# Cloud Build context for the TRI-BACK bot image (Dockerfile.bot).
+.git/
+.cursor/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.web/
+**/.states/
+**/node_modules/
+**/*.egg-info/
+
+Graphs/
+Project/
+Reports/
+Uncanny Valley/
+data/
+Testing/
+/scripts/
+shared/
+Neo4j-*.txt
+*.pptx
+patient_agent/
+plan_2026.9.1/
+prototypes/
+
+bot/data/
+bot/Embeddings test/
+bot/Knowledge Base/
+bot/docs/
+bot/scripts/
+bot/tests/
+bot/temp_plan.txt
+
+# Keep bot/pyproject.toml, README, readme.txt, and bot/app for Dockerfile.bot

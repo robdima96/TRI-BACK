@@ -21,12 +21,14 @@ _DEFAULT_FACTORS = _KB_MANUAL / "red_flags_factors_v4_2026.9.10.csv"
 
 
 def _resolve_env_path(var_name: str, fallback: Path) -> Path:
-    """Resolve ``DIGIMSK_GRAPH_*`` paths from ``bot/.env`` (or process env)."""
-    # bot/.env is authoritative for DigiMSK graph pointers; do not override
+    """Resolve ``TRI_BACK_GRAPH_*`` (or legacy ``DIGIMSK_GRAPH_*``) from ``bot/.env``."""
+    from app.config import env_lookup
+
+    # bot/.env is authoritative for TRI-BACK graph pointers; do not override
     # already-exported process env (tests / CLI overrides).
     if _BOT_ENV.is_file():
         load_dotenv(_BOT_ENV, override=False)
-    raw = (os.getenv(var_name) or "").strip()
+    raw = (env_lookup(var_name) or "").strip()
     if not raw:
         return fallback
     path = Path(raw)
@@ -37,9 +39,9 @@ def _resolve_env_path(var_name: str, fallback: Path) -> Path:
     return path
 
 
-DEFAULT_INVENTORY_PATH = _resolve_env_path("DIGIMSK_GRAPH_INVENTORY", _DEFAULT_INVENTORY)
-DEFAULT_CSV_PATH = _resolve_env_path("DIGIMSK_GRAPH_CSV", _DEFAULT_CSV)
-DEFAULT_FACTORS_PATH = _resolve_env_path("DIGIMSK_GRAPH_FACTORS", _DEFAULT_FACTORS)
+DEFAULT_INVENTORY_PATH = _resolve_env_path("TRI_BACK_GRAPH_INVENTORY", _DEFAULT_INVENTORY)
+DEFAULT_CSV_PATH = _resolve_env_path("TRI_BACK_GRAPH_CSV", _DEFAULT_CSV)
+DEFAULT_FACTORS_PATH = _resolve_env_path("TRI_BACK_GRAPH_FACTORS", _DEFAULT_FACTORS)
 
 
 @dataclass(frozen=True)

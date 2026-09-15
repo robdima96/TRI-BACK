@@ -10,7 +10,7 @@ mediators (conceptual gateways), and relation vocabulary that actually exist in
 ground truth keeps the agent's vocabulary in sync with the graph and stops it
 from reasoning over conditions or factors that are not real.
 
-This is the DigiMSK analogue of the ``<MainConcepts> / <MainTopics> /
+This is the TRI-BACK analogue of the ``<MainConcepts> / <MainTopics> /
 <ConceptualGateways> / <Relations>`` block in
 ``Graphs/n8n-infranodus-templates/reasoning-expert-graph-ontology.json``.
 """

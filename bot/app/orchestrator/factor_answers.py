@@ -13,6 +13,10 @@ from app.services.agentic_graph_rag.ontology import (
     FactorQuestionSpec,
     get_factor_question_spec,
 )
+from app.services.rag.factor_patterns import (
+    _severity_implies_not_severe,
+    _severity_implies_severe,
+)
 from app.services.rag.factor_polarity import (
     FACTOR_STATE_AFFIRMED,
     FACTOR_STATE_DENIED,
@@ -61,6 +65,11 @@ def polarity_for_factor_reply(
         return FACTOR_STATE_UNKNOWN
     if _UNCERTAINTY.match(text):
         return FACTOR_STATE_UNKNOWN
+    if spec.factor == "Severe pain":
+        if _severity_implies_severe(text):
+            return FACTOR_STATE_AFFIRMED
+        if _severity_implies_not_severe(text):
+            return FACTOR_STATE_DENIED
     span = _synonym_span(text, spec)
     if span is not None:
         return polarity_for_span(text, span[0], span[1])

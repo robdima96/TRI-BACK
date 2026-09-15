@@ -16,5 +16,5 @@ def test_validate_requires_at_least_one_path(monkeypatch):
             graphrag_load=False,
         ),
     )
-    with pytest.raises(ValueError, match="DIGIMSK_RAG"):
+    with pytest.raises(ValueError, match="TRI_BACK_RAG"):
         validate_retrieval_paths()

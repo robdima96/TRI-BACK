@@ -2,14 +2,28 @@
 # Start study UI on Cloud Run: init SQLite, Redis, Reflex backend, then Caddy on $PORT.
 set -eu
 
-PORT="${PORT:-8080}"
-export PORT
-export DIGIMSK_STUDY_DB="${DIGIMSK_STUDY_DB:-/mnt/digimsk/study/digimsk.db}"
+CLOUD_RUN_PORT="${PORT:-8080}"
+# Reflex maps $PORT to --frontend-port. Cloud Run injects 8080, which breaks
+# `--backend-only` ("Cannot specify --frontend-port when not running frontend").
+unset PORT
+
+# Prefer TRI_BACK_*; fall back to DIGIMSK_* and the existing GCS study DB filename.
+if [ -z "${TRI_BACK_STUDY_DB:-}" ]; then
+  if [ -n "${DIGIMSK_STUDY_DB:-}" ]; then
+    export TRI_BACK_STUDY_DB="$DIGIMSK_STUDY_DB"
+  else
+    export TRI_BACK_STUDY_DB="/mnt/tri-back/study/tri_back.db"
+  fi
+fi
+if [ ! -f "$TRI_BACK_STUDY_DB" ] && [ -f /mnt/tri-back/study/digimsk.db ]; then
+  export TRI_BACK_STUDY_DB=/mnt/tri-back/study/digimsk.db
+fi
+export DIGIMSK_STUDY_DB="${DIGIMSK_STUDY_DB:-$TRI_BACK_STUDY_DB}"
 # Keep Granian light on Cloud Run CPU
 export REFLEX_GRANIAN_WORKERS="${REFLEX_GRANIAN_WORKERS:-1}"
 export WEB_CONCURRENCY="${WEB_CONCURRENCY:-1}"
 
-mkdir -p "$(dirname "$DIGIMSK_STUDY_DB")"
+mkdir -p "$(dirname "$TRI_BACK_STUDY_DB")"
 python scripts/init_db.py
 
 if [ -f /study/Caddyfile ]; then
@@ -47,4 +61,5 @@ if ! curl -sf "http://127.0.0.1:8000/ping" >/dev/null 2>&1; then
   exit 1
 fi
 
+export PORT="$CLOUD_RUN_PORT"
 exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile

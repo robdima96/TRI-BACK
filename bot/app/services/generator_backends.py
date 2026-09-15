@@ -38,7 +38,7 @@ def _ensure_vertex() -> None:
         return
     if not settings.vertex_project_id or not settings.vertex_location:
         raise RuntimeError(
-            "DIGIMSK_VERTEX_PROJECT_ID and DIGIMSK_VERTEX_LOCATION must be set"
+            "TRI_BACK_VERTEX_PROJECT_ID and TRI_BACK_VERTEX_LOCATION must be set"
         )
     try:
         import vertexai

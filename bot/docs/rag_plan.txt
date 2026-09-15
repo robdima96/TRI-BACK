@@ -1,4 +1,4 @@
-DigiMSK — RAG / Specialized Vector Database Implementation Plan
+TRI-BACK — RAG / Specialized Vector Database Implementation Plan
 ================================================================
 
 Purpose

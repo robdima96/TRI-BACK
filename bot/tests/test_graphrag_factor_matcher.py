@@ -45,9 +45,16 @@ def test_match_mild_severity_does_not_map_to_severe():
             source="pattern",
             label="symptom_severity",
         ),
+        ChecklistItem(
+            text="6",
+            kind="severity",
+            source="llm",
+            label="symptom_severity",
+        ),
     ]
     matches = match_checklist_to_factors(items)
-    assert all(m.factor_name is None for m in matches)
+    assert all(m.factor_name == "Severe pain" for m in matches)
+    assert all(m.polarity == "denied" for m in matches)
 
 
 def test_match_numeric_severe_pain():
@@ -109,11 +116,12 @@ def test_factor_matching_audit_captures_gaps():
     audit = build_factor_matching_audit(matches)
     assert audit["summary"]["checklist_items"] == 4
     assert "Recent trauma" in audit["summary"]["matched_factors"]
+    assert "Severe pain" in audit["summary"]["denied_factors"]
     codes = {g["code"] for g in audit["gaps"]}
     assert "age_below_threshold" in codes
-    assert "severity_below_threshold" in codes
     assert "unmatched" in codes
     assert any(e["status"] == "gated" for e in audit["items"])
+    assert any(e["status"] == "denied" for e in audit["items"])
 
 
 def test_match_female_sex_demographic():
@@ -183,6 +191,20 @@ def test_sitting_alias_stays_mechanical_not_venous_stasis():
     ]
     matches = match_checklist_to_factors(items)
     assert matches[0].factor_name == "Prolonged sitting aggravates"
+
+
+def test_palliative_sitting_down_does_not_affirm_sitting_aggravates():
+    items = [
+        ChecklistItem(
+            text="sitting down",
+            kind="palliative",
+            source="slot_answer",
+            label="palliative",
+        ),
+    ]
+    matches = match_checklist_to_factors(items)
+    asserted = [m for m in matches if m.factor_name == "Prolonged sitting aggravates"]
+    assert not asserted or all(m.polarity == "denied" for m in asserted)
 
 
 def test_match_fell_alias():

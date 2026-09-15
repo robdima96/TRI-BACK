@@ -26,8 +26,8 @@ BOT_SCHEMA = REPO_ROOT / "bot" / "app" / "services" / "graphrag" / "schemas.py"
 STUDY_SCHEMA = (
     REPO_ROOT
     / "prototypes"
-    / "digimsk_study_app"
-    / "digimsk_study_app"
+    / "tri_back_study_app"
+    / "tri_back_study_app"
     / "graph"
     / "schemas.py"
 )

@@ -1,4 +1,4 @@
-# DigiMSK study UI — Caddy serves static frontend and proxies Reflex backend.
+# TRI-BACK study UI — Caddy serves static frontend and proxies Reflex backend.
 # Cloud Run terminates TLS and sets $PORT (usually 8080).
 
 :{$PORT}

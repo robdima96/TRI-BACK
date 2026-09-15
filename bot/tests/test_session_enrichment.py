@@ -368,7 +368,7 @@ def test_merge_messages_keeps_study_intro_prefix_and_feedback():
     existing = [
         {
             "role": "assistant",
-            "content": "Welcome to DigiMSK.",
+            "content": "Welcome to TRI-BACK.",
             "message_id": "msg_intro",
             "feedback": {"rating": "up", "rated_at": "t0"},
         },

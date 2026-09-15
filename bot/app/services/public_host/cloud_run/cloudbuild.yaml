@@ -1,9 +1,9 @@
-# Build from DigiMSK monorepo root (folder that contains bot/ and prototypes/):
+# Build from TRI-BACK monorepo root (folder that contains bot/ and prototypes/):
 #   gcloud builds submit --config bot/app/services/public_host/cloud_run/cloudbuild.yaml
 
 substitutions:
   _REGION: us-central1
-  _REPO: digimsk
+  _REPO: tri-back
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -17,9 +17,9 @@ steps:
       - -f
       - bot/app/services/public_host/cloud_run/Dockerfile.bot
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-bot:$COMMIT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-bot:$COMMIT_SHA
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-bot:latest
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-bot:latest
       - .
 
   - name: gcr.io/cloud-builders/docker
@@ -29,19 +29,19 @@ steps:
       - -f
       - bot/app/services/public_host/cloud_run/Dockerfile.study
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study:$COMMIT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-study:$COMMIT_SHA
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study:latest
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-study:latest
       - .
 
   - name: gcr.io/cloud-builders/docker
     id: push-bot
-    args: [push, --all-tags, ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-bot]
+    args: [push, --all-tags, ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-bot]
 
   - name: gcr.io/cloud-builders/docker
     id: push-study
-    args: [push, --all-tags, ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study]
+    args: [push, --all-tags, ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-study]
 
 images:
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-bot
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/digimsk-study
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-bot
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-study

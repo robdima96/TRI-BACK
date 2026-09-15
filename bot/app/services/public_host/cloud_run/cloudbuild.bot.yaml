@@ -1,0 +1,58 @@
+# Build/push/deploy tri-back (image update only — keeps env/mounts).
+# Manual: gcloud builds submit --config bot/app/services/public_host/cloud_run/cloudbuild.bot.yaml --ignore-file=.gcloudignore.bot
+# Auto: Cloud Build trigger tri-back-bot-deploy on push to main (bot paths).
+#
+# Manual submits have no COMMIT_SHA; default _TAG is latest.
+
+substitutions:
+  _REGION: us-central1
+  _REPO: tri-back
+  _SERVICE: tri-back
+  _TAG: latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+  substitutionOption: ALLOW_LOOSE
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-bot
+    args:
+      - build
+      - -f
+      - bot/app/services/public_host/cloud_run/Dockerfile.bot
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-bot:${_TAG}
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-bot:latest
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-bot-tag
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-bot:${_TAG}
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-bot-latest
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-bot:latest
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: deploy-bot
+    entrypoint: gcloud
+    args:
+      - run
+      - services
+      - update
+      - ${_SERVICE}
+      - --project=$PROJECT_ID
+      - --region=${_REGION}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-bot:${_TAG}
+      - --quiet
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-bot:${_TAG}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-bot:latest

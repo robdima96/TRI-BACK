@@ -46,6 +46,65 @@ def _is_symptom_entity_row(row: dict[str, str]) -> bool:
     return row.get("kind") == "ner_entity" and row.get("label", "").casefold() == "symptom"
 
 
+_PAIN_VERBS = frozenset({"hurt", "hurts", "hurting"})
+_PAIN_HINTS = ("pain", "ache", "hurt")
+_PREFERRED_BODY_PARTS = ("low back", "lower back", "lumbar", "spine", "back")
+
+
+def _normalize_pain_word(text: str) -> str:
+    raw = (text or "").strip()
+    if raw.casefold() in _PAIN_VERBS:
+        return "pain"
+    return raw
+
+
+def _body_part_texts(checklist: list[dict[str, str]]) -> list[str]:
+    parts: list[str] = []
+    seen: set[str] = set()
+    for row in checklist:
+        if row.get("kind") != "ner_entity":
+            continue
+        if (row.get("label") or "").casefold() != "body part":
+            continue
+        text = (row.get("text") or "").strip()
+        key = text.casefold()
+        if not text or key in seen:
+            continue
+        seen.add(key)
+        parts.append(text)
+    return parts
+
+
+def _preferred_body_part(parts: list[str]) -> str | None:
+    if not parts:
+        return None
+    folded = [p.casefold() for p in parts]
+    for want in _PREFERRED_BODY_PARTS:
+        for part, key in zip(parts, folded):
+            if key == want or want in key:
+                return part
+    return parts[0]
+
+
+def _compose_symptom_display_name(
+    text: str, *, body_parts: list[str]
+) -> str:
+    """Turn GliNER spans like ``hurts`` + ``back`` into ``back pain``."""
+    label = _normalize_pain_word(text)
+    if not label:
+        return "pain"
+    folded = label.casefold()
+    part = _preferred_body_part(body_parts)
+    if not part:
+        return label
+    part_key = part.casefold()
+    if part_key in folded:
+        return label
+    if any(hint in folded for hint in _PAIN_HINTS):
+        return f"{part} {label}"
+    return label
+
+
 def _rows_for_kind_label(
     checklist: list[dict[str, str]],
     *,
@@ -82,13 +141,15 @@ def build_symptom_instances(
     seen_text: set[str] = set()
     instances: list[SymptomInstance] = []
     next_idx = 1
+    body_parts = _body_part_texts(checklist)
     for row in checklist:
         if not _is_symptom_entity_row(row):
             continue
         text = (row.get("text") or "").strip()
         if not text:
             continue
-        key = text.casefold()
+        display = _compose_symptom_display_name(text, body_parts=body_parts)
+        key = display.casefold()
         if key in seen_text:
             continue
         seen_text.add(key)
@@ -99,6 +160,7 @@ def build_symptom_instances(
             if ck not in keys:
                 keys.append(ck)
             inst["checklist_keys"] = keys
+            inst["display_name"] = display
             instances.append(inst)
             continue
         sid = f"s{next_idx}"
@@ -106,7 +168,7 @@ def build_symptom_instances(
         instances.append(
             SymptomInstance(
                 symptom_id=sid,
-                display_name=text,
+                display_name=display,
                 checklist_keys=[ck],
             )
         )
@@ -128,7 +190,7 @@ def consolidate_symptom_instances(
     pain_related = [
         inst
         for inst in instances
-        if any(token in inst["display_name"].casefold() for token in ("pain", "ache"))
+        if any(token in inst["display_name"].casefold() for token in _PAIN_HINTS)
     ]
     pool = pain_related if pain_related else instances
     primary = max(pool, key=lambda inst: len(inst["display_name"]))

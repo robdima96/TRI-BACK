@@ -116,10 +116,8 @@ _TEXT_ALIASES: dict[str, str] = {
     "hard to sit": "Prolonged sitting aggravates",
     "whenever i sit": "Prolonged sitting aggravates",
     "when i sit": "Prolonged sitting aggravates",
-    "i sit": "Prolonged sitting aggravates",
     "sit or lay": "Prolonged sitting aggravates",
     "sit or lie": "Prolonged sitting aggravates",
-    "sitting": "Prolonged sitting aggravates",
     "position change relief": "Position change relief",
     "better with position change": "Position change relief",
     "eases when i change position": "Position change relief",
@@ -295,6 +293,7 @@ _PAIN_SCALE_RE = re.compile(
     re.IGNORECASE,
 )
 _BARE_SCORE_RE = re.compile(r"^\s*(\d{1,2})\s*$")
+_SHORT_SCORE_RE = re.compile(r"\b(10|[0-9])\b")
 
 
 def _norm(text: str) -> str:
@@ -314,32 +313,68 @@ def _age_implies_over_50(text: str) -> bool:
     )
 
 
+def pain_score_0_to_10(text: str) -> int | None:
+    """Best 0–10 pain score in ``text``, or None when no score is present.
+
+    Short replies such as ``its like a 6`` count; longer narratives only count
+    explicit ``n/10`` (or ``n out of 10``) so an age like 52 is not a severity.
+    """
+    raw = (text or "").strip()
+    if not raw:
+        return None
+    scores: list[int] = []
+    bare = _BARE_SCORE_RE.match(raw)
+    if bare:
+        try:
+            n = int(bare.group(1))
+        except ValueError:
+            n = -1
+        if 0 <= n <= 10:
+            scores.append(n)
+    for match in _PAIN_SCALE_RE.finditer(raw):
+        try:
+            n = int(match.group(1))
+        except ValueError:
+            continue
+        if 0 <= n <= 10:
+            scores.append(n)
+    if not scores and len(raw.split()) <= 8:
+        for match in _SHORT_SCORE_RE.finditer(raw):
+            try:
+                n = int(match.group(1))
+            except ValueError:
+                continue
+            if 0 <= n <= 10:
+                scores.append(n)
+    if not scores:
+        return None
+    return max(scores)
+
+
 def _severity_implies_severe(text: str) -> bool:
     """True only when text implies severe pain (numeric ≥7 or severe-class words)."""
     raw = (text or "").strip()
     if not raw:
         return False
-    has_severe_word = bool(_SEVERE_WORD_RE.search(raw))
-    bare = _BARE_SCORE_RE.match(raw)
-    if bare:
-        try:
-            score = int(bare.group(1))
-        except ValueError:
-            score = -1
-        if 0 <= score <= 10:
-            return score >= 7
-    for match in _PAIN_SCALE_RE.finditer(raw):
-        try:
-            score = int(match.group(1))
-        except ValueError:
-            continue
-        if 0 <= score <= 10:
-            return score >= 7
-    if has_severe_word:
+    score = pain_score_0_to_10(raw)
+    if score is not None:
+        return score >= 7
+    if _SEVERE_WORD_RE.search(raw):
         return True
     if _MILD_OR_MODERATE_RE.search(raw):
         return False
     return False
+
+
+def _severity_implies_not_severe(text: str) -> bool:
+    """True when text is a 0–6 score or mild/moderate wording (not unknown)."""
+    raw = (text or "").strip()
+    if not raw:
+        return False
+    score = pain_score_0_to_10(raw)
+    if score is not None:
+        return score < 7
+    return bool(_MILD_OR_MODERATE_RE.search(raw)) and not _SEVERE_WORD_RE.search(raw)
 
 
 # Word-boundary sex tokens (female before male: "female" contains "male", "woman" contains "man").

@@ -1,6 +1,6 @@
-"""Toggleable agentic Graph-RAG disposition path for DigiMSK.
+"""Toggleable agentic Graph-RAG disposition path for TRI-BACK.
 
-Enabled with ``DIGIMSK_DISPOSITION_MODE=agentic`` (default ``deterministic``).
+Enabled with ``TRI_BACK_DISPOSITION_MODE=agentic`` (legacy ``DIGIMSK_DISPOSITION_MODE``; default ``deterministic``).
 RAG and GraphRAG tools are exposed independently by their evidence toggles.
 The agent starts from factor matching plus an unranked ontology-membership tally;
 it does not consume deterministic traversal/ranking unless its own run fails.

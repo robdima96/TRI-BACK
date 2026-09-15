@@ -1,8 +1,11 @@
-# DigiMSK study (Reflex) for Cloud Run — single $PORT via Caddy + static export + backend.
-# Build from DigiMSK monorepo root:
+# TRI-BACK study (Reflex) for Cloud Run — single $PORT via Caddy + static export + backend.
+# Build from TRI-BACK monorepo root:
 #   docker build -f bot/app/services/public_host/cloud_run/Dockerfile.study \
-#     --build-arg PUBLIC_BASE_URL=https://tri-back-study-PLACEHOLDER.us-central1.run.app \
-#     -t digimsk-study .
+#     --build-arg PUBLIC_BASE_URL=https://tri-back-study-XXXX.us-central1.run.app \
+#     -t tri-back-study .
+#
+# After first deploy, rebuild with the printed study URL as PUBLIC_BASE_URL
+# or WebSockets will still point at the old digimsk-study host.
 
 FROM python:3.11-slim-bookworm
 
@@ -14,16 +17,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PORT=${PORT} \
-    DIGIMSK_PUBLIC_ACCESS=1 \
-    DIGIMSK_PUBLIC_BASE_URL=${PUBLIC_BASE_URL} \
+    TRI_BACK_PUBLIC_ACCESS=1 \
+    TRI_BACK_PUBLIC_BASE_URL=${PUBLIC_BASE_URL} \
     API_URL=${PUBLIC_BASE_URL} \
     DEPLOY_URL=${PUBLIC_BASE_URL} \
     REFLEX_API_URL=${PUBLIC_BASE_URL} \
     REFLEX_REDIS_URL=redis://127.0.0.1:6379 \
-    DIGIMSK_STUDY_DB=/mnt/digimsk/study/digimsk.db \
-    # Placeholders for import-time checks during `reflex export` (overridden at runtime).
-    DIGIMSK_BOT_API_KEY=build-placeholder \
-    DIGIMSK_ADMIN_PASSWORD=build-placeholder
+    TRI_BACK_STUDY_DB=/mnt/tri-back/study/digimsk.db \
+    TRI_BACK_BOT_API_KEY=build-placeholder \
+    TRI_BACK_ADMIN_PASSWORD=build-placeholder
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     caddy \
@@ -34,10 +36,10 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
 
 WORKDIR /study
 
-COPY prototypes/digimsk_study_app/requirements.txt ./
+COPY prototypes/tri_back_study_app/requirements.txt ./
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-COPY prototypes/digimsk_study_app/ ./
+COPY prototypes/tri_back_study_app/ ./
 COPY bot/app/services/public_host/cloud_run/Caddyfile.study ./Caddyfile
 COPY bot/app/services/public_host/cloud_run/scripts/entrypoint_study.sh /entrypoint_study.sh
 RUN chmod +x /entrypoint_study.sh \
@@ -51,8 +53,8 @@ RUN reflex init \
     && rm -rf .web
 
 # Drop build-only secrets from the image env (runtime sets real values).
-ENV DIGIMSK_BOT_API_KEY= \
-    DIGIMSK_ADMIN_PASSWORD=
+ENV TRI_BACK_BOT_API_KEY= \
+    TRI_BACK_ADMIN_PASSWORD=
 
 EXPOSE ${PORT}
 STOPSIGNAL SIGKILL

@@ -5,7 +5,7 @@ Three apps in one project for musculoskeletal triage chatbot research.
 | App | Folder | Role |
 |-----|--------|------|
 | **Bot backend** | [`bot/`](bot/) | FastAPI + LangGraph chatbot API (inference, GraphRAG, Vertex, session JSON) |
-| **Study prototype** | [`prototypes/digimsk_study_app/`](prototypes/tri_back_study_app/) | Reflex UI for the research study (login, arms, admin) |
+| **Study prototype** | [`prototypes/tri_back_study_app/`](prototypes/tri_back_study_app/) | Reflex UI for the research study (login, arms, admin) |
 | **Session lab** | [`Testing/`](Testing/) | Local browser for developers to inspect `bot/data/sessions` |
 
 Each app has a **`readme.txt`** with what it does and how to run it locally.
@@ -19,3 +19,6 @@ Each app has a **`readme.txt`** with what it does and how to run it locally.
 ## Hosting
 
 Cloud Run + GCS packaging lives under `bot/app/services/public_host/cloud_run/`.
+Cutover from DigiMSK service names: see [`STUDY_SERVICE.md`](bot/app/services/public_host/cloud_run/STUDY_SERVICE.md).
+
+Env vars prefer `TRI_BACK_*`; legacy `DIGIMSK_*` still works until you migrate `.env` files.

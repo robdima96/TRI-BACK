@@ -54,6 +54,21 @@ def test_credit_factor_yes_no_unknown():
     assert unsure["Saddle anaesthesia"] == "unknown"
 
 
+def test_credit_severe_pain_numeric_six_is_denied():
+    states = credit_asked_factor_answer(
+        message="its like a 6",
+        asked_factor="Severe pain",
+        factor_states={},
+    )
+    assert states["Severe pain"] == "denied"
+    eight = credit_asked_factor_answer(
+        message="8 out of 10",
+        asked_factor="Severe pain",
+        factor_states={"Severe pain": "denied"},
+    )
+    assert eight["Severe pain"] == "affirmed"
+
+
 def test_bare_no_to_factor_is_not_credited_to_slot():
     states = credit_asked_factor_answer(
         message="no",

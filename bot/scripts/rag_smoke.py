@@ -5,9 +5,9 @@ Run from the repo root (``bot``) so imports and relative paths resolve::
     python scripts/rag_smoke.py
     python scripts/rag_smoke.py --query "heat therapy for low back pain"
 
-Expect ``DIGIMSK_LOAD_RAG=1`` (default) and a valid ``DIGIMSK_ENCODER_DIR`` (Clinical_sBERT
+Expect ``TRI_BACK_LOAD_RAG=1`` (default; legacy ``DIGIMSK_LOAD_RAG``) and a valid ``TRI_BACK_ENCODER_DIR`` (Clinical_sBERT
 folder with ``config.json``; ``sentence_transformers`` backend by default). Chroma uses
-``DIGIMSK_CHROMA_PATH``; sub-collections must already contain ingested chunks (re-ingest
+``TRI_BACK_CHROMA_PATH``; sub-collections must already contain ingested chunks (re-ingest
 after model changes via ``scripts/chroma_clear.py --empty``).
 
 Exit codes: 0 ok, 1 config/embedding failure, 2 no retrieval rows.
@@ -138,11 +138,11 @@ def main() -> int:
     from app.services.rag.store import get_sub_collection, list_sub_collections
 
     if not settings.rag_load:
-        sys.stderr.write("RAG is disabled (set DIGIMSK_LOAD_RAG=1).\n")
+        sys.stderr.write("RAG is disabled (set TRI_BACK_LOAD_RAG=1).\n")
         return 1
     if not rag_embedding_model_configured():
         sys.stderr.write(
-            f"Encoder layout invalid — check DIGIMSK_ENCODER_DIR: "
+            f"Encoder layout invalid — check TRI_BACK_ENCODER_DIR: "
             f"{settings.encoder_model_dir}\n"
         )
         return 1

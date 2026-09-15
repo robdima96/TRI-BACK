@@ -10,7 +10,7 @@ from app.services.generator import generator_model_configured, generator_status_
 
 def probe_rag() -> tuple[bool, str]:
     if not settings.rag_load:
-        return True, "skipped (DIGIMSK_RAG=0)"
+        return True, "skipped (TRI_BACK_RAG=0)"
     try:
         from app.services.rag.store import get_sub_collection, list_sub_collections
 
