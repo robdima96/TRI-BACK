@@ -38,7 +38,7 @@ module.exports = {
   graphsDir: GRAPHS_DIR,
   port: Number(process.env.PORT || 3847),
   appPassword: (process.env.APP_PASSWORD || "").trim(),
-  sessionSecret: (process.env.SESSION_SECRET || "digimsk-graph-dev-secret").trim(),
+  sessionSecret: (process.env.SESSION_SECRET || "tri-back-graph-dev-secret").trim(),
   neo4j: { uri, username, password, database },
   graphVersion: "red flags/v1",
 };

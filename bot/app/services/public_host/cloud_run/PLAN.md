@@ -1,6 +1,6 @@
 # TRI-BACK — Cloud Run + GCS mounts (implementation plan)
 
-**Status:** implementation in `public_host/cloud_run/`; cutover runbook is **[STUDY_SERVICE.md](STUDY_SERVICE.md)**  
+**Status:** implementation in `public_host/cloud_run/`; operator runbook is **[STUDY_SERVICE.md](STUDY_SERVICE.md)**  
 **GCP project:** `YOUR_GCP_PROJECT` (same billing / Vertex as LLM calls)  
 **Region:** `us-central1`  
 **Storage strategy:** existing GCS bucket + Cloud Run volume mounts at `/mnt/tri-back` (not bake-into-image for GliNER/graph)
@@ -25,7 +25,7 @@ Browser
 
 ### Hosted retrieval defaults
 
-Prefer `TRI_BACK_*`; legacy `DIGIMSK_*` still resolves.
+Prefer `TRI_BACK_*`; legacy `TRI_BACK_*` still resolves.
 
 | Env | Value | Meaning |
 |-----|--------|---------|

@@ -1,4 +1,4 @@
-"""Load and summarize DigiMSK bot session JSON files for the Testing browser."""
+"""Load and summarize TRI-BACK bot session JSON files for the Testing browser."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# Repo root = DigiMSKbot/ (Testing/ is one level down).
+# Repo root = TRI-BACK clone (Testing/ is one level down).
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SESSIONS_DIR = REPO_ROOT / "bot" / "data" / "sessions"
 

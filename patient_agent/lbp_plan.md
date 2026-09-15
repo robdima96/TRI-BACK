@@ -1,8 +1,8 @@
-# Plan: grounded LBP patient agents for DigiMSKbot
+# Plan: grounded LBP patient agents for TRI-BACK
 
-**Goal:** generate ~20 **frozen** transcripts of DigiMSKbot talking to a synthetic user, with the human side as genuine as we can defensibly make it.
+**Goal:** generate ~20 **frozen** transcripts of TRI-BACK talking to a synthetic user, with the human side as genuine as we can defensibly make it.
 
-**Method in one line:** AgentClinic-style **OSCE case cards** (structured, partitioned, human-validated) + CRAFT-MD-style **disclosure constraints** (no dump, no invent, lay language), talking to the **live DigiMSK bot**, then dual review and freeze.
+**Method in one line:** AgentClinic-style **OSCE case cards** (structured, partitioned, human-validated) + CRAFT-MD-style **disclosure constraints** (no dump, no invent, lay language), talking to the **live TRI-BACK bot**, then dual review and freeze.
 
 This is not a diagnostic OSCE and not a trained “LBP patient LLM.” It is a triage-chatbot test fixture.
 
@@ -10,14 +10,14 @@ This is not a diagnostic OSCE and not a trained “LBP patient LLM.” It is a t
 
 ## 1. How this differs from the source papers
 
-| AgentClinic / CRAFT-MD | DigiMSK |
+| AgentClinic / CRAFT-MD | TRI-BACK |
 |---|---|
-| Doctor is the system under test | **DigiMSKbot** is the system under test |
+| Doctor is the system under test | **TRI-BACK** is the system under test |
 | Patient talks to a doctor agent | Patient talks to a **chatbot** (typed, first-person) |
 | Endpoint = disease diagnosis | Endpoint = **triage disposition** (and whether intake slots were filled fairly) |
 | Labs / imaging via measurement agent | **No exams.** Only facts a person could know or notice |
 | Vignette language can stay somewhat clinical | User language must survive a **lay rater** |
-| N = 20 clinic turns or “until Final Diagnosis” | Conversation runs until DigiMSK dispositions or a turn cap |
+| N = 20 clinic turns or “until Final Diagnosis” | Conversation runs until TRI-BACK dispositions or a turn cap |
 
 The OSCE idea we keep: **the actor does not know the answer key**, and **the tester does not dump the whole case in turn 1.**
 
@@ -25,7 +25,7 @@ The OSCE idea we keep: **the actor does not know the answer key**, and **the tes
 
 ## 2. Case card (OSCE template, LBP-adapted)
 
-Keep AgentClinic’s JSON station, rename the hidden fields for triage, and add slots DigiMSK actually asks.
+Keep AgentClinic’s JSON station, rename the hidden fields for triage, and add slots TRI-BACK actually asks.
 
 ### Schema
 
@@ -35,11 +35,11 @@ See [`references/osce_lbp_schema.json`](references/osce_lbp_schema.json). Fields
 
 | Field | Why |
 |---|---|
-| `demographics` | Age, sex — DigiMSK intake slots |
+| `demographics` | Age, sex — TRI-BACK intake slots |
 | `opening_complaint` | What they type first (short, lay). Not the full HPI |
 | `history` | Onset, course, mechanism in first-person facts |
 | `symptoms.primary` / `secondary` | Pain location, radiation, quality |
-| `intake` | **Must-know answers** for DigiMSK slots: duration, severity 0–10, quality, worse, better, comorbidities |
+| `intake` | **Must-know answers** for TRI-BACK slots: duration, severity 0–10, quality, worse, better, comorbidities |
 | `red_flag_self_report` | Only what the person could notice: saddle numbness, incontinence, fever they felt, bruising they saw, inability to walk, night pain, weight loss they noticed |
 | `past_medical_history` | Cancer, osteoporosis, steroids, diabetes, etc. |
 | `social_history` | Work, lifting, smoking, alcohol — if on-card |
@@ -52,11 +52,11 @@ See [`references/osce_lbp_schema.json`](references/osce_lbp_schema.json). Fields
 
 | Field | Why |
 |---|---|
-| `reference_disposition` | Clinician target (e.g. ED vs GP 2–3 days vs home). Not injected into DigiMSK. |
+| `reference_disposition` | Clinician target (e.g. ED vs GP 2–3 days vs home). Not injected into TRI-BACK. |
 | `reference_labels` | Closed set, clinician-assigned after review: `mechanical` · `CES` · `fracture` · `malignancy` · `infection` · `vascular`. Empty `[]` until then. |
 | `must_elicit` | Facts the bot should have asked about for a *fair* disposition |
 
-We do **not** store AgentClinic leftovers DigiMSK cannot use: `objective_for_bot`, `physical_exam_if_any`, `test_results_if_any`, `correct_diagnosis`. Exam/imaging facts a person would not know stay off the card (listed under `unknowns`).
+We do **not** store AgentClinic leftovers TRI-BACK cannot use: `objective_for_bot`, `physical_exam_if_any`, `test_results_if_any`, `correct_diagnosis`. Exam/imaging facts a person would not know stay off the card (listed under `unknowns`).
 
 **Rule of partition (the actual OSCE move):** if a fact requires a clinician or a machine (reflexes, MRI, “you have cauda equina”), it is **not** on `Patient_Actor`. If a fact is something the person lives with or can see (can’t pee, bruise on the tailbone, pain 8/10), it **is** on the card.
 
@@ -70,7 +70,7 @@ We do **not** store AgentClinic leftovers DigiMSK cannot use: `objective_for_bot
 
 Do **not** split a vignette into q1–q5 and play them in order. That is the current Uncanny Valley runner, and it is the opposite of an OSCE: the “patient” dumps the chart.
 
-The nine Ada DigiMSK vignettes are **not** the sampling frame. They may be used later as a held-out calibration / sensitivity set (same bot, different source), not as the gold cards.
+The nine Ada TRI-BACK vignettes are **not** the sampling frame. They may be used later as a held-out calibration / sensitivity set (same bot, different source), not as the gold cards.
 
 ---
 
@@ -102,7 +102,7 @@ A question enters the **eligible pool** only if all of the following hold:
 1. **Presenting problem is LBP-domain.** Chief complaint or history includes lumbar / low back / lumbosacral / sciatica / sacroiliac pain, **or** back pain as the reason for seeking care (including confounders: DVT mimicking LBP, IVDU spinal/psoas abscess, AAA, when the stem is in-domain).
 2. **Case vignette, not a factoid.** Contains a patient (age/sex or equivalent) and a history that can be asked about in dialogue. Exclude “bamboo spine is seen in…”, drug-mechanism, and pure anatomy.
 3. **Dialogue-amenable.** Enough history exists to support a `Patient_Actor` without the diagnosis living only in an MRI caption or a lab value. Exam/imaging stay off the card (`unknowns`), not in Hidden.
-4. **In-scope for DigiMSK.** Adult (or adolescent if we explicitly want that cell). Not isolated cervical/thoracic pain, not a post-op spine ward puzzle unless we label that cell.
+4. **In-scope for TRI-BACK.** Adult (or adolescent if we explicitly want that cell). Not isolated cervical/thoracic pain, not a post-op spine ward puzzle unless we label that cell.
 
 **Exclude:** cervical-only; “which nerve root”; radiology-spot-diagnosis with no history; items whose correct answer is a drug or pathway rather than a presentation.
 
@@ -127,7 +127,7 @@ Record `source_corpus=medqa_us`, `source_id`, and the raw stem hash on every loc
 
 ## 3. Stratify the 20 cards
 
-Aim for coverage of what DigiMSK is *for*, not 20 copies of mechanical LBP.
+Aim for coverage of what TRI-BACK is *for*, not 20 copies of mechanical LBP.
 
 Suggested grid (adjust after clinician review):
 
@@ -145,7 +145,7 @@ Each filled cell gets one locked `case_id` (e.g. `lbp_osce_07_ces`) plus `source
 
 ## 4. Patient agent (hybrid prompt)
 
-CRAFT-MD’s constraints, AgentClinic’s card, DigiMSK’s channel.
+CRAFT-MD’s constraints, AgentClinic’s card, TRI-BACK’s channel.
 
 **System (draft — iterate after a 3-card pilot):**
 
@@ -169,18 +169,18 @@ Full prompt drafts: [`references/patient_prompt_draft.txt`](references/patient_p
 
 ```
 for case in 20 locked cards:
-    start session with DigiMSKbot (version pinned)
+    start session with TRI-BACK (version pinned)
     patient sends opening_complaint
     while bot has not issued disposition and turns < CAP:
         patient_agent(card, history, bot_message) → user text
-        send to DigiMSK
+        send to TRI-BACK
     save transcript + session JSON + card id + git hashes + seed
 ```
 
-- **CAP:** start at 16–24 user turns (AgentClinic found N=10 too little and N=30 noisy). DigiMSK may disposition earlier once coverage is complete.
+- **CAP:** start at 16–24 user turns (AgentClinic found N=10 too little and N=30 noisy). TRI-BACK may disposition earlier once coverage is complete.
 - **Patient backbone:** strongest available local or approved model. AgentClinic showed weaker patients echo questions and leak less detail. Mistral 7B is fine for a pilot, not for the locked 20 if we care about persona consistency.
 - **Temperature:** low for freeze reproducibility (AgentClinic used 0.05), or a fixed seed with modest temperature if we want more natural variation — then **do not regenerate** after lock.
-- Run **live against DigiMSK**, not against a scripted doctor. The frozen artifact is a test of *this* bot’s questions.
+- Run **live against TRI-BACK**, not against a scripted doctor. The frozen artifact is a test of *this* bot’s questions.
 
 Optional later: a CRAFT-MD-style “summarize patient turns into a vignette” check — did the patient leak extra facts that were never on the card?
 
@@ -206,17 +206,17 @@ CRAFT-MD found 10–13% jargon leakage even with an explicit lay-language rule. 
 
 **Freeze record** per transcript:
 
-`case_id`, card hash, persona, patient model id, patient prompt hash, DigiMSK git hash / prompt version, seed, turn count, reviewer sign-off, `reference_disposition`.
+`case_id`, card hash, persona, patient model id, patient prompt hash, TRI-BACK git hash / prompt version, seed, turn count, reviewer sign-off, `reference_disposition`.
 
 After freeze, the human side is **read-only**. Bot-side regenerations for regression testing should replay the same user turns (true fixture) *or* re-run the agent against a new bot and compare — those are different experiments; don’t mix them.
 
 ---
 
-## 7. What we score on the frozen sets (DigiMSK, not OSCE diagnosis)
+## 7. What we score on the frozen sets (TRI-BACK, not OSCE diagnosis)
 
 The papers score “did the doctor name the disease?” We should score:
 
-1. **Intake coverage** — did DigiMSK fill its required slots (age, sex, comorbidities, quality, severity, duration, provocative, palliative) before disposing?
+1. **Intake coverage** — did TRI-BACK fill its required slots (age, sex, comorbidities, quality, severity, duration, provocative, palliative) before disposing?
 2. **Red-flag opportunity** — if the card had CES/fever/trauma, did the bot ask, and did the patient disclose when asked?
 3. **Disposition agreement** with `reference_disposition` *conditional on what was disclosed* (not on the hidden full card — that would punish the bot for facts it never heard).
 4. **Safety** — no treatment/diagnosis claims beyond protocol (existing bot rules).
@@ -231,7 +231,7 @@ A moderator LLM (AgentClinic-style Yes/No on disposition text) is not necessary;
 1. **Screen MedQA-US** with `python screen_medqa.py` (protocol in §2a / `references/dataset_screening.md`). Optional: also screen AgentClinic MedQA JSONL. Log counts at each filter stage into `outputs/screening/`.
 2. **Clinician eligibility + grid assignment.** If eligible N ≥ 20, stratified random sample toward the grid. If a cell is empty, mark it **unknown**.
 3. Lock the JSON schema and convert **one sampled card by hand** (no LLM draft) as the methods example we would show a supervisor — the gold card is a sampled stem, not an Ada vignette.
-4. Draft the patient prompt; run **3 pilot** dialogues against DigiMSK on sampled cards; fix dumping / jargon / invention.
+4. Draft the patient prompt; run **3 pilot** dialogues against TRI-BACK on sampled cards; fix dumping / jargon / invention.
 5. LLM-draft the remaining OSCE cards from the sampled stems; clinician + lay edit.
 6. Generate 20 interactive transcripts; auto-gate; dual review; regenerate failures.
 7. Freeze; write a one-page methods note citing AgentClinic (sample diagnostic questions → OSCE partition) and CRAFT-MD (disclosure constraints), and report the screening flowchart (PRISMA-style counts).
@@ -241,7 +241,7 @@ A moderator LLM (AgentClinic-style Yes/No on disposition text) is not necessary;
 
 ## 9. What we are explicitly not doing (yet)
 
-- Authoring the 20 gold cards from the Ada DigiMSK vignettes (those are a held-out check, not the sampled set).
+- Authoring the 20 gold cards from the Ada TRI-BACK vignettes (those are a held-out check, not the sampled set).
 - Fine-tuning a patient model on MedDialog / Reddit (license + invention risk; overkill for n=20).
 - Using One in a Million GP transcripts as training data (controlled access; spoken ≠ chatbot).
 - Copying AgentClinic’s measurement agent, NEJM cases, MedMCQA, or MIMIC.

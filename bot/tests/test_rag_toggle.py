@@ -1,4 +1,4 @@
-"""RAG disabled via ``settings.rag_load`` mirrors ``DIGIMSK_LOAD_RAG`` env."""
+"""RAG disabled via ``settings.rag_load`` mirrors ``TRI_BACK_LOAD_RAG`` env."""
 
 from app.config import settings
 from app.services.rag import retrieve_evidence

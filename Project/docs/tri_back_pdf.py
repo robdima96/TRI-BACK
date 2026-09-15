@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""DigiMSKbot PDF layout (ReportLab) — source of truth for reading reports and checklist-style PDFs.
+"""TRI-BACK PDF layout (ReportLab) — source of truth for reading reports and checklist-style PDFs.
 
 Matches `pdf formatting.txt`: US Letter, 0.85\" margins, #26262B background, Merriweather, accent #4A9EFF.
 """
@@ -227,7 +227,7 @@ def _make_styles() -> dict[str, ParagraphStyle]:
     }
 
 
-class DigiMSKDocTemplate(BaseDocTemplate):
+class TriBackDocTemplate(BaseDocTemplate):
     def __init__(
         self,
         filename: str,
@@ -250,7 +250,7 @@ class DigiMSKDocTemplate(BaseDocTemplate):
             showBoundary=0,
         )
         pt = PageTemplate(
-            id="DigiMSK",
+            id="TRI-BACK",
             frames=[frame],
             onPage=self._on_page,
             onPageEnd=self._on_page_end,
@@ -271,7 +271,7 @@ class DigiMSKDocTemplate(BaseDocTemplate):
         canv.setFillColor(TEXT_WHITE)
         canv.setFont(self._font_names["footer"], 9)
         header_y = page_height - HEADER_Y_FROM_TOP
-        canv.drawString(MARGIN, header_y, "DigiMSK Chatbot - Ardern Lab UBC")
+        canv.drawString(MARGIN, header_y, "TRI-BACK Chatbot - Ardern Lab UBC")
         canv.restoreState()
 
     def _on_page_end(self, canv, doc) -> None:
@@ -321,7 +321,7 @@ def build_markdown_pdf(
     version_date: str | None = None,
     font_dir: str | Path | None = None,
 ) -> Path:
-    """Render a Markdown file to a DigiMSK-styled PDF. Returns output path."""
+    """Render a Markdown file to a TRI-BACK-styled PDF. Returns output path."""
     md_path = Path(md_path)
     pdf_path = Path(pdf_path)
     if font_dir is None:
@@ -342,7 +342,7 @@ def build_markdown_pdf(
     def run_build(path: str | Path, total_pages: int | None) -> None:
         # Fresh story each time: ReportLab consumes flowables during build.
         story = _build_story(doc_title, blocks, styles)
-        doc = DigiMSKDocTemplate(
+        doc = TriBackDocTemplate(
             str(path),
             version_date=version_date,
             total_pages=total_pages,

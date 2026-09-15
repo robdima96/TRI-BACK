@@ -1,7 +1,7 @@
 {
   "name": "red_flags",
   "version": "v1",
-  "description": "DigiMSK low-back red flags knowledge graph (validated configuration)",
+  "description": "TRI-BACK low-back red flags knowledge graph (validated configuration)",
   "created_at": "2026-06-27T19:02:20Z",
   "verified": true,
   "files": {

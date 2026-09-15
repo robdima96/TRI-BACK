@@ -14,7 +14,7 @@ from app.config import settings
 def require_bot_api_key(
     authorization: str | None = Header(default=None),
 ) -> None:
-    """Reject chat calls when ``TRI_BACK_BOT_API_KEY`` (or legacy ``DIGIMSK_BOT_API_KEY``) is set and Bearer does not match."""
+    """Reject chat calls when ``TRI_BACK_BOT_API_KEY`` is set and Bearer does not match."""
     expected = (settings.bot_api_key or "").strip()
     if not expected:
         return

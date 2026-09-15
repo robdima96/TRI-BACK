@@ -1,4 +1,4 @@
-// DigiMSK Red Flags knowledge graph — starter queries for Neo4j Browser / Bloom
+// TRI-BACK Red Flags knowledge graph — starter queries for Neo4j Browser / Bloom
 
 // Backup: red flags v1
 

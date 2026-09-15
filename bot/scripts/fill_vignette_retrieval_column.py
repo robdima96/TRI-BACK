@@ -26,7 +26,7 @@ _DEFAULT_XLSX = (
     _ROOT / "tests" / "data" / "results" / "NER_checklist_matching_with_vignettes.xlsx"
 )
 
-os.environ.setdefault("DIGIMSK_LOAD_RAG", "1")
+os.environ.setdefault("TRI_BACK_LOAD_RAG", "1")
 
 
 def _format_retrieval_for_xlsx(
@@ -98,7 +98,7 @@ def main() -> int:
         return 1
     if not rag_embedding_model_configured():
         sys.stderr.write(
-            f"Encoder layout invalid — check DIGIMSK_ENCODER_DIR: "
+            f"Encoder layout invalid — check TRI_BACK_ENCODER_DIR: "
             f"{settings.encoder_model_dir}\n"
         )
         return 1

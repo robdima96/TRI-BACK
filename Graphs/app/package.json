@@ -1,7 +1,7 @@
 {
-  "name": "digimsk-red-flags-graph",
+  "name": "tri-back-red-flags-graph",
   "version": "1.0.0",
-  "description": "Interactive web explorer for DigiMSK red flags Neo4j knowledge graph",
+  "description": "Interactive web explorer for TRI-BACK red flags Neo4j knowledge graph",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -3,7 +3,7 @@
   "case_id": "lbp_osce_01_mechanical",
   "source_corpus": "medqa_us",
   "source_id": "REPLACE_WITH_MEDQA_ID",
-  "source_note": "Schema example only. Locked cards must come from the screened sample, not from Ada DigiMSK vignettes.",
+  "source_note": "Schema example only. Locked cards must come from the screened sample, not from Ada TRI-BACK vignettes.",
   "Patient_Actor": {
     "demographics": "38-year-old man",
     "opening_complaint": "My lower back has been killing me since I moved some boxes a couple weeks ago.",

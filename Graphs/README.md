@@ -1,4 +1,4 @@
-# DigiMSK Red Flags Knowledge Graph (Neo4j)
+# TRI-BACK Red Flags Knowledge Graph (Neo4j)
 
 Import the formatted red-flags CSV into Neo4j and explore it in Browser, Bloom, or an exported HTML graph. The graph is structured for later LLM navigation during screening → discrimination → disposition.
 

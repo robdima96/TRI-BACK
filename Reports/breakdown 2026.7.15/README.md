@@ -1,4 +1,4 @@
-# DigiMSK System Breakdown — 2026.7.15
+# TRI-BACK System Breakdown — 2026.7.15
 
 A **small supervisor pack** for a non-technical audience.
 
@@ -19,7 +19,7 @@ From the repo root:
 python "Reports/breakdown 2026.7.15/scripts/render_briefing_pdfs.py"
 ```
 
-Needs DigiMSK PDF deps (`cd bot && pip install -e ".[pdf]"`).
+Needs TRI-BACK PDF extras (`cd bot && pip install -e ".[pdf]"`).
 
 ## Viewing diagrams
 

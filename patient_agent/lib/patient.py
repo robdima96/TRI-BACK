@@ -62,7 +62,7 @@ class OpenAIBackend:
 
 
 class VertexBackend:
-    """Gemini on Vertex AI — same project, location, ADC, and default model as DigiMSK generator."""
+    """Gemini on Vertex AI — same project, location, ADC, and default model as TRI-BACK generator."""
 
     def __init__(
         self,
@@ -223,6 +223,14 @@ def make_backend(kind: str, actor: dict[str, Any], *, model: str | None = None) 
         model = model or os.environ.get("PATIENT_MODEL", "gpt-4o-mini")
         return OpenAIBackend(model=model)
     if kind in {"local", "mistral"}:
-        model_dir = model or os.environ.get("PATIENT_MODEL_DIR") or r"E:\DigiMSKbot\Mistral7Binstruct"
+        preferred = Path(r"E:\TRI-BACK\Mistral7Binstruct")
+        legacy = Path(r"E:\TRI-BACK\Mistral7Binstruct")
+        env_dir = model or os.environ.get("PATIENT_MODEL_DIR")
+        if env_dir:
+            model_dir = env_dir
+        elif preferred.exists():
+            model_dir = str(preferred)
+        else:
+            model_dir = str(legacy)
         return LocalMistralBackend(model_dir=model_dir)
     raise ValueError(f"unknown backend {kind!r}; use vertex, echo, openai, or local")

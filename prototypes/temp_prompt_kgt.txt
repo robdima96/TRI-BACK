@@ -1,8 +1,8 @@
-# DigiMSK Knowledge Graph Traversal & RAG — Improvement Specification
+# TRI-BACK Knowledge Graph Traversal & RAG — Improvement Specification
 
-You are a senior Python engineer working on the **DigiMSKbot** clinical triage chatbot (`bot/`). Your task is to **improve and integrate** the knowledge-graph traversal and RAG retrieval pipeline so it matches the study-app requirements in `prototypes/prompt_2.txt` and the clinical design below.
+You are a senior Python engineer working on the **TRI-BACK** clinical triage chatbot (`bot/`). Your task is to **improve and integrate** the knowledge-graph traversal and RAG retrieval pipeline so it matches the study-app requirements in `prototypes/prompt_2.txt` and the clinical design below.
 
-Work **only** in `bot/app/services/rag/`, `bot/app/services/graphrag/`, and the minimum orchestrator wiring needed (`bot/app/orchestrator/`, `bot/app/schemas.py`, `bot/app/main.py`). Do not build the Reflex study UI (`prototypes/digimsk_study_app/`). The study app will consume your outputs via `POST /api/v1/chat` once exposed on `ChatResponse`.
+Work **only** in `bot/app/services/rag/`, `bot/app/services/graphrag/`, and the minimum orchestrator wiring needed (`bot/app/orchestrator/`, `bot/app/schemas.py`, `bot/app/main.py`). Do not build the Reflex study UI (`prototypes/tri_back_study_app/`). The study app will consume your outputs via `POST /api/v1/chat` once exposed on `ChatResponse`.
 
 ---
 
@@ -156,7 +156,7 @@ Regex patterns already extract: comorbidities, duration, age, sex, severity, nig
 
 **Smoke test:** `bot/scripts/graphrag_smoke.py` — encode message → checklist → traverse (no LangGraph).
 
-**Toggle:** `DIGIMSK_LOAD_GRAPHRAG` / `settings.graphrag_load` — when false, skip graph traversal entirely; when true, use **local** v1 graph (not Neo4j).
+**Toggle:** `TRI_BACK_LOAD_GRAPHRAG` / `settings.graphrag_load` — when false, skip graph traversal entirely; when true, use **local** v1 graph (not Neo4j).
 
 ### 4.5 Cross-reference summary — gaps to close
 
@@ -314,7 +314,7 @@ def traverse_from_turn(
    4. `traverse_direct` / `traverse_mediated` / `evidence_link` — from local CSV rows
    5. `aggregate_conditions` — ranked candidates
 
-6. **Default graph backend:** `DIGIMSK_GRAPH_BACKEND=local` (default). Optional `neo4j` value exists only for dev comparison against `Graphs/` — not required for study deployment.
+6. **Default graph backend:** `TRI_BACK_GRAPH_BACKEND=local` (default). Optional `neo4j` value exists only for dev comparison against `Graphs/` — not required for study deployment.
 
 ### 5.5 Fusion layer (`rag/fusion.py`)
 
@@ -370,7 +370,7 @@ def graph_traversal_node(state: ChatState) -> ChatState:
 
 **Question-mode path:** when `plan_question` routes to `generate_question`, skip graph traversal (no disposition yet) OR run lightweight factor matching only — document choice; default **skip full traversal during intake questions**.
 
-Wire `DIGIMSK_LOAD_GRAPHRAG=0` to skip traversal entirely but still run regex factor matching + semantic chunk retrieval.
+Wire `TRI_BACK_LOAD_GRAPHRAG=0` to skip traversal entirely but still run regex factor matching + semantic chunk retrieval.
 
 ### 5.7 API / schema updates
 
@@ -446,7 +446,7 @@ All tests run against the local v1 CSV — no Neo4j fixture required. Optional i
 
 ## 10. Out of scope
 
-- Reflex study UI (`prototypes/digimsk_study_app/`)
+- Reflex study UI (`prototypes/tri_back_study_app/`)
 - Generator prompt rewriting for Arm 2 chain-of-thought (consumer-side formatter)
 - Changes to `Graphs/` Neo4j schema, import pipeline, or `Graphs/app/` explorer
 - Neo4j as a runtime dependency of `bot/` chatbot traversal
@@ -461,4 +461,4 @@ All tests run against the local v1 CSV — no Neo4j fixture required. Optional i
 2. Extended `graphrag/` with `LocalGraphClient` (v1 CSV), chunk-seeded traversal, and condition ranking
 3. LangGraph node + `ChatResponse` fields wired end-to-end
 4. Tests + updated `bot/scripts/graphrag_smoke.py` demonstrating three-leg fusion (no Neo4j required)
-5. Brief inline docstrings; update `bot/README.md` with local graph path, `DIGIMSK_GRAPH_BACKEND=local`, and new response fields
+5. Brief inline docstrings; update `bot/README.md` with local graph path, `TRI_BACK_GRAPH_BACKEND=local`, and new response fields

@@ -5,21 +5,20 @@
 #   $env:TRI_BACK_BOT_API_KEY = "..."
 #   $env:TRI_BACK_ADMIN_PASSWORD = "..."
 #   .\bot\app\services\public_host\cloud_run\scripts\deploy_study.ps1
-#   .\bot\app\services\public_host\cloud_run\scripts\deploy_study.ps1 -Service digimsk-study -BotService digimskbot
 
 param(
-  [string]$ProjectId = $(if ($env:TRI_BACK_GCP_PROJECT) { $env:TRI_BACK_GCP_PROJECT } elseif ($env:DIGIMSK_GCP_PROJECT) { $env:DIGIMSK_GCP_PROJECT } else { "YOUR_GCP_PROJECT" }),
+  [string]$ProjectId = $(if ($env:TRI_BACK_GCP_PROJECT) { $env:TRI_BACK_GCP_PROJECT } else { "YOUR_GCP_PROJECT" }),
   [string]$Region = "us-central1",
   [string]$Service = "tri-back-study",
   [string]$BotService = "tri-back",
-  [string]$Bucket = $(if ($env:TRI_BACK_GCS_BUCKET) { $env:TRI_BACK_GCS_BUCKET } elseif ($env:DIGIMSK_GCS_BUCKET) { $env:DIGIMSK_GCS_BUCKET } else { "digimsk-cloudrun-$ProjectId" }),
+  [string]$Bucket = $(if ($env:TRI_BACK_GCS_BUCKET) { $env:TRI_BACK_GCS_BUCKET } else { "digimsk-cloudrun-$ProjectId" }),
   [string]$Image = "",
   [string]$Memory = "2Gi",
   [string]$Cpu = "2",
   [int]$MaxInstances = 1,
   [int]$MinInstances = 0,
-  [string]$BotApiKey = $(if ($env:TRI_BACK_BOT_API_KEY) { $env:TRI_BACK_BOT_API_KEY } elseif ($env:DIGIMSK_BOT_API_KEY) { $env:DIGIMSK_BOT_API_KEY } else { "" }),
-  [string]$AdminPassword = $(if ($env:TRI_BACK_ADMIN_PASSWORD) { $env:TRI_BACK_ADMIN_PASSWORD } elseif ($env:DIGIMSK_ADMIN_PASSWORD) { $env:DIGIMSK_ADMIN_PASSWORD } else { "" }),
+  [string]$BotApiKey = $(if ($env:TRI_BACK_BOT_API_KEY) { $env:TRI_BACK_BOT_API_KEY } else { "" }),
+  [string]$AdminPassword = $(if ($env:TRI_BACK_ADMIN_PASSWORD) { $env:TRI_BACK_ADMIN_PASSWORD } else { "" }),
   [string]$PublicBaseUrl = "",
   [string]$ChatbotBaseUrl = ""
 )
@@ -29,8 +28,8 @@ $ErrorActionPreference = "Stop"
 if (-not $Image) {
   $Image = "$Region-docker.pkg.dev/$ProjectId/tri-back/tri-back-study:latest"
 }
-if (-not $BotApiKey) { throw "Set TRI_BACK_BOT_API_KEY (or legacy DIGIMSK_BOT_API_KEY)." }
-if (-not $AdminPassword) { throw "Set TRI_BACK_ADMIN_PASSWORD (or legacy DIGIMSK_ADMIN_PASSWORD)." }
+if (-not $BotApiKey) { throw "Set TRI_BACK_BOT_API_KEY." }
+if (-not $AdminPassword) { throw "Set TRI_BACK_ADMIN_PASSWORD." }
 
 if (-not $ChatbotBaseUrl) {
   $ChatbotBaseUrl = (gcloud run services describe $BotService --project=$ProjectId --region=$Region --format="value(status.url)").Trim()
@@ -41,14 +40,13 @@ Write-Host "Deploying $Service"
 Write-Host "  image:  $Image"
 Write-Host "  bot:    $ChatbotBaseUrl"
 Write-Host "  bucket: gs://$Bucket -> /mnt/tri-back"
-Write-Host "  (override -Service digimsk-study -BotService digimskbot for the old names)"
 
 $envVars = @(
   "TRI_BACK_PUBLIC_ACCESS=1",
   "CHATBOT_BASE_URL=$ChatbotBaseUrl",
   "TRI_BACK_BOT_API_KEY=$BotApiKey",
   "TRI_BACK_ADMIN_PASSWORD=$AdminPassword",
-  "TRI_BACK_STUDY_DB=/mnt/tri-back/study/digimsk.db",
+  "TRI_BACK_STUDY_DB=/mnt/tri-back/study/tri_back.db",
   "TRI_BACK_SESSIONS_DIR=/mnt/tri-back/sessions",
   "REFLEX_REDIS_URL=redis://127.0.0.1:6379"
 ) -join ","

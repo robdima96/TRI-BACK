@@ -1,7 +1,7 @@
 """RAG sentence embeddings for Chroma (ingest + query).
 
-Production default: **Clinical_sBERT** via ``sentence_transformers`` (``DIGIMSK_ENCODER_DIR``).
-Span NER uses GliNER-BioMed separately (``DIGIMSK_GLINER_MODEL_DIR``).
+Production default: **Clinical_sBERT** via ``sentence_transformers`` (``TRI_BACK_ENCODER_DIR``).
+Span NER uses GliNER-BioMed separately (``TRI_BACK_GLINER_MODEL_DIR``).
 
 Optional legacy backend ``hf_mean_pool``: Hugging Face ``AutoModel`` + mean pooling
 (GliNER bundle backbone or plain ``config.json``).
@@ -192,7 +192,7 @@ def _ensure_sentence_transformer(model_dir: str) -> bool:
             and _st_dim != settings.encoder_embedding_dim
         ):
             _log.warning(
-                "Clinical_sBERT embedding dim %s != DIGIMSK_ENCODER_DIM %s",
+                "Clinical_sBERT embedding dim %s != TRI_BACK_ENCODER_DIM %s",
                 _st_dim,
                 settings.encoder_embedding_dim,
             )

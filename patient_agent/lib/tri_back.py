@@ -1,14 +1,27 @@
-"""HTTP client for DigiMSKbot POST /api/v1/chat."""
+"""HTTP client for TRI-BACK POST /api/v1/chat."""
 
 from __future__ import annotations
 
+import json
 import os
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
-import urllib.error
-import urllib.request
-import json
+
+def _env_lookup(name: str) -> str:
+    if name.startswith("TRI_BACK_"):
+        keys = (name, "TRI_BACK_" + name[len("TRI_BACK_") :])
+    elif name.startswith("TRI_BACK_"):
+        keys = ("TRI_BACK_" + name[len("TRI_BACK_") :], name)
+    else:
+        keys = (name,)
+    for key in keys:
+        val = (os.environ.get(key) or "").strip()
+        if val:
+            return val
+    return ""
 
 
 @dataclass
@@ -20,15 +33,20 @@ class BotTurn:
     raw: dict[str, Any]
 
 
-class DigiMSKClient:
+class TriBackClient:
     def __init__(
         self,
         base_url: str | None = None,
         api_key: str | None = None,
         timeout: float = 120.0,
     ) -> None:
-        self.base_url = (base_url or os.environ.get("DIGIMSK_BOT_URL") or "http://127.0.0.1:8001").rstrip("/")
-        self.api_key = api_key if api_key is not None else os.environ.get("DIGIMSK_BOT_API_KEY")
+        self.base_url = (
+            base_url or _env_lookup("TRI_BACK_BOT_URL") or "http://127.0.0.1:8001"
+        ).rstrip("/")
+        if api_key is not None:
+            self.api_key = api_key
+        else:
+            self.api_key = _env_lookup("TRI_BACK_BOT_API_KEY") or None
         self.timeout = timeout
 
     def chat(self, session_id: str, message: str) -> BotTurn:
@@ -43,7 +61,7 @@ class DigiMSKClient:
                 body = json.loads(resp.read().decode("utf-8"))
         except urllib.error.URLError as exc:
             raise RuntimeError(
-                f"DigiMSK chat failed at {url}: {exc}. "
+                f"TRI-BACK chat failed at {url}: {exc}. "
                 "Start the bot on port 8001 (usual local URL http://127.0.0.1:8001)."
             ) from exc
         return BotTurn(
@@ -62,3 +80,5 @@ class DigiMSKClient:
         if not turn.question_mode and turn.response:
             return True
         return False
+
+

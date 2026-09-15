@@ -1,6 +1,6 @@
 # Graph-driven intake (plan, 1 Sep 2026 · revised 10 Sep 2026)
 
-Pickup note for making DigiMSK order its intake questions by **graph relevance**, while keeping the existing HPI **slot floor** as a completion requirement. Written from the 31 Aug–1 Sep 2026 design discussion. Not implemented.
+Pickup note for making TRI-BACK order its intake questions by **graph relevance**, while keeping the existing HPI **slot floor** as a completion requirement. Written from the 31 Aug–1 Sep 2026 design discussion. Not implemented.
 
 **Revision, 10 Sep 2026.** The earlier draft built a second coverage layer that enumerated every unknown factor on every touched high-acuity condition and *interrupted* the HPI until those clusters were complete. That is the wrong behaviour — it drives toward covering the whole graph. It is replaced here by a **single dynamically-ranked question queue**: the floor stays mandatory, graph factors join the same queue, and relevance decides the order each turn.
 
@@ -43,7 +43,7 @@ The bottleneck is routing and a hard-coded order, not "too few tools."
 
 - LangGraph (`bot/app/orchestrator/graph.py`): encode → enrich → coverage → `plan_question` → **question** | **disposition** | **escalate**.
 - `plan_next_question` (`question_planner.py`) only consults slot coverage + `max_questions` + `risk_hits`. The next slot is a **fixed sequence** (`intake_slots.py`): age → sex → symptom_anchor → quality → severity → duration → provocative → palliative → comorbidities. Nothing about the patient changes that order.
-- `DIGIMSK_DISPOSITION_MODE=agentic` runs **after** coverage is complete (or the question cap). Its only legal finish is a patient-facing triage paragraph (`final_answer`). Tools are read-only over already-matched factors/paths/RAG.
+- `TRI_BACK_DISPOSITION_MODE=agentic` runs **after** coverage is complete (or the question cap). Its only legal finish is a patient-facing triage paragraph (`final_answer`). Tools are read-only over already-matched factors/paths/RAG.
 - Extra graph tools on that loop cannot introduce a CES question mid-history.
 
 CES is already in the graph: **Bilat neuro motor deficit**, **Bilat neuro sensory deficit**, **Bladder dysfunction**, **Bowel dysfunction**, **Saddle anaesthesia**. "Legs tingling" can match **Neuro sensory deficit**. CES's distinctive factors stay unknown unless volunteered. Today the planner still asks quality → severity → duration → worse → better regardless.
@@ -325,7 +325,7 @@ Unchanged: matched factors → real CSV/Neo4j paths → conditions, plus the cur
 
 Same payload shape (`GraphTraversalTrace` or a compatible subset), different *slice* and `mode` (e.g. `intake_gap` vs today's `traversal`). This is "why this question." Built after ranking on **question** turns, and accumulated across the interview.
 
-**Schema literals must be widened in two hand-mirrored files.** `mode` is `Literal["traversal"]` in `bot/app/services/graphrag/schemas.py` *and* in the duplicated study-app copy `prototypes/digimsk_study_app/digimsk_study_app/graph/schemas.py`. `TraversalAction` is likewise a closed literal in both. Adding `intake_gap` plus new step actions (`graph_gap`, `ask_factor`, `deny_factor`) without editing both will fail Pydantic validation in the study app. Note `scripts/sync_digimsk_cytoscape.py` syncs the Cytoscape JS but **not** these schemas — the mirror is manual.
+**Schema literals must be widened in two hand-mirrored files.** `mode` is `Literal["traversal"]` in `bot/app/services/graphrag/schemas.py` *and* in the duplicated study-app copy `prototypes/tri_back_study_app/tri_back_study_app/graph/schemas.py`. `TraversalAction` is likewise a closed literal in both. Adding `intake_gap` plus new step actions (`graph_gap`, `ask_factor`, `deny_factor`) without editing both will fail Pydantic validation in the study app. Note `scripts/sync_tri_back_cytoscape.py` syncs the Cytoscape JS but **not** these schemas — the mirror is manual.
 
 What to draw — **only existing graph edges**:
 
@@ -396,15 +396,15 @@ Arm 3:
 
 ## Appendix — current engine vs literature (31 Aug 2026)
 
-DigiMSK today: **local code decides the clinical next step; a language model only writes the sentence.** Coverage is slot completeness, not "have we ruled out serious disease." GraphRAG / agentic GraphRAG run at **disposition**, not during questioning.
+TRI-BACK today: **local code decides the clinical next step; a language model only writes the sentence.** Coverage is slot completeness, not "have we ruled out serious disease." GraphRAG / agentic GraphRAG run at **disposition**, not during questioning.
 
-| Approach | Who asks what | How advice is produced | Vs DigiMSK |
+| Approach | Who asks what | How advice is produced | Vs TRI-BACK |
 |---|---|---|---|
-| Commercial symptom checkers (Ada, Babylon, Buoy) | Adaptive: next question maximises information about a disease set | Ranked conditions + triage | This plan moves DigiMSK into the same family, but ranks by graph adjacency and acuity rather than probabilistic information gain |
+| Commercial symptom checkers (Ada, Babylon, Buoy) | Adaptive: next question maximises information about a disease set | Ranked conditions + triage | This plan moves TRI-BACK into the same family, but ranks by graph adjacency and acuity rather than probabilistic information gain |
 | Guideline / NHS-111 style (NICE NG59) | Red flags early, then mechanical vs radicular | Pathway node → disposition | Graph is NICE-like **at the end**; this plan brings it into intake |
-| LLM clinicians (AMIE, AgentClinic) | Model improvises history-taking | Open-ended diagnosis | DigiMSK is the inverse: auditable ranking, stiffer talk |
+| LLM clinicians (AMIE, AgentClinic) | Model improvises history-taking | Open-ended diagnosis | TRI-BACK is the inverse: auditable ranking, stiffer talk |
 | GraphRAG / tool-using medical agents | Often the LLM chooses tools *and* questions | Graph + retrieval + LLM | Disposition path is in this family; question path stays code-ranked |
-| Ungrounded GPT wrappers | Model decides everything | Model decides everything | DigiMSK stronger on safety *design* |
+| Ungrounded GPT wrappers | Model decides everything | Model decides everything | TRI-BACK stronger on safety *design* |
 
 This plan keeps that safety design and moves graph inspection **into question planning**, with the floor as a completion requirement rather than a fixed script.
 

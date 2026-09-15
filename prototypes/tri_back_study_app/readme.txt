@@ -3,7 +3,7 @@ TRI-BACK — Study prototype UI (research)
 
 WHAT IT IS
 ----------
-Reflex web app for the TRI-BACK research study (formerly DigiMSK). Participants
+Reflex web app for the TRI-BACK research study. Participants
 and researchers log in here. All three experimental arms call the SAME bot
 backend; only the presentation differs (baseline text / reasoning / graph panel).
 
@@ -21,7 +21,7 @@ Open http://localhost:3000 (not 3001).
 
 Terminal 1 — bot:
 
-  cd "C:\ROBS STUFF\UBC Postdoctoral Fellowship\DigiMSKbot\bot"
+  cd "C:\ROBS STUFF\UBC Postdoctoral Fellowship\TRI-BACK\bot"
   .\.venv\Scripts\Activate.ps1
   uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
 
@@ -31,7 +31,7 @@ pick up study-app files.
 
 Terminal 2 — study UI:
 
-  cd "C:\ROBS STUFF\UBC Postdoctoral Fellowship\DigiMSKbot\prototypes\tri_back_study_app"
+  cd "C:\ROBS STUFF\UBC Postdoctoral Fellowship\TRI-BACK\prototypes\tri_back_study_app"
   .\.venv\Scripts\Activate.ps1
   python scripts/run_local.py --kill-stale
 
@@ -50,7 +50,7 @@ Expected ports:
 
 First-time only (venv + roster/login accounts), then run_local.py as above:
 
-  cd "C:\ROBS STUFF\UBC Postdoctoral Fellowship\DigiMSKbot\prototypes\tri_back_study_app"
+  cd "C:\ROBS STUFF\UBC Postdoctoral Fellowship\TRI-BACK\prototypes\tri_back_study_app"
   python -m venv .venv
   .\.venv\Scripts\Activate.ps1
   pip install -r requirements.txt
@@ -67,7 +67,7 @@ bot/app/services/public_host/cloud_run/scripts/entrypoint_study.sh.
 LOGIN
 -----
 Admin:        username admin, password TRI_BACK_ADMIN_PASSWORD
-              (local fallbacks triback / digimsk if unset and not in public mode)
+              (local fallbacks triback / tri-back if unset and not in public mode)
 Participant:  study ID + password from data/participant_credentials.csv
               (created when you seed; keep private)
 

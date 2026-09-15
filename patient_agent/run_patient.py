@@ -1,4 +1,4 @@
-"""CLI: run a grounded patient agent against DigiMSKbot (or echo dry-run).
+"""CLI: run a grounded patient agent against TRI-BACK (or echo dry-run).
 
   python run_patient.py --card PATH --backend echo
   python run_patient.py --card PATH --backend vertex --bot-url http://127.0.0.1:8001
@@ -18,24 +18,24 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from lib.cards import load_card, patient_actor_only
-from lib.digimsk import DigiMSKClient
+from lib.tri_back import TriBackClient
 from lib.gates import summarize_flags
 from lib.patient import PatientAgent, VertexBackend, make_backend
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Dialogue between patient agent and DigiMSKbot.")
+    parser = argparse.ArgumentParser(description="Dialogue between patient agent and TRI-BACK.")
     parser.add_argument("--card", type=Path, required=True)
     parser.add_argument(
         "--backend",
         choices=("vertex", "echo", "openai", "local"),
         default="vertex",
-        help="vertex = same GCP/Vertex auth as DigiMSK generator (default)",
+        help="vertex = same GCP/Vertex auth as TRI-BACK generator (default)",
     )
     parser.add_argument(
         "--model",
         default=None,
-        help="Vertex model id (overrides PATIENT_VERTEX_MODEL and DIGIMSK_GENERATOR_MODEL)",
+        help="Vertex model id (overrides PATIENT_VERTEX_MODEL and TRI_BACK_GENERATOR_MODEL)",
     )
     parser.add_argument("--bot-url", default=None, help="Default http://127.0.0.1:8001")
     parser.add_argument("--max-turns", type=int, default=20)
@@ -92,7 +92,7 @@ def main() -> int:
         log.append({"role": "chatbot", "text": fake, "question_mode": True})
         log.append({"role": "patient", "text": reply})
     else:
-        client = DigiMSKClient(base_url=args.bot_url)
+        client = TriBackClient(base_url=args.bot_url)
         bot = client.chat(session_id, opening)
         log.append(
             {

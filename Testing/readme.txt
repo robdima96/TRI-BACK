@@ -1,4 +1,4 @@
-DigiMSK — Session lab (developer testing)
+TRI-BACK — Session lab (developer testing)
 =========================================
 
 WHAT IT IS
@@ -19,11 +19,11 @@ chatting via the study app or calling the bot API).
 
 Open:  http://127.0.0.1:8765
 
-Sessions are loaded from ../bot/data/sessions (relative to the DigiMSK
+Sessions are loaded from ../bot/data/sessions (relative to the TRI-BACK
 workspace root). test_log.json appears as a reference row when present.
 
 
 RELATED
 -------
 - Bot backend:   ../bot/readme.txt
-- Study UI:      ../prototypes/digimsk_study_app/readme.txt
+- Study UI:      ../prototypes/tri_back_study_app/readme.txt

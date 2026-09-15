@@ -81,7 +81,7 @@ def _footer(slide, page: int, total: int) -> None:
     box = slide.shapes.add_textbox(Inches(0.5), Inches(7.12), Inches(10.5), Inches(0.28))
     p = box.text_frame.paragraphs[0]
     run = p.add_run()
-    run.text = "DigiMSK  ·  Patient agent  ·  MedQA screening  ·  confidential — internal"
+    run.text = "TRI-BACK  ·  Patient agent  ·  MedQA screening  ·  confidential — internal"
     _set_run_font(run, size_pt=11, color=MUTED)
     num = slide.shapes.add_textbox(Inches(11.6), Inches(7.12), Inches(1.2), Inches(0.28))
     np = num.text_frame.paragraphs[0]
@@ -184,7 +184,7 @@ def build() -> Path:
     s = add()
     kicker = s.shapes.add_textbox(Inches(0.55), Inches(1.7), Inches(12), Inches(0.4))
     kr = kicker.text_frame.paragraphs[0].add_run()
-    kr.text = "DIGIMSK  ·  RESEARCH METHODS BRIEFING"
+    kr.text = "TRI-BACK  ·  RESEARCH METHODS BRIEFING"
     _set_run_font(kr, size_pt=14, bold=True, color=ACCENT)
     t = s.shapes.add_textbox(Inches(0.55), Inches(2.15), Inches(12.2), Inches(1.6))
     t.text_frame.word_wrap = True
@@ -201,7 +201,7 @@ def build() -> Path:
     _set_run_font(sr, size_pt=18, color=MUTED)
     note = s.shapes.add_textbox(Inches(0.55), Inches(5.7), Inches(12), Inches(0.5))
     nr = note.text_frame.paragraphs[0].add_run()
-    nr.text = f"Internal  ·  28 August 2026  ·  UBC DigiMSK  ·  screen {run_id}"
+    nr.text = f"Internal  ·  28 August 2026  ·  UBC TRI-BACK  ·  screen {run_id}"
     _set_run_font(nr, size_pt=14, color=MUTED)
 
     # --- 2 goal ---
@@ -211,8 +211,8 @@ def build() -> Path:
     _bullets(
         s,
         [
-            "About 20 frozen transcripts of DigiMSKbot talking to a realistic human-side user.",
-            "The system under test is DigiMSK (text triage), not a diagnostic doctor agent.",
+            "About 20 frozen transcripts of TRI-BACK talking to a realistic human-side user.",
+            "The system under test is TRI-BACK (text triage), not a diagnostic doctor agent.",
             "The human side is a grounded patient agent, not a fine-tuned “LBP personality.”",
             "Methods claim: sampled from MedQA, OSCE-converted, style-constrained, human-locked.",
         ],
@@ -236,9 +236,9 @@ def build() -> Path:
     )
     _card(
         s, 0.5, 3.8, 12.3, 2.7,
-        "What is different for DigiMSK",
+        "What is different for TRI-BACK",
         "Endpoint is triage disposition, not disease name. No measurement/exam agent. "
-        "User language must survive a lay rater. Conversation stops when DigiMSK dispositions "
+        "User language must survive a lay rater. Conversation stops when TRI-BACK dispositions "
         "(or a turn cap). Empty grid cells stay unknown — we do not open another corpus. "
         "Confounders we hunt: DVT mimicking LBP, and IV-drug-use spinal/psoas abscess — not pancreatic/abdominal radiating pain.",
     )
@@ -279,7 +279,7 @@ def build() -> Path:
     _card(
         s, 8.9, 2.65, 3.9, 3.85,
         "What we do not treat as MedQA",
-        "Ada DigiMSK vignettes, MedMCQA, MIMIC, AgentClinic-NEJM. AgentClinic-MedQA JSONL is an optional shortcut (still MedQA stems, already OSCE-shaped) — not a second corpus.",
+        "Ada TRI-BACK vignettes, MedMCQA, MIMIC, AgentClinic-NEJM. AgentClinic-MedQA JSONL is an optional shortcut (still MedQA stems, already OSCE-shaped) — not a second corpus.",
         hsize=14,
         bsize=14,
     )
@@ -399,7 +399,7 @@ def build() -> Path:
         [
             "After coding: apply_clinician.py. If eligible N ≥ 20, stratified sample down to 20. If N < 20, take all. Empty cells stay unknown.",
             "Hand-convert one sampled stem into a lay OSCE card (the methods example — not an Ada vignette).",
-            "Three-card pilot: Vertex patient agent ↔ live DigiMSK on port 8001. Fix dumping, jargon, invention.",
+            "Three-card pilot: Vertex patient agent ↔ live TRI-BACK on port 8001. Fix dumping, jargon, invention.",
             "LLM-draft the remaining cards from sampled stems; clinician + lay edit; then lock the JSON.",
             "Persona (PatientSim: personality, language proficiency, medical-history recall, cognitive confusion) is assigned after sampling — it does not choose the stem.",
         ],
@@ -431,7 +431,7 @@ def build() -> Path:
     _rule(s)
     _para(
         s,
-        "AgentClinic’s station idea: the actor does not know the answer key. DigiMSK keeps that partition. "
+        "AgentClinic’s station idea: the actor does not know the answer key. TRI-BACK keeps that partition. "
         "Locked cards also store source_corpus=medqa_us, source_id, and a stem hash.",
         top=0.95,
         height=0.7,
@@ -456,21 +456,21 @@ def build() -> Path:
         "(closed set: mechanical, CES, fracture, malignancy, infection, vascular) · "
         "must_elicit (facts the bot should have had a chance to ask). "
         "Never sent to the patient LLM. No objective_for_bot, exam, labs, or correct_diagnosis — "
-        "DigiMSK has no measurement agent.",
+        "TRI-BACK has no measurement agent.",
         hsize=14,
         bsize=14,
     )
 
     # --- 11 dialogues ---
     s = add()
-    _title(s, "After cards lock: conversations with DigiMSK")
+    _title(s, "After cards lock: conversations with TRI-BACK")
     _rule(s)
     _bullets(
         s,
         [
-            "Patient LLM uses the same Google Vertex project, region, and ADC as DigiMSK’s generator (default gemini-2.5-flash).",
+            "Patient LLM uses the same Google Vertex project, region, and ADC as TRI-BACK’s generator (default gemini-2.5-flash).",
             "Swap the patient model later with --model or PATIENT_VERTEX_MODEL without changing the bot.",
-            "DigiMSK is assumed at http://127.0.0.1:8001 when we generate transcripts.",
+            "TRI-BACK is assumed at http://127.0.0.1:8001 when we generate transcripts.",
             "Stop when the bot escalates, coverage is ready, or it leaves question mode — plus a turn cap (~16–24).",
             "Auto-gates (dumping, jargon, character-break) then clinician + lay review. Freeze; do not regenerate the human side.",
         ],
@@ -493,7 +493,7 @@ def build() -> Path:
         s, 0.5, 3.7, 12.3, 2.7,
         "Do not say",
         "These are real patients. These are Ada vignettes. We fine-tuned on Reddit/MedDialog. "
-        "We backfilled missing CES cases from another dataset. DigiMSK “diagnosed” the USMLE answer.",
+        "We backfilled missing CES cases from another dataset. TRI-BACK “diagnosed” the USMLE answer.",
         hsize=16,
         bsize=16,
     )
@@ -508,7 +508,7 @@ def build() -> Path:
             f"Protect time for clinician include/exclude on the {n_elig}-row sheet (and a small dual-coded overlap if feasible).",
             "Agree that empty grid cells remain unknown rather than inventing or switching corpora.",
             "After sampling, one person hand-locks the first card in lay language as the methods exemplar.",
-            "When DigiMSK is up on port 8001, run the three-card Vertex pilot before generating the full set.",
+            "When TRI-BACK is up on port 8001, run the three-card Vertex pilot before generating the full set.",
         ],
     )
     close = s.shapes.add_textbox(Inches(0.5), Inches(5.55), Inches(12.3), Inches(0.9))

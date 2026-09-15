@@ -87,14 +87,14 @@ They **do** penalize invention and dumping. Experts still found jargon leakage a
 - Simulated Likert “patient satisfaction” is not human perception (AgentClinic says this).
 - Both evaluate a **doctor** making a **diagnosis**. Neither is a triage-chatbot user.
 
-## Implications for DigiMSK
+## Implications for TRI-BACK
 
 We should **steal AgentClinic’s OSCE card** (structured, partitioned, human-validated) and **steal CRAFT-MD’s patient constraints** (no dump, no invent, lay language, stay in character).
 
 We should **not**:
 
-- Give DigiMSKbot a measurement agent or NEJM images (out of scope).
-- Score open-ended *diagnosis* as the primary freeze criterion (DigiMSK outputs a **disposition**).
+- Give TRI-BACK a measurement agent or NEJM images (out of scope).
+- Score open-ended *diagnosis* as the primary freeze criterion (TRI-BACK outputs a **disposition**).
 - Paste the full vignette paragraph the way CRAFT-MD does — that invites dumping and jargon. Put facts in JSON fields, then prompt “answer from this card.”
 - Use AgentClinic’s loose “1–3 sentences, convey symptoms if asked” as the only rule; their own raters said patients were too verbose.
 - Treat either paper’s GPT-4 patient as “genuine human dialogue.” Realism scores were middling; CRAFT-MD still had 10–13% jargon.

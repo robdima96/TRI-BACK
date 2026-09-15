@@ -35,7 +35,7 @@ Not remaining work. The v4 tables are authored, a local Graphs backup pack exist
 - `bot/Knowledge Base/Red Flags/chunks/manual/red_flags_edges_v4_2026.9.10.csv` is the edge table (v3 relationship rows, unchanged columns)
 - `bot/Knowledge Base/Red Flags/chunks/manual/red_flags_factors_v4_2026.9.10.csv` is the factor-node sheet (58 rows; `askable` / `intent` / `fallback` / `synonyms`)
 - `bot/Knowledge Base/Red Flags/chunks/manual/red_flags_inventory_v4_2026.9.10.json` is the factor/condition inventory
-- `bot/.env` has `DIGIMSK_GRAPH_CSV` / `DIGIMSK_GRAPH_INVENTORY` / `DIGIMSK_GRAPH_FACTORS` on those Knowledge Base paths. `Graphs/backups/red flags/v4/` is a local snapshot only.
+- `bot/.env` has `TRI_BACK_GRAPH_CSV` / `TRI_BACK_GRAPH_INVENTORY` / `TRI_BACK_GRAPH_FACTORS` on those Knowledge Base paths. `Graphs/backups/red flags/v4/` is a local snapshot only.
 - five `CONFIRM_AGAINST` rows: `Neuro sensory deficit` / `Neuro motor deficit` → CES (`r_45`, `r_46`); `Recent surgery` / `Refractory pain` / `Point tenderness` → Infection (`r_30`–`r_32`)
 
 `ontology.py` already builds `factors_by_condition` from `parent_id` + `source_nodes` regardless of edge type, so those rows already make the CES / Infection hops. No extra ingest code, and no planner special case.
@@ -115,7 +115,7 @@ Example (`Saddle anaesthesia`): `askable=yes`; `intent` = numbness around the gr
 
 **Do not harvest `factor_patterns.py`.** That file maps volunteered checklist text → factor name. It has aliases for roughly a third of the inventory and **none** for `Bilat neuro sensory deficit` or `Bilat neuro motor deficit`. `chunk_string` is clinician evidence, not a patient question.
 
-**Remaining code.** Teach `csv_rows` / `ontology.py` to load `DIGIMSK_GRAPH_FACTORS`. Pack promote already fails if a factors-CSV name is missing from the inventory, duplicated, or if an inventory factor has no sheet row (`update_graph.py`). Keep that check when the loaders are added so a hand-edited backup copy cannot drift.
+**Remaining code.** Teach `csv_rows` / `ontology.py` to load `TRI_BACK_GRAPH_FACTORS`. Pack promote already fails if a factors-CSV name is missing from the inventory, duplicated, or if an inventory factor has no sheet row (`update_graph.py`). Keep that check when the loaders are added so a hand-edited backup copy cannot drift.
 
 Expose as `get_factor_question_spec(factor)` returning `askable`, `intent`, `fallback`, `synonyms`. Wording still goes through the existing pending-question path so the LLM phrases it, bound to `intent` + `fallback`. A missing spec, or `askable=no`, is not a legal ask target.
 
@@ -146,5 +146,5 @@ From the parent plan's action list:
 
 - ~~**Action 1 — finish the `CONFIRM_AGAINST` edge set.**~~ **Done.** Five edges in v3 (`r_30`–`r_32`, `r_45`, `r_46`). `Severe pain` → AAA was a candidate and was not added.
 - ~~**Action 3 — author the v4 factor sheet.**~~ **Done 10 Sep 2026.** `red_flags_factors_v4_2026.9.10.csv` — 58 rows; `askable=no` for `Endothelial injury`, `Hypercoagulability`, `Venous stasis`, `Nutrient Deficiency`, `Vitamin Deficiency`, `Mechanical loading`, `Osteoporosis`, `Age over 50`, `Male sex`, `Female sex`. CES cluster first. Specs live in that CSV, not in `factor_patterns.py` and not as extra edge columns.
-- ~~**Action 4 — promote the v4 backup pack.**~~ **Done 10 Sep 2026.** Local snapshot at `Graphs/backups/red flags/v4/`. `bot/.env` points `DIGIMSK_GRAPH_CSV` / `DIGIMSK_GRAPH_INVENTORY` / `DIGIMSK_GRAPH_FACTORS` at the Knowledge Base files (not Graphs). Aura instance wiped and reloaded from the edges CSV (86 rows / 58 factors / 7 conditions).
+- ~~**Action 4 — promote the v4 backup pack.**~~ **Done 10 Sep 2026.** Local snapshot at `Graphs/backups/red flags/v4/`. `bot/.env` points `TRI_BACK_GRAPH_CSV` / `TRI_BACK_GRAPH_INVENTORY` / `TRI_BACK_GRAPH_FACTORS` at the Knowledge Base files (not Graphs). Aura instance wiped and reloaded from the edges CSV (86 rows / 58 factors / 7 conditions).
 - ~~**Action 5 — a separate question-spec file.**~~ **Absorbed into action 3.**

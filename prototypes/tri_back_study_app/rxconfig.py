@@ -14,7 +14,7 @@ except ImportError:
     pass
 
 def _env_pref(*names: str) -> str:
-    """First non-empty env among names; TRI_BACK_* callers should also pass DIGIMSK_*."""
+    """First non-empty env among names; TRI_BACK_* callers should also pass TRI_BACK_*."""
     for name in names:
         val = (os.getenv(name) or "").strip()
         if val:
@@ -22,13 +22,13 @@ def _env_pref(*names: str) -> str:
     return ""
 
 
-_public = _env_pref("TRI_BACK_PUBLIC_ACCESS", "DIGIMSK_PUBLIC_ACCESS").lower() in (
+_public = _env_pref("TRI_BACK_PUBLIC_ACCESS", "TRI_BACK_PUBLIC_ACCESS").lower() in (
     "1",
     "true",
     "yes",
     "on",
 )
-_base = _env_pref("TRI_BACK_PUBLIC_BASE_URL", "DIGIMSK_PUBLIC_BASE_URL", "API_URL").rstrip(
+_base = _env_pref("TRI_BACK_PUBLIC_BASE_URL", "TRI_BACK_PUBLIC_BASE_URL", "API_URL").rstrip(
     "/"
 )
 

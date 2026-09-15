@@ -162,7 +162,7 @@ Patch-Sticky $stFutR "Future repository: video/audio assets, body-map / diagram 
 Patch-Sticky $stUi "UI current: study chat website. Arms 1/2/3 only change how disposition is shown. Feedback buttons." $c4 3780 420
 Patch-Sticky $stFutU "Future UI: body map, diagrams, audio/video, clinician / human-in-the-loop view." $c4 4085 420
 Patch-Sticky $stFutD "D(E)/D(U) future: location for clinics near you; sensors / computer vision; persistent symptom-trajectory and activity memory." $c1 4390 420
-Patch-Sticky $stPink6 "Keep Mohr's four components. DigiMSK Encoder / Orchestrator / Generator implement sensing, &#934;, and acting. Do not rename Profiler to Encoder." 2060 4390 420
+Patch-Sticky $stPink6 "Keep Mohr's four components. TRI-BACK Encoder / Orchestrator / Generator implement sensing, &#934;, and acting. Do not rename Profiler to Encoder." 2060 4390 420
 
 Write-Host "=== Connector captions (symbols) ===" -ForegroundColor Cyan
 Patch-ConnectorCap "3458764683082621056" "I<sub>t</sub> spec"

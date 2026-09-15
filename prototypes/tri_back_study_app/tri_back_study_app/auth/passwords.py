@@ -64,13 +64,11 @@ def admin_password_hash() -> str:
 
 def verify_admin_password(password: str) -> bool:
 
-    """Match env password via bcrypt, or local fallbacks ``triback`` / ``digimsk``."""
+    """Match env password via bcrypt, or the local fallback ``triback``."""
 
     from tri_back_study_app.auth.config import (
 
         ADMIN_PASSWORD_FALLBACK,
-
-        ADMIN_PASSWORD_FALLBACK_LEGACY,
 
         admin_password_plaintext,
 
@@ -92,6 +90,6 @@ def verify_admin_password(password: str) -> bool:
 
     _ = admin_password_plaintext()  # raises if public (already handled)
 
-    return (password or "") in (ADMIN_PASSWORD_FALLBACK, ADMIN_PASSWORD_FALLBACK_LEGACY)
+    return (password or "") == ADMIN_PASSWORD_FALLBACK
 
 

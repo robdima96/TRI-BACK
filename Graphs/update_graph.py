@@ -13,7 +13,7 @@ What it does:
   2. If a factors CSV is supplied or inferred (``_edges_`` → ``_factors_`` sibling),
      validate it against the inventory and copy it into ``source/`` beside the edges file
   3. Write a v1-shaped backup pack under --backup-dir (source keeps input basenames)
-  4. Upsert DIGIMSK_GRAPH_CSV / DIGIMSK_GRAPH_INVENTORY / DIGIMSK_GRAPH_FACTORS in bot/.env
+  4. Upsert TRI_BACK_GRAPH_CSV / TRI_BACK_GRAPH_INVENTORY / TRI_BACK_GRAPH_FACTORS in bot/.env
      (paths relative to repo root, pointing at the **Knowledge Base** sources — not Graphs/)
   5. Clear + re-ingest only the chosen Chroma sub-collection (default red_flags)
   6. Optional Neo4j Aura import via Graphs/.env (--neo4j) — edges only
@@ -354,9 +354,9 @@ def _write_backup_pack(
     )
     contents_table = "\n".join(contents_rows)
     env_keys = (
-        "DIGIMSK_GRAPH_CSV`` / ``DIGIMSK_GRAPH_INVENTORY`` / ``DIGIMSK_GRAPH_FACTORS"
+        "TRI_BACK_GRAPH_CSV`` / ``TRI_BACK_GRAPH_INVENTORY`` / ``TRI_BACK_GRAPH_FACTORS"
         if factors_rel
-        else "DIGIMSK_GRAPH_CSV`` / ``DIGIMSK_GRAPH_INVENTORY"
+        else "TRI_BACK_GRAPH_CSV`` / ``TRI_BACK_GRAPH_INVENTORY"
     )
     promoted_from = csv_path.name
     if factors_path is not None:
@@ -365,7 +365,7 @@ def _write_backup_pack(
         "name": "red_flags",
         "version": version,
         "description": (
-            f"DigiMSK low-back red flags knowledge graph ({version}) "
+            f"TRI-BACK low-back red flags knowledge graph ({version}) "
             f"promoted from {promoted_from}"
         ),
         "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -425,11 +425,11 @@ def _upsert_bot_env(
     factors_source: Path | None = None,
 ) -> None:
     updates = {
-        "DIGIMSK_GRAPH_CSV": _rel(csv_source),
-        "DIGIMSK_GRAPH_INVENTORY": _rel(inventory_source),
+        "TRI_BACK_GRAPH_CSV": _rel(csv_source),
+        "TRI_BACK_GRAPH_INVENTORY": _rel(inventory_source),
     }
     if factors_source is not None:
-        updates["DIGIMSK_GRAPH_FACTORS"] = _rel(factors_source)
+        updates["TRI_BACK_GRAPH_FACTORS"] = _rel(factors_source)
     existing = ""
     if BOT_ENV.is_file():
         existing = BOT_ENV.read_text(encoding="utf-8")
@@ -441,8 +441,8 @@ def _upsert_bot_env(
     for line in lines:
         stripped = line.strip()
         if stripped == "# Red-flags graph pack (local GraphRAG / agentic ontology)":
-            if "DIGIMSK_GRAPH_CSV" in keys_done or any(
-                existing_line.strip().startswith("DIGIMSK_GRAPH_CSV=")
+            if "TRI_BACK_GRAPH_CSV" in keys_done or any(
+                existing_line.strip().startswith("TRI_BACK_GRAPH_CSV=")
                 for existing_line in out
             ):
                 skip_next_blank_after_dup_comment = True
@@ -464,11 +464,16 @@ def _upsert_bot_env(
     if keys_done != set(updates):
         if out and out[-1].strip():
             out.append("")
-        if "DIGIMSK_GRAPH_CSV" not in keys_done:
+        if "TRI_BACK_GRAPH_CSV" not in keys_done and "TRI_BACK_GRAPH_CSV" not in keys_done:
             out.append("# Red-flags graph pack (local GraphRAG / agentic ontology)")
-        for key, value in updates.items():
-            if key not in keys_done:
-                out.append(f"{key}={value}")
+        preferred = (
+            "TRI_BACK_GRAPH_CSV",
+            "TRI_BACK_GRAPH_INVENTORY",
+            "TRI_BACK_GRAPH_FACTORS",
+        )
+        for key in preferred:
+            if key in updates and key not in keys_done:
+                out.append(f"{key}={updates[key]}")
 
     text = "\n".join(out)
     if not text.endswith("\n"):
@@ -647,7 +652,7 @@ def _infer_version(backup_dir: Path) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Promote a red-flags CSV into a Graphs backup and wire DigiMSK bot."
+        description="Promote a red-flags CSV into a Graphs backup and wire TRI-BACK bot."
     )
     parser.add_argument(
         "--csv",
@@ -763,7 +768,7 @@ def main(argv: list[str] | None = None) -> int:
             _die(
                 f"Chroma step failed: {exc}\n"
                 "  Tip: stop uvicorn/bot if Chroma reports SQLITE_BUSY; "
-                "ensure DIGIMSK_ENCODER_DIR (Clinical_sBERT) is configured."
+                "ensure TRI_BACK_ENCODER_DIR (Clinical_sBERT) is configured."
             )
     else:
         print("Chroma: skipped (--skip-chroma)")
@@ -787,9 +792,9 @@ def main(argv: list[str] | None = None) -> int:
         print("Smoke: skipped")
 
     print(
-        "\nDone. Restart the DigiMSK bot (uvicorn) so LocalGraphClient / "
-        "factor-pattern caches reload DIGIMSK_GRAPH_CSV + DIGIMSK_GRAPH_INVENTORY"
-        " + DIGIMSK_GRAPH_FACTORS."
+        "\nDone. Restart the TRI-BACK bot (uvicorn) so LocalGraphClient / "
+        "factor-pattern caches reload TRI_BACK_GRAPH_CSV + TRI_BACK_GRAPH_INVENTORY"
+        " + TRI_BACK_GRAPH_FACTORS."
     )
     return 0
 

@@ -1,4 +1,4 @@
-DIGIMSK PATIENT AGENT — DRAFT SYSTEM PROMPT
+TRI-BACK PATIENT AGENT — DRAFT SYSTEM PROMPT
 Hybrid of AgentClinic Patient_Actor grounding and CRAFT-MD disclosure rules.
 Do not put Hidden.* in this prompt.
 

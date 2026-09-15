@@ -22,7 +22,7 @@ DEFAULT_PROMPT = PROTOTYPES_DIR / "prompt.txt"
 IMPROVED_PROMPT = PROTOTYPES_DIR / "prompt_2.txt"
 ALIGNMENT_DOC = PROTOTYPES_DIR / "alignment_specifics.txt"
 
-# Topics that must appear in a complete build prompt for DigiMSK study app.
+# Topics that must appear in a complete build prompt for TRI-BACK study app.
 REQUIRED_TOPICS: list[tuple[str, list[str], str]] = [
     (
         "Existing backend integration",
@@ -147,7 +147,7 @@ def check_improved_prompt(improved_path: Path) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Analyze DigiMSK build prompt alignment.")
+    parser = argparse.ArgumentParser(description="Analyze TRI-BACK build prompt alignment.")
     parser.add_argument(
         "--prompt",
         type=Path,

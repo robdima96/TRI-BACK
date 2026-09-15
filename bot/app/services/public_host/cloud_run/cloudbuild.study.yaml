@@ -4,7 +4,7 @@
 #
 # After the first tri-back-study deploy, set _PUBLIC_BASE_URL (and _SERVICE) to the
 # new run.app hostname. The baked frontend URL must match or WebSockets break.
-# Keep the old digimsk-study service until smoke tests pass.
+# Keep the old tri-back-study service until smoke tests pass.
 
 substitutions:
   _REGION: us-central1

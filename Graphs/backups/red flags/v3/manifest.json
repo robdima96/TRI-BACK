@@ -1,7 +1,7 @@
 {
   "name": "red_flags",
   "version": "v3",
-  "description": "DigiMSK low-back red flags knowledge graph (v3) promoted from red_flags_manual_v3_2026.9.9.csv",
+  "description": "TRI-BACK low-back red flags knowledge graph (v3) promoted from red_flags_manual_v3_2026.9.9.csv",
   "created_at": "2026-09-10T17:54:04Z",
   "verified": false,
   "files": {

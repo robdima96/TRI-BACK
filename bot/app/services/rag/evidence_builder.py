@@ -136,8 +136,8 @@ def build_generator_evidence(
     """
     Merge evidence from enabled paths:
 
-    - ``DIGIMSK_RAG=1``: Chroma + checklist lexical chunk hits
-    - ``DIGIMSK_GRAPH_RAG=1``: graph traversal semantics and traversed chunks
+    - ``TRI_BACK_RAG=1``: Chroma + checklist lexical chunk hits
+    - ``TRI_BACK_GRAPH_RAG=1``: graph traversal semantics and traversed chunks
     """
     items: list[Evidence] = []
     if settings.rag_load and chunk_matches:

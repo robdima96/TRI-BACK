@@ -138,7 +138,7 @@ $question = "light_pink"
 $safety   = "orange"
 $locked   = "light_green"
 
-Write-Host "=== Building DigiMSKbot BIT model board ===" -ForegroundColor Cyan
+Write-Host "=== Building TRI-BACK BIT model board ===" -ForegroundColor Cyan
 Write-Host "Board: $boardId"
 Write-Host "Empty starter layout after Mohr et al. 2014 (JMIR). Seed stickies are DRAFT." -ForegroundColor Gray
 
@@ -160,7 +160,7 @@ $cx = 1650   # horizontal centre of the whole composition
 # ============================================================
 Write-Host "`n--- Title and legend ---" -ForegroundColor Yellow
 
-$null = New-Shape -Content "<b>DigiMSKbot BIT model</b>" -X $cx -Y -80 -W 1600 -H 90 -Fill $navy -Border $navy -TextColor $white -FontSize "32"
+$null = New-Shape -Content "<b>TRI-BACK BIT model</b>" -X $cx -Y -80 -W 1600 -H 90 -Fill $navy -Border $navy -TextColor $white -FontSize "32"
 $null = New-Text -Content "A behavioural intervention technology (BIT) to reduce unnecessary ED visits for non-specific mechanical back pain.<br/>Starter board: yellow = DRAFT seed to rewrite; blue = empty slot; pink = open question; orange = safety-critical." -X $cx -Y 20 -W 1600 -FontSize "16" -Align "center" -Color "#444444"
 $null = New-Text -Content "Framework: Mohr DC, Schueller SM, Montague E, Burns MN, Rashidi P. The Behavioral Intervention Technology Model. J Med Internet Res. 2014;16(6):e146. https://www.jmir.org/2014/6/e146/" -X $cx -Y 80 -W 1600 -FontSize "12" -Align "center" -Color "#666666"
 
@@ -280,7 +280,7 @@ $null = New-Text -Content "Attributes of elements: medium, complexity, aesthetic
 $null = New-Sticky -Content "[DRAFT] Medium: text dialogue (LLM). Not video/audio - yet?" -X ($techX - 330) -Y ($instY - 280) -FillColor $draft
 $null = New-Sticky -Content "[DRAFT] Complexity: protocol-constrained; health-literacy targeted; not diagnostic language" -X ($techX - 110) -Y ($instY - 280) -FillColor $draft
 $null = New-Sticky -Content "[DRAFT] Personalization: retrieval / graph tailored to this presentation" -X ($techX + 110) -Y ($instY - 280) -FillColor $draft
-$null = New-Sticky -Content "[PLACEHOLDER] Aesthetics / tone: DigiMSK voice - how human, how clinical?" -X ($techX + 330) -Y ($instY - 280) -FillColor $empty
+$null = New-Sticky -Content "[PLACEHOLDER] Aesthetics / tone: TRI-BACK voice - how human, how clinical?" -X ($techX + 330) -Y ($instY - 280) -FillColor $empty
 
 $null = New-Sticky -Content "[Add medium variant]" -X ($techX - 220) -Y ($instY - 90) -FillColor $empty
 $null = New-Sticky -Content "[Add complexity rule]" -X ($techX + 20) -Y ($instY - 90) -FillColor $empty
@@ -367,7 +367,7 @@ $null = New-Connector -StartId $p1.id -EndId $p2.id -Label "D" -Color $purple
 $null = New-Connector -StartId $p2.id -EndId $p3.id -Label "I_t spec" -Color $purple
 $null = New-Connector -StartId $p3.id -EndId $p4.id -Label "E + C" -Color $purple
 
-$null = New-Sticky -Content "[DRAFT Profiler] Session state, utterance, checklist answers. Map to DigiMSK encoder / state." -X ($cx - 1200) -Y ($techY + 20) -FillColor $draft
+$null = New-Sticky -Content "[DRAFT Profiler] Session state, utterance, checklist answers. Map to TRI-BACK encoder / state." -X ($cx - 1200) -Y ($techY + 20) -FillColor $draft
 $null = New-Sticky -Content "[DRAFT Planner] Orchestrator / LangGraph as Phi. Predefined now; adaptive later?" -X ($cx - 400) -Y ($techY + 20) -FillColor $draft
 $null = New-Sticky -Content "[DRAFT Repository] Guidelines, graph, prompts, canned escalation copy" -X ($cx + 400) -Y ($techY + 20) -FillColor $draft
 $null = New-Sticky -Content "[DRAFT UI] Chat surface. Future: body map, summary card, clinician view?" -X ($cx + 1200) -Y ($techY + 20) -FillColor $draft
@@ -445,7 +445,7 @@ $null = New-Text -Content "If a sticky here earns a full Aim->Workflow chain, pr
 $elapsed = (Get-Date) - $startTime
 $view = "https://miro.com/app/board/$boardId/"
 Write-Host "`n========================================" -ForegroundColor Green
-Write-Host "COMPLETE - DigiMSKbot BIT model starter board" -ForegroundColor Green
+Write-Host "COMPLETE - TRI-BACK BIT model starter board" -ForegroundColor Green
 Write-Host "API calls:  $($script:apiCalls)"
 Write-Host "Time:       $([Math]::Round($elapsed.TotalMinutes, 1)) minutes"
 Write-Host "Board URL:  $view" -ForegroundColor Cyan

@@ -5,7 +5,7 @@
 #     -t tri-back-study .
 #
 # After first deploy, rebuild with the printed study URL as PUBLIC_BASE_URL
-# or WebSockets will still point at the old digimsk-study host.
+# or WebSockets will still point at the old tri-back-study host.
 
 FROM python:3.11-slim-bookworm
 
@@ -23,7 +23,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DEPLOY_URL=${PUBLIC_BASE_URL} \
     REFLEX_API_URL=${PUBLIC_BASE_URL} \
     REFLEX_REDIS_URL=redis://127.0.0.1:6379 \
-    TRI_BACK_STUDY_DB=/mnt/tri-back/study/digimsk.db \
+    TRI_BACK_STUDY_DB=/mnt/tri-back/study/tri_back.db \
     TRI_BACK_BOT_API_KEY=build-placeholder \
     TRI_BACK_ADMIN_PASSWORD=build-placeholder
 

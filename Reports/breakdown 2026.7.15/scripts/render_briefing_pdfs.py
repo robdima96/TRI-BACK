@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Render the two one-page DigiMSK briefing PDFs for 2026.7.15.
+"""Render the two one-page TRI-BACK briefing PDFs for 2026.7.15.
 
-Uses Project/docs/digimsk_pdf.py (dark charcoal, Merriweather, blue rules).
+Uses Project/docs/tri_back_pdf.py (dark charcoal, Merriweather, blue rules).
 
 Run from repo root:
   python "Reports/breakdown 2026.7.15/scripts/render_briefing_pdfs.py"
@@ -17,34 +17,34 @@ from pathlib import Path
 
 
 def _repo_root(start: Path) -> Path:
-    """Walk up from this script until DigiMSKbot root (``bot/`` present)."""
+    """Walk up from this script until TRI-BACK root (``bot/`` present)."""
     for candidate in (start, *start.parents):
         if (candidate / "bot").is_dir() and (
             (candidate / "bot" / "app").is_dir() or (candidate / "bot" / "docs").is_dir()
         ):
             return candidate
-    raise RuntimeError(f"Could not find DigiMSKbot root above {start}")
+    raise RuntimeError(f"Could not find TRI-BACK root above {start}")
 
 
-def _digimsk_pdf_dir(root: Path) -> Path:
-    """Locate ``digimsk_pdf.py`` (Project/docs preferred; bot/docs fallback)."""
+def _tri_back_pdf_dir(root: Path) -> Path:
+    """Locate ``tri_back_pdf.py`` (Project/docs preferred; bot/docs fallback)."""
     for rel in ("Project/docs", "bot/docs"):
         docs = root / rel
-        if (docs / "digimsk_pdf.py").is_file():
+        if (docs / "tri_back_pdf.py").is_file():
             return docs
     raise RuntimeError(
-        f"Could not find digimsk_pdf.py under {root}/Project/docs or {root}/bot/docs"
+        f"Could not find tri_back_pdf.py under {root}/Project/docs or {root}/bot/docs"
     )
 
 
 BREAKDOWN = Path(__file__).resolve().parents[1]
 ROOT = _repo_root(BREAKDOWN)
-PDF_DOCS = _digimsk_pdf_dir(ROOT)
+PDF_DOCS = _tri_back_pdf_dir(ROOT)
 PDF_DIR = BREAKDOWN / "pdf"
 
 sys.path.insert(0, str(PDF_DOCS))
 
-from digimsk_pdf import build_markdown_pdf  # noqa: E402
+from tri_back_pdf import build_markdown_pdf  # noqa: E402
 
 SOURCES = [
     ("01_executive_brief.md", "01_executive_brief.pdf"),

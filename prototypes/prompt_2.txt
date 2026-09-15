@@ -1,6 +1,6 @@
-# DigiMSK Study Web Application — Build Specification (v2.2)
+# TRI-BACK Study Web Application — Build Specification (v2.2)
 
-You are a senior full-stack developer. Build a **local-first Python web application** using the **Reflex** framework that serves as the participant-facing front end for the DigiMSK musculoskeletal triage chatbot research study.
+You are a senior full-stack developer. Build a **local-first Python web application** using the **Reflex** framework that serves as the participant-facing front end for the TRI-BACK musculoskeletal triage chatbot research study.
 
 This is **not** a greenfield chatbot project. The conversational dialogue backend already exists under `bot/` (FastAPI + LangGraph). Your job is to build the **study shell**: authentication, group routing, admin controls, a shared chat UI, session logging, message feedback, and the **prototype infrastructure** for knowledge-graph traversal results — with clean seams so arm-specific presentation layers can differ while all arms share the same underlying pipeline.
 
@@ -13,7 +13,7 @@ This is **not** a greenfield chatbot project. The conversational dialogue backen
 | Framework | Reflex (Python), single deployable app |
 | Hosting | Local development first (`reflex run`); structure for later LAN/tunnel deployment |
 | Backend integration | Call the existing FastAPI service in `bot/` — do **not** reimplement conversational dialogue, encoding, or LangGraph orchestration |
-| Repo layout | New app lives in `prototypes/digimsk_study_app/` — do not modify `bot/` internals except via HTTP |
+| Repo layout | New app lives in `prototypes/tri_back_study_app/` — do not modify `bot/` internals except via HTTP |
 | Session logs | JSON snapshots written to `prototypes/sessions/` (parallel to `bot/data/sessions/`) |
 | Graph traversal | `bot/` queries red-flags v1 **locally** from `Graphs/backups/red flags/v1/` (no live Neo4j); study app consumes `graph_traversal` from `ChatResponse` |
 | Python | Match `bot/` (3.11+ recommended) |
@@ -67,7 +67,7 @@ The three experimental arms differ **only in what the participant sees** after t
 | Field | Value |
 |-------|-------|
 | username | `admin` |
-| password | `digimsk` |
+| password | `tri-back` |
 | role | `admin` |
 
 Store admin credentials in a config module (`auth/config.py`) with a comment and interface stub for future DB-backed auth. Use a password hash (e.g. `bcrypt` or `passlib`) even for the hardcoded password. Track admin login count separately (SQLite `admin_meta` table or dedicated row) for `admin_{n}` session IDs.
@@ -194,7 +194,7 @@ Persist a **rich session snapshot per login session** to `prototypes/sessions/`,
 - `session_duration_sec` (= `time_on_task_sec`)
 - `feedback_up_count`, `feedback_down_count` — tallies across assistant messages in this session
 
-Implement `prototypes/digimsk_study_app/session_store.py` with `load_session(session_id)` and `save_session(session_id, **fields)`. Call `save_session` after every successful chat turn, after every feedback click, and on logout.
+Implement `prototypes/tri_back_study_app/session_store.py` with `load_session(session_id)` and `save_session(session_id, **fields)`. Call `save_session` after every successful chat turn, after every feedback click, and on logout.
 
 ### 2.5 Session ID strategy
 
@@ -270,7 +270,7 @@ class ChatbotAdapter(Protocol):
 
 ### 3.4 Arm 2 — chain-of-thought reasoning text (prototype layer)
 
-Build `prototypes/digimsk_study_app/graph/reasoning_formatter.py` that converts a `GraphTraversalTrace` + `citations` into human-readable numbered reasoning steps. Consume `graph_traversal` from `ChatResponse` once `bot/` exposes it (local v1 graph traversal).
+Build `prototypes/tri_back_study_app/graph/reasoning_formatter.py` that converts a `GraphTraversalTrace` + `citations` into human-readable numbered reasoning steps. Consume `graph_traversal` from `ChatResponse` once `bot/` exposes it (local v1 graph traversal).
 
 ### 3.5 Message feedback (thumbs up / down)
 
@@ -300,7 +300,7 @@ The study app does **not** re-implement traversal. It consumes `ChatResponse.gra
 ### 4.1 Module layout (study app — presentation only)
 
 ```
-prototypes/digimsk_study_app/graph/
+prototypes/tri_back_study_app/graph/
   __init__.py
   schemas.py              # Re-export or mirror bot/app/services/graphrag/schemas.py
   traversal_client.py     # Thin HTTP passthrough: reads graph_traversal from ChatResponse
@@ -347,7 +347,7 @@ Surface `ChatResponse.citations` as expandable chips. Citations must correspond 
 
 ### 5.2 Layout
 
-- Header: DigiMSK study title, **study ID** displayed prominently (participants see their study ID; admin sees `admin`), session ID in subdued text (e.g. badge)
+- Header: TRI-BACK study title, **study ID** displayed prominently (participants see their study ID; admin sees `admin`), session ID in subdued text (e.g. badge)
 - Message history: scrollable, newest at bottom
 - Each assistant message: content blocks + citation chips + feedback row
 - Composer: text input + Send; disable while awaiting response
@@ -424,9 +424,9 @@ Do not expose participant passwords in the dashboard.
 prototypes/
   sessions/
     .gitignore
-  digimsk_study_app/
-    digimsk_study_app/
-      digimsk_study_app.py
+  tri_back_study_app/
+    tri_back_study_app/
+      tri_back_study_app.py
       session_store.py
       pages/
         login.py                  # Participant + admin forms; admin arm selector
@@ -487,13 +487,13 @@ Document the full end-to-end setup in `README.md`. A developer must be able to g
 - **Node.js 18+** (required by Reflex frontend toolchain)
 - **Google Cloud SDK (`gcloud`)** — for Vertex AI Application Default Credentials
 - Local model checkpoints on disk (paths configured in `bot/.env`):
-  - **Clinical_sBERT** — RAG sentence embeddings (`DIGIMSK_ENCODER_DIR`)
-  - **GliNER-BioMed** — span NER (`DIGIMSK_GLINER_MODEL_DIR`)
+  - **Clinical_sBERT** — RAG sentence embeddings (`TRI_BACK_ENCODER_DIR`)
+  - **GliNER-BioMed** — span NER (`TRI_BACK_GLINER_MODEL_DIR`)
 - **No Neo4j credentials required** for the study app or `bot/` chatbot — graph traversal uses `Graphs/backups/red flags/v1/` locally. (Optional: Neo4j in `Graphs/.env` is only for the separate `Graphs/app/` explorer — leave that tooling unchanged.)
 
 ### 8.2 Google Cloud / Vertex AI authentication
 
-The generator backend is configured as `DIGIMSK_GENERATOR_BACKEND=vertex` in `bot/.env`. Vertex uses **user Application Default Credentials** — no JSON service-account key file.
+The generator backend is configured as `TRI_BACK_GENERATOR_BACKEND=vertex` in `bot/.env`. Vertex uses **user Application Default Credentials** — no JSON service-account key file.
 
 **One-time setup:**
 
@@ -534,26 +534,26 @@ Copy or edit `bot/.env`. Minimum variables for a full stack run:
 
 ```ini
 # Model paths (adjust to your local directories)
-DIGIMSK_ENCODER_DIR=E:\DigiMSKbot\Clinical_sBERT
-DIGIMSK_GLINER_MODEL_DIR=E:\DigiMSKbot\GliNER-BioMed
-DIGIMSK_LOAD_GLINER=1
-DIGIMSK_LOAD_NER=1
-DIGIMSK_LOAD_RAG=1
+TRI_BACK_ENCODER_DIR=E:\TRI-BACK\Clinical_sBERT
+TRI_BACK_GLINER_MODEL_DIR=E:\TRI-BACK\GliNER-BioMed
+TRI_BACK_LOAD_GLINER=1
+TRI_BACK_LOAD_NER=1
+TRI_BACK_LOAD_RAG=1
 
 # Generator — Vertex AI
-DIGIMSK_GENERATOR_BACKEND=vertex
-DIGIMSK_GENERATOR_MODEL=gemini-2.0-flash-001
-DIGIMSK_VERTEX_PROJECT_ID=your-gcp-project-id
-DIGIMSK_VERTEX_LOCATION=us-central1
+TRI_BACK_GENERATOR_BACKEND=vertex
+TRI_BACK_GENERATOR_MODEL=gemini-2.0-flash-001
+TRI_BACK_VERTEX_PROJECT_ID=your-gcp-project-id
+TRI_BACK_VERTEX_LOCATION=us-central1
 
 # Chroma RAG
-DIGIMSK_CHROMA_PATH=data/chroma
-DIGIMSK_CHROMA_COLLECTION=digimsk_evidence
-DIGIMSK_ENCODER_DIM=768
-DIGIMSK_RAG_TOP_K=10
+TRI_BACK_CHROMA_PATH=data/chroma
+TRI_BACK_CHROMA_COLLECTION=tri_back_evidence
+TRI_BACK_ENCODER_DIM=768
+TRI_BACK_RAG_TOP_K=10
 
 # Session stores
-DIGIMSK_SESSION_STORE_DIR=data/sessions
+TRI_BACK_SESSION_STORE_DIR=data/sessions
 ```
 
 Do not commit secrets. Project ID is not a secret but keep `.env` local.
@@ -567,7 +567,7 @@ python -m venv .venv
 pip install -e ".[dev,generator-api]"
 ```
 
-**Ingest RAG evidence** (if `DIGIMSK_LOAD_RAG=1` and Chroma is empty):
+**Ingest RAG evidence** (if `TRI_BACK_LOAD_RAG=1` and Chroma is empty):
 
 ```powershell
 python scripts/chroma_clear.py --empty
@@ -604,7 +604,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/chat `
 In a **separate terminal** (keep `bot/` API running):
 
 ```powershell
-cd prototypes/digimsk_study_app
+cd prototypes/tri_back_study_app
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -640,8 +640,8 @@ Open the URL printed by Reflex (typically `http://localhost:3000`).
 | 1 | Activate `bot/.venv`; confirm `bot/.env` and Vertex ADC are valid |
 | 2 | `cd bot && uvicorn app.main:app --reload --port 8000` |
 | 3 | Confirm `GET /ready` returns ready |
-| 4 | Activate `prototypes/digimsk_study_app/.venv` |
-| 5 | `cd prototypes/digimsk_study_app && reflex run` |
+| 4 | Activate `prototypes/tri_back_study_app/.venv` |
+| 5 | `cd prototypes/tri_back_study_app && reflex run` |
 | 6 | Log in as participant (study ID) or admin (with arm selector) |
 | 7 | Chat; verify session JSON appears in `prototypes/sessions/` |
 
@@ -649,8 +649,8 @@ Open the URL printed by Reflex (typically `http://localhost:3000`).
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `DIGIMSK_STUDY_DB` | `data/digimsk.db` | SQLite path |
-| `DIGIMSK_SESSIONS_DIR` | `../sessions` | Session JSON directory (`prototypes/sessions/`) |
+| `TRI_BACK_STUDY_DB` | `data/tri_back.db` | SQLite path |
+| `TRI_BACK_SESSIONS_DIR` | `../sessions` | Session JSON directory (`prototypes/sessions/`) |
 | `CHATBOT_BASE_URL` | `http://127.0.0.1:8000` | FastAPI base (same for all arms) |
 | `TRAVERSAL_MODE` | `bot` | Study app reads traversal from `bot/` `ChatResponse` (not a local graph engine) |
 | `IDLE_TIMEOUT_SEC` | `60` | Gap threshold for time-on-task exclusion |
@@ -659,10 +659,10 @@ Open the URL printed by Reflex (typically `http://localhost:3000`).
 
 | Symptom | Likely fix |
 |---------|------------|
-| `/ready` generator check fails | Run `gcloud auth application-default login`; verify `DIGIMSK_VERTEX_PROJECT_ID`; enable Vertex AI API |
+| `/ready` generator check fails | Run `gcloud auth application-default login`; verify `TRI_BACK_VERTEX_PROJECT_ID`; enable Vertex AI API |
 | `GOOGLE_APPLICATION_CREDENTIALS` error | Unset that env var; use user ADC only |
-| Encoder check fails | Verify `DIGIMSK_ENCODER_DIR` points to Clinical_sBERT weights |
-| RAG check fails / empty collection | Run `ingest_chunks.py` or set `DIGIMSK_LOAD_RAG=0` for generator-only testing |
+| Encoder check fails | Verify `TRI_BACK_ENCODER_DIR` points to Clinical_sBERT weights |
+| RAG check fails / empty collection | Run `ingest_chunks.py` or set `TRI_BACK_LOAD_RAG=0` for generator-only testing |
 | UI cannot reach bot | Confirm `CHATBOT_BASE_URL` and that uvicorn is on port 8000 |
 | Reflex init errors | Ensure Node.js 18+ installed; run `reflex init` if starting fresh |
 

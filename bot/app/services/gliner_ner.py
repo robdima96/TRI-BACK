@@ -1,4 +1,4 @@
-"""GliNER zero-shot span NER (optional; uses ``DIGIMSK_GLINER_MODEL_DIR``)."""
+"""GliNER zero-shot span NER (optional; uses ``TRI_BACK_GLINER_MODEL_DIR``)."""
 
 from __future__ import annotations
 

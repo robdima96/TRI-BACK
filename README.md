@@ -19,6 +19,6 @@ Each app has a **`readme.txt`** with what it does and how to run it locally.
 ## Hosting
 
 Cloud Run + GCS packaging lives under `bot/app/services/public_host/cloud_run/`.
-Cutover from DigiMSK service names: see [`STUDY_SERVICE.md`](bot/app/services/public_host/cloud_run/STUDY_SERVICE.md).
+Cutover from TRI-BACK service names: see [`STUDY_SERVICE.md`](bot/app/services/public_host/cloud_run/STUDY_SERVICE.md).
 
-Env vars prefer `TRI_BACK_*`; legacy `DIGIMSK_*` still works until you migrate `.env` files.
+Env vars are `TRI_BACK_*`.

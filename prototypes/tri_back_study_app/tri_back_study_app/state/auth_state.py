@@ -29,14 +29,6 @@ class AuthState(rx.State):
         secure=True if PUBLIC_ACCESS else None,
         same_site="lax",
     )
-    # One-shot read of the pre-rename cookie so existing study sessions survive.
-    _legacy_sid: str = rx.Cookie(
-        name="digimsk_sid",
-        path="/",
-        max_age=SESSION_COOKIE_MAX_AGE,
-        secure=True if PUBLIC_ACCESS else None,
-        same_site="lax",
-    )
     login_count: int = 0
     login_at: str = ""
     login_error: str = ""
@@ -45,9 +37,6 @@ class AuthState(rx.State):
     def _hydrate_from_session_store(self) -> bool:
         if self.is_authenticated and (self.session_id or "").strip():
             return True
-        if not (self.session_id or "").strip() and (self._legacy_sid or "").strip():
-            self.session_id = self._legacy_sid
-            self._legacy_sid = ""
         fields = auth_fields_from_session(self.session_id)
         if not fields:
             return False

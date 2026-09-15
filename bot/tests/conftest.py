@@ -8,16 +8,13 @@ import pytest
 
 def _force_env(suffix: str, value: str) -> None:
     os.environ[f"TRI_BACK_{suffix}"] = value
-    os.environ[f"DIGIMSK_{suffix}"] = value
 
 
 def _pop_env(suffix: str) -> None:
     os.environ.pop(f"TRI_BACK_{suffix}", None)
-    os.environ.pop(f"DIGIMSK_{suffix}", None)
 
 
 os.environ.setdefault("TRI_BACK_CHROMA_PATH", ".chroma_pytest")
-os.environ.setdefault("DIGIMSK_CHROMA_PATH", ".chroma_pytest")
 
 # Force both prefixes so a developer .env cannot disable retrieval under pytest.
 _force_env("RAG", "1")
@@ -36,7 +33,6 @@ os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
 
 # Deterministic disposition in unit tests unless a test opts into agentic.
 os.environ.setdefault("TRI_BACK_DISPOSITION_MODE", "deterministic")
-os.environ.setdefault("DIGIMSK_DISPOSITION_MODE", "deterministic")
 
 # Deterministic factor matching unless a test opts into the LLM cross-check.
 _force_env("LLM_FACTOR_MATCH", "0")

@@ -5,7 +5,7 @@ services:
       - "7474:7474"
       - "7687:7687"
     environment:
-      NEO4J_AUTH: neo4j/digimsk-graph
+      NEO4J_AUTH: neo4j/tri-back-graph
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
     volumes:

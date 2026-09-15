@@ -75,7 +75,7 @@ class ChatState(TypedDict):
     traversed_chunk_ids: NotRequired[list[str]]
     # Per-item factor matcher decisions + coverage gaps (also nested under graph_traversal).
     factor_matching_audit: NotRequired[dict | None]
-    # Audit trail for the agentic disposition path (DIGIMSK_DISPOSITION_MODE=agentic)
+    # Audit trail for the agentic disposition path (TRI_BACK_DISPOSITION_MODE=agentic)
     agent_trace: NotRequired[dict | None]
     # Authoritative graph rank + factor provenance for disposition generation.
     disposition_brief: NotRequired[dict | None]

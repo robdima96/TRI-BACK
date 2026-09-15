@@ -26,4 +26,4 @@ cd Graphs
 python import_red_flags.py --csv "backups/red flags/v2/source/red_flags_manual_v2.csv" --wipe
 ```
 
-Chatbot GraphRAG reads this pack via ``DIGIMSK_GRAPH_CSV`` / ``DIGIMSK_GRAPH_INVENTORY`` in ``bot/.env`` (local CSV; Neo4j optional).
+Chatbot GraphRAG reads this pack via ``TRI_BACK_GRAPH_CSV`` / ``TRI_BACK_GRAPH_INVENTORY`` in ``bot/.env`` (local CSV; Neo4j optional).

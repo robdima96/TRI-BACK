@@ -1,7 +1,7 @@
-DigiMSKbot — PDF formatting (MONTH1_IMPLEMENTATION_PLAN.pdf, Data-Safety-Privacy-Checklist.pdf)
+TRI-BACK — PDF formatting (MONTH1_IMPLEMENTATION_PLAN.pdf, Data-Safety-Privacy-Checklist.pdf)
 =============================================================================================
 
-Source of truth: bot/docs/digimsk_pdf.py
+Source of truth: Project/docs/tri_back_pdf.py
 - Month 1 plan: python docs/render_month1_pdf.py
 - Data safety checklist: python docs/render_checklist_pdf.py
 
@@ -40,7 +40,7 @@ Header (PageTemplate.onPage — with background, every page)
 ------------------------------------------------------------
 - Top vertical position: 0.55 inch below top of page (y = page height − 0.55 inch)
 - Horizontal margin from left edge: 0.85 inch
-- Text: "DigiMSK Chatbot - Ardern Lab UBC" (Merriweather 9 pt, white)
+- Text: "TRI-BACK Chatbot - Ardern Lab UBC" (Merriweather 9 pt, white)
 
 Footer (PageTemplate.onPageEnd — after page content, every page)
 -----------------------------------------------------------------

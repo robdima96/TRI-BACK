@@ -1,9 +1,9 @@
-DigiMSK Study App — Alignment Specifics
+TRI-BACK Study App — Alignment Specifics
 ========================================
 
 This document lists concrete details that must be explicit in the build prompt (or
 confirmed with the requester) so generated code matches research intent. It was
-derived by comparing prototypes/prompt.txt against the existing DigiMSKbot repo.
+derived by comparing prototypes/prompt.txt against the existing TRI-BACK repo.
 
 Run `python improve_prompt.py` to regenerate the gap analysis from prompt.txt.
 
@@ -18,7 +18,7 @@ MUST specify:
       ChatRequest:  { session_id, message }
       ChatResponse: { session_id, response, citations, escalated, safety_reason,
                       question_mode, questions_asked, coverage_ready }
-  - New app directory: prototypes/digimsk_study_app/ (isolated from bot/).
+  - New app directory: prototypes/tri_back_study_app/ (isolated from bot/).
   - Run order: uvicorn bot first, then reflex run.
 
 RISK if omitted:
@@ -78,7 +78,7 @@ RISK if omitted:
 -------------------------
 
 MUST specify:
-  - Admin: username admin, password digimsk — still hashed at rest.
+  - Admin: username admin, password tri-back — still hashed at rest.
   - Participants: 90 seeded accounts, random passwords, one-time CSV export.
   - Generic login failure message (no username enumeration).
   - Session mechanism (signed cookie / Reflex session state).
@@ -124,7 +124,7 @@ MUST specify:
   - Directory tree (pages, components, adapters, auth, db, scripts).
   - requirements.txt, rxconfig.py, README with setup steps.
   - Unit tests for routing and used-flag logic at minimum.
-  - data/.gitignore for digimsk.db and participant_credentials.csv.
+  - data/.gitignore for tri_back.db and participant_credentials.csv.
 
 RISK if omitted:
   - Monolithic single file; hard to swap chatbot adapters later.

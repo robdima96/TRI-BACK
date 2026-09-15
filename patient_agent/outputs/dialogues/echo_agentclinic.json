@@ -3,7 +3,7 @@
   "case_id": "lbp_osce_e73fe2f4",
   "source_id": "agentclinic_medqa:19",
   "backend": "echo",
-  "card_path": "C:\\ROBS STUFF\\UBC Postdoctoral Fellowship\\DigiMSKbot\\patient_agent\\outputs\\cards\\20260828T212355Z\\lbp_osce_e73fe2f4.json",
+  "card_path": "C:\\ROBS STUFF\\UBC Postdoctoral Fellowship\\TRI-BACK\\patient_agent\\outputs\\cards\\20260828T212355Z\\lbp_osce_e73fe2f4.json",
   "messages": [
     {
       "role": "patient",

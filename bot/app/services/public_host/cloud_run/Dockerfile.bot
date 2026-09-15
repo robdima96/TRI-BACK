@@ -2,7 +2,7 @@
 # Build from the TRI-BACK monorepo root (parent of bot/):
 #   docker build -f bot/app/services/public_host/cloud_run/Dockerfile.bot -t tri-back-bot .
 #
-# Override: .\scripts\deploy_bot.ps1 -Service digimskbot  (old Cloud Run name)
+# Override: .\scripts\deploy_bot.ps1 -Service tri-back  (old Cloud Run name)
 
 FROM python:3.11-slim-bookworm
 

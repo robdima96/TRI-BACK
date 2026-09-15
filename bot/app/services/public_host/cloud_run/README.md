@@ -8,8 +8,6 @@ Git → Cloud Build → Cloud Run for the study UI + bot, using **GCS volume mou
 
 Traditional Chroma RAG is **off** on the hosted bot (`TRI_BACK_RAG=0`); GraphRAG stays on.
 
-Legacy `DIGIMSK_*` env names still work. Cutover from the old `digimskbot` / `digimsk-study` pair is in **[STUDY_SERVICE.md](STUDY_SERVICE.md)**.
-
 ## Start here
 
 **[STUDY_SERVICE.md](STUDY_SERVICE.md)** — full step-by-step from GCP setup through bot deploy, study Caddy/Reflex finish, and acceptance tests.

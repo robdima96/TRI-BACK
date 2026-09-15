@@ -90,6 +90,6 @@ Until Stage 3 is complete, screening reports `clinician_eligible: pending`.
 - Assign `persona` **after** sampling (orthogonal to the stem). Closed set: `personality` (impatient, overanxious, distrustful, overly_positive, verbose, neutral); `language_proficiency` (basic, intermediate, advanced); `medical_history_recall` (high_recall, low_recall); `cognitive_confusion` (highly_confused, normal).
 - Store `source_corpus=medqa_us`, `source_id`, stem hash. Prefer derived OSCE cards over raw USMLE stems in any public artifact.
 
-## Ada DigiMSK vignettes
+## Ada TRI-BACK vignettes
 
 `Uncanny Valley/LBPvignettes_conv.csv` is **out of the sampling frame**. Optional later: run the same patient agent on those nine as a non-sampled sensitivity check.

@@ -1,7 +1,7 @@
 [project]
 name = "tri-back"
 version = "0.1.1"
-description = "TRI-BACK musculoskeletal triage chatbot backend (formerly DigiMSK)."
+description = "TRI-BACK musculoskeletal triage chatbot backend."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

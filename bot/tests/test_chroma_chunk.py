@@ -111,12 +111,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--chroma-path",
         metavar="PATH",
-        help="Override DIGIMSK_CHROMA_PATH for this run only",
+        help="Override TRI_BACK_CHROMA_PATH for this run only",
     )
     args = parser.parse_args(argv)
 
     if args.chroma_path:
-        os.environ["DIGIMSK_CHROMA_PATH"] = args.chroma_path
+        os.environ["TRI_BACK_CHROMA_PATH"] = args.chroma_path
 
     from app.config import settings
 

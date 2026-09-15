@@ -13,7 +13,7 @@ Other apps call it over HTTP:
 Pipeline (simplified): encode / GliNER checklist -> GraphRAG (red-flags graph) ->
 Vertex (or local) generator -> session JSON under data/sessions/.
 
-Optional: TRI_BACK_BOT_API_KEY (legacy DIGIMSK_BOT_API_KEY) requires
+Optional: TRI_BACK_BOT_API_KEY requires
 Authorization: Bearer <key> on /api/v1/chat.
 
 

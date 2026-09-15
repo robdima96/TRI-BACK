@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=digimsk-bot
+#SBATCH --job-name=tri-back-bot
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
@@ -16,7 +16,7 @@
 #SBATCH --gres=gpu:1
 
 # Submit from repo root containing pyproject.toml, e.g.:
-#   cd /scratch/$USER/digimsk/repo/bot
+#   cd /scratch/$USER/tri-back/repo/bot
 #   sbatch scripts/sockeye/job_uvicorn_gpu.slurm
 
 set -euo pipefail

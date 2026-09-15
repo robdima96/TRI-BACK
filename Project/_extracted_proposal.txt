@@ -1,6 +1,6 @@
 [0] Research Proposal
 [1] Project Title
-[2] Co-designing DigiMSK - a trustworthy virtual triage tool for low back pain
+[2] Co-designing TRI-BACK - a trustworthy virtual triage tool for low back pain
 [3] Principal Investigator
 [4] Clare Ardern, Ph.D. BPhysio(Hons) – Assistant Professor
 [5] Department of Physical Therapy
@@ -34,7 +34,7 @@
 [34] Design
 [35] This is a two-phase mixed-methods patient co-design study. Phase 1 is a between-subjects experiment. We will randomize 108 adults in BC who sought care for acute LBP to one of three prototypes (n = 36 per group). All three share the same interface and a curated set of clinical knowledge, which the chatbot searches to generate advice (retrieval-augmented generation / GraphRAG). Across groups, only transparency differs: (i) triage disposition only; (ii) a step-by-step CoT/ReAct explanation of how the disposition was reached; (iii) a visible traversal of the knowledge graph. Participants are told they are interacting with an AI-operated chatbot. Phase 2 recruits 15 Phase 1 participants—purposively selected for equity—into think-aloud interviews and consensus methods to refine and prioritize design features alongside iterative platform feasibility testing.
 [37] Setting and Participants
-[38] All study activities are conducted online and hosted from the DigiMSK laboratory at The University of British Columbia City Centre 1 (Surrey) site. Consent and questionnaires are administered online via REDCap. After online consent and the baseline survey, participants receive an access code for an independent web-based chatbot session (~15 minutes), followed by the remaining surveys within the same session.  Phase 2 think-aloud interviews and consensus sessions use the UBC licensed Zoom platform.
+[38] All study activities are conducted online and hosted from the TRI-BACK laboratory at The University of British Columbia City Centre 1 (Surrey) site. Consent and questionnaires are administered online via REDCap. After online consent and the baseline survey, participants receive an access code for an independent web-based chatbot session (~15 minutes), followed by the remaining surveys within the same session.  Phase 2 think-aloud interviews and consensus sessions use the UBC licensed Zoom platform.
 [39] Inclusion Criteria
 [40] Adults (19+) who have sought care for an acute episode of LBP in BC at least once in the previous 12 months
 [41] Able to participate in English in online study activities
@@ -89,7 +89,7 @@
 [97] 8. Oncioiu I. AI Transparency and User Behavior in Human–AI Collaboration: Evidence from E-Commerce Recommendation Systems. J Theor Appl Electron Commer Res. 2026 May;21(5):153. doi:10.3390/jtaer21050153
 [98] 9. Zerilli J, Bhatt U, Weller A. How transparency modulates trust in artificial intelligence. Patterns. 2022 Apr 8;3(4). doi:10.1016/j.patter.2022.100455
 [99] 10. Slattery P, Saeri AK, Bragge P. Research co-design in health: a rapid overview of reviews. Health Res Policy Syst. 2020;18(1):17. doi:10.1186/s12961-020-0528-9
-[100] 11. Dima R. DigiMSKbot [Internet]. 2026 [cited 2026 Sep 4]. Available from: https://github.com/robdima96/DigiMSKbot
+[100] 11. Dima R. TRI-BACK [Internet]. 2026 [cited 2026 Sep 4]. Available from: https://github.com/robdima96/TRI-BACK
 [101] 12. Wutich A, Beresford M, Bernard HR. Sample Sizes for 10 Types of Qualitative Data Analysis: An Integrative Review, Empirical Guidance, and Next Steps. Int J Qual Methods. 2024 May 1;23:16094069241296206. doi:10.1177/16094069241296206
 [102] 13. The HLS19 Consortium of the WHO Action Network M-POHL. The HLS19-DIGI Instruments for measuring Digital Health Literacy. Factsheet. Vienna: Austrian National Public Health Institute; 2024.
 [103] 14. Schepman A, Rodway P. Validation of the Short General Attitudes Towards Artificial Intelligence Scale: The Short GAAIS-10. Int J Human–Computer Interact. 2026 Jan 6;1–17. doi:10.1080/10447318.2025.2610446

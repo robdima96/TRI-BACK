@@ -93,7 +93,7 @@ function Escape-Html([string]$t) {
 
 # ===== Parse CSV =====
 Write-Host "=== Parsing CSV ===" -ForegroundColor Cyan
-$csv = Import-Csv -Path "c:\ROBS STUFF\UBC Postdoctoral Fellowship\DigiMSKbot\Project\Brainstorming\HAICEF_271.csv"
+$csv = Import-Csv -Path "c:\ROBS STUFF\UBC Postdoctoral Fellowship\TRI-BACK\Project\Brainstorming\HAICEF_271.csv"
 
 $l1Order = [System.Collections.ArrayList]@()
 $hierarchy = [ordered]@{}

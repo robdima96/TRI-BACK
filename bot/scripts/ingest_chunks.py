@@ -9,7 +9,7 @@ Run from repo root::
     python scripts/ingest_chunks.py --sub-collection red_flags --registry manual
     python scripts/ingest_chunks.py --sub-collection red_flags --chunks-csv path/to.csv
 
-Requires RAG embeddings (``DIGIMSK_ENCODER_DIR`` = Clinical_sBERT by default).
+Requires RAG embeddings (``TRI_BACK_ENCODER_DIR`` = Clinical_sBERT by default).
 """
 
 from __future__ import annotations

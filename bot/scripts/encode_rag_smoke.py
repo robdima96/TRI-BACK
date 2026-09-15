@@ -245,7 +245,7 @@ def main() -> int:
     parser.add_argument(
         "--no-ner",
         action="store_true",
-        help="Disable GliNER (DIGIMSK_LOAD_NER=0); not production-default",
+        help="Disable GliNER (TRI_BACK_LOAD_NER=0); not production-default",
     )
     parser.add_argument(
         "--verbose",
@@ -255,13 +255,13 @@ def main() -> int:
     args = parser.parse_args()
     _configure_logging(verbose=args.verbose)
 
-    os.environ.setdefault("DIGIMSK_LOAD_RAG", "1")
+    os.environ.setdefault("TRI_BACK_LOAD_RAG", "1")
     if args.no_ner:
-        os.environ["DIGIMSK_LOAD_NER"] = "0"
-        os.environ["DIGIMSK_LOAD_GLINER"] = "0"
+        os.environ["TRI_BACK_LOAD_NER"] = "0"
+        os.environ["TRI_BACK_LOAD_GLINER"] = "0"
     else:
-        os.environ.setdefault("DIGIMSK_LOAD_NER", "1")
-        os.environ.setdefault("DIGIMSK_LOAD_GLINER", "1")
+        os.environ.setdefault("TRI_BACK_LOAD_NER", "1")
+        os.environ.setdefault("TRI_BACK_LOAD_GLINER", "1")
 
     from app.config import settings
     from app.services.encoder import encode_user_message
@@ -278,7 +278,7 @@ def main() -> int:
         return 1
     if not rag_embedding_model_configured():
         sys.stderr.write(
-            f"RAG encoder not configured — check DIGIMSK_ENCODER_DIR: "
+            f"RAG encoder not configured — check TRI_BACK_ENCODER_DIR: "
             f"{settings.encoder_model_dir}\n"
         )
         return 1

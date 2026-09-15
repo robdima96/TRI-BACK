@@ -1,6 +1,6 @@
 # Red Flags Knowledge Graph — v1
 
-Validated backup of the DigiMSK low-back red flags Neo4j configuration.
+Validated backup of the TRI-BACK low-back red flags Neo4j configuration.
 
 ## Contents
 

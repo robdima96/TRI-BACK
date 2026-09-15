@@ -1,4 +1,4 @@
-"""Tests for optional DIGIMSK_BOT_API_KEY on /api/v1/chat."""
+"""Tests for optional TRI_BACK_BOT_API_KEY on /api/v1/chat."""
 
 from fastapi.testclient import TestClient
 

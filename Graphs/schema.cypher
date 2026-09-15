@@ -1,4 +1,4 @@
-// DigiMSK Red Flags — graph schema (constraints applied automatically on import)
+// TRI-BACK Red Flags — graph schema (constraints applied automatically on import)
 
 // Nodes
 // (:Factor {name})           — symptoms, traits, AND path mediators (shared label)

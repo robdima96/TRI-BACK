@@ -5,7 +5,7 @@ Run from the repo root (``bot``) so imports and relative paths resolve::
     python scripts/rag_smoke.py
     python scripts/rag_smoke.py --query "heat therapy for low back pain"
 
-Expect ``TRI_BACK_LOAD_RAG=1`` (default; legacy ``DIGIMSK_LOAD_RAG``) and a valid ``TRI_BACK_ENCODER_DIR`` (Clinical_sBERT
+Expect ``TRI_BACK_LOAD_RAG=1`` (default; legacy ``TRI_BACK_LOAD_RAG``) and a valid ``TRI_BACK_ENCODER_DIR`` (Clinical_sBERT
 folder with ``config.json``; ``sentence_transformers`` backend by default). Chroma uses
 ``TRI_BACK_CHROMA_PATH``; sub-collections must already contain ingested chunks (re-ingest
 after model changes via ``scripts/chroma_clear.py --empty``).

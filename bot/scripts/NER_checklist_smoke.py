@@ -8,8 +8,8 @@ Run from the repo root::
     python scripts/NER_checklist_smoke.py -m "I fell yesterday and have severe low back pain."
     python scripts/NER_checklist_smoke.py --no-ner -m "diabetes for 5 years, pain 8/10"
 
-Uses ``DIGIMSK_LOAD_NER`` + ``DIGIMSK_GLINER_MODEL_DIR`` (GliNER-BioMed). RAG embeddings
-use ``DIGIMSK_ENCODER_DIR`` (Clinical_sBERT) separately.
+Uses ``TRI_BACK_LOAD_NER`` + ``TRI_BACK_GLINER_MODEL_DIR`` (GliNER-BioMed). RAG embeddings
+use ``TRI_BACK_ENCODER_DIR`` (Clinical_sBERT) separately.
 Use ``--no-rag`` (default) to skip RAG / DeBERTa load.
 
 Exit codes: 0 ok, 1 empty message, 2 NER enabled but GliNER did not load.
@@ -29,8 +29,8 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 # Apply toggles before ``app.config`` is imported (first app import below).
-os.environ.setdefault("DIGIMSK_LOAD_NER", "1")
-os.environ.setdefault("DIGIMSK_LOAD_RAG", "0")
+os.environ.setdefault("TRI_BACK_LOAD_NER", "1")
+os.environ.setdefault("TRI_BACK_LOAD_RAG", "0")
 
 _SOURCE_ORDER = ("pattern", "safety_phrase", "gliner")
 
@@ -192,9 +192,9 @@ def main(argv: list[str] | None = None) -> int:
     _configure_logging(verbose=args.verbose)
 
     if args.no_ner:
-        os.environ["DIGIMSK_LOAD_NER"] = "0"
+        os.environ["TRI_BACK_LOAD_NER"] = "0"
     if args.rag:
-        os.environ["DIGIMSK_LOAD_RAG"] = "1"
+        os.environ["TRI_BACK_LOAD_RAG"] = "1"
 
     from app.config import settings
     from app.services.encoder import encode_user_message
@@ -217,7 +217,7 @@ def main(argv: list[str] | None = None) -> int:
     if settings.ner_load and settings.gliner_load and not gliner_ok:
         sys.stderr.write(
             "NER is enabled but GliNER failed to load; "
-            "check DIGIMSK_GLINER_MODEL_DIR and docs/NER_PIPELINE.md.\n"
+            "check TRI_BACK_GLINER_MODEL_DIR and docs/NER_PIPELINE.md.\n"
         )
         return 2
 

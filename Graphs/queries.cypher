@@ -1,4 +1,4 @@
-// DigiMSK Red Flags knowledge graph — starter queries for Neo4j Browser / Bloom
+// TRI-BACK Red Flags knowledge graph — starter queries for Neo4j Browser / Bloom
 // Paste one block at a time. Aura: https://console.neo4j.io
 
 // --- Overview: condition hub (symptoms linked to each diagnosis) ---

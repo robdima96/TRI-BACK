@@ -1,6 +1,6 @@
-// DigiMSK Red Flags — generated import script
+// TRI-BACK Red Flags — generated import script
 // Open Neo4j Browser (Aura or Desktop), paste sections or run the full file.
-// Source: c:\ROBS STUFF\UBC Postdoctoral Fellowship\DigiMSKbot\Graphs\backups\red flags\v1\source\red_flags_manual_failsafe.csv
+// Source: c:\ROBS STUFF\UBC Postdoctoral Fellowship\TRI-BACK\Graphs\backups\red flags\v1\source\red_flags_manual_failsafe.csv
 // Rows: 66
 
 // --- wipe existing graph ---

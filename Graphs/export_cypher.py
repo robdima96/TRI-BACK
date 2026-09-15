@@ -18,7 +18,7 @@ DEFAULT_OUTPUT = OUTPUT_DIR / "red_flags_import.cypher"
 def build_cypher_file(csv_path: Path, *, wipe: bool = False) -> str:
     rows = load_chunks(csv_path)
     blocks: list[str] = [
-        "// DigiMSK Red Flags — generated import script",
+        "// TRI-BACK Red Flags — generated import script",
         "// Open Neo4j Browser (Aura or Desktop), paste sections or run the full file.",
         f"// Source: {csv_path}",
         f"// Rows: {len(rows)}",

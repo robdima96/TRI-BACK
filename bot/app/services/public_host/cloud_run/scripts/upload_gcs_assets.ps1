@@ -7,10 +7,10 @@
 #   .\bot\app\services\public_host\cloud_run\scripts\upload_gcs_assets.ps1 -GliNERDir "E:\TRI-BACK\GliNER-BioMed"
 
 param(
-  [string]$ProjectId = $(if ($env:TRI_BACK_GCP_PROJECT) { $env:TRI_BACK_GCP_PROJECT } elseif ($env:DIGIMSK_GCP_PROJECT) { $env:DIGIMSK_GCP_PROJECT } else { "YOUR_GCP_PROJECT" }),
-  [string]$Bucket = $(if ($env:TRI_BACK_GCS_BUCKET) { $env:TRI_BACK_GCS_BUCKET } elseif ($env:DIGIMSK_GCS_BUCKET) { $env:DIGIMSK_GCS_BUCKET } else { "digimsk-cloudrun-$ProjectId" }),
-  [string]$Region = $(if ($env:TRI_BACK_VERTEX_LOCATION) { $env:TRI_BACK_VERTEX_LOCATION } elseif ($env:DIGIMSK_VERTEX_LOCATION) { $env:DIGIMSK_VERTEX_LOCATION } else { "us-central1" }),
-  [string]$GliNERDir = $(if ($env:TRI_BACK_GLINER_MODEL_DIR) { $env:TRI_BACK_GLINER_MODEL_DIR } elseif ($env:DIGIMSK_GLINER_MODEL_DIR) { $env:DIGIMSK_GLINER_MODEL_DIR } elseif (Test-Path "E:\TRI-BACK\GliNER-BioMed") { "E:\TRI-BACK\GliNER-BioMed" } else { "E:\DigiMSKbot\GliNER-BioMed" }),
+  [string]$ProjectId = $(if ($env:TRI_BACK_GCP_PROJECT) { $env:TRI_BACK_GCP_PROJECT } else { "YOUR_GCP_PROJECT" }),
+  [string]$Bucket = $(if ($env:TRI_BACK_GCS_BUCKET) { $env:TRI_BACK_GCS_BUCKET } else { "digimsk-cloudrun-$ProjectId" }),
+  [string]$Region = $(if ($env:TRI_BACK_VERTEX_LOCATION) { $env:TRI_BACK_VERTEX_LOCATION } else { "us-central1" }),
+  [string]$GliNERDir = $(if ($env:TRI_BACK_GLINER_MODEL_DIR) { $env:TRI_BACK_GLINER_MODEL_DIR } elseif (Test-Path "E:\TRI-BACK\GliNER-BioMed") { "E:\TRI-BACK\GliNER-BioMed" } else { "E:\TRI-BACK\GliNER-BioMed" }),
   [string]$RepoRoot = ""
 )
 

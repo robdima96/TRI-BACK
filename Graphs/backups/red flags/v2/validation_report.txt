@@ -1,4 +1,4 @@
-CSV: C:\ROBS STUFF\UBC Postdoctoral Fellowship\DigiMSKbot\bot\Knowledge Base\Red Flags\chunks\manual\red_flags_manual_v2.csv
+CSV: C:\ROBS STUFF\UBC Postdoctoral Fellowship\TRI-BACK\bot\Knowledge Base\Red Flags\chunks\manual\red_flags_manual_v2.csv
   rows: 79
   unique Factor names (source_nodes + path): 59
   conditions: {'Fracture': 18, 'Malignancy': 11, 'Infection': 12, 'CES': 5, 'AAA': 8, 'DVT': 12, 'Non-specific Mechanical Cause': 13}

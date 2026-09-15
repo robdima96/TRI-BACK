@@ -79,18 +79,18 @@ $startX = 0
 $startY = 300
 
 # ===== Delete old board if exists, create fresh =====
-Write-Host "=== Setting up DigiMSK Design Plan board ===" -ForegroundColor Cyan
+Write-Host "=== Setting up TRI-BACK Design Plan board ===" -ForegroundColor Cyan
 $boardsList = Invoke-Miro -Method Get -Uri "$baseUri/boards"
 foreach ($b in $boardsList.data) {
-    if ($b.name -eq "DigiMSK Design Plan") {
+    if ($b.name -eq "TRI-BACK Design Plan") {
         Write-Host "Deleting old board: $($b.id)" -ForegroundColor Yellow
         try { Invoke-Miro -Method Delete -Uri "$baseUri/boards/$($b.id)" | Out-Null } catch {}
     }
 }
 
 $boardBody = @{
-    name        = "DigiMSK Design Plan"
-    description = "Design brief and planning board for the DigiMSK chatbot project."
+    name        = "TRI-BACK Design Plan"
+    description = "Design brief and planning board for the TRI-BACK chatbot project."
 } | ConvertTo-Json
 $board = Invoke-Miro -Method Post -Uri "$baseUri/boards" -Body $boardBody
 $boardId = $board.id
@@ -111,7 +111,7 @@ function Get-FramePos {
 # ===== BOARD TITLE (above the grid) =====
 Write-Host "`nCreating board title..." -ForegroundColor Yellow
 $titleShape = Invoke-Miro -Method Post -Uri "$baseUri/boards/$boardId/shapes" -Body (@{
-    data     = @{ content = "<b>DigiMSK Design Plan</b>"; shape = "round_rectangle" }
+    data     = @{ content = "<b>TRI-BACK Design Plan</b>"; shape = "round_rectangle" }
     style    = @{ fillColor = $colors.HeaderBg; color = $colors.HeaderText; borderColor = $colors.HeaderBg; fontSize = "36"; textAlign = "center"; textAlignVertical = "middle"; borderWidth = "2" }
     position = @{ x = $startX + (($cols - 1) * ($frameW + $frameGapX)) / 2 + $frameW / 2; y = $startY - 120 }
     geometry = @{ width = 1200; height = 100 }
@@ -132,7 +132,7 @@ $sections = @(
         Title = "1. Project Overview"
         Color = $colors.SectionBg
         Items = @(
-            @{ Type="text"; Content="<b>Project Name:</b> DigiMSK (Digital Musculoskeletal Bot)"; X=-300; Y=-150; W=800 }
+            @{ Type="text"; Content="<b>Project Name:</b> TRI-BACK (Digital Musculoskeletal Bot)"; X=-300; Y=-150; W=800 }
             @{ Type="text"; Content="<b>Domain:</b> Musculoskeletal Health / Low Back Pain (LBP)"; X=-300; Y=-110; W=800 }
             @{ Type="text"; Content="<b>Institution:</b> UBC Postdoctoral Fellowship"; X=-300; Y=-70; W=800 }
             @{ Type="sticky"; Content="Principal Investigator / Lead"; FillColor="light_yellow"; X=-300; Y=50 }

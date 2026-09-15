@@ -1,8 +1,8 @@
-# DigiMSK grounded patient agent
+# TRI-BACK grounded patient agent
 
 > **Start here:** [`STATUS.md`](STATUS.md) — what is done, what is parked (399 clinician rows), and the steps to lock ~20 case cards.
 
-AgentClinic-style **OSCE case cards** sampled from **MedQA-US**, plus CRAFT-MD **disclosure constraints**, talking to DigiMSKbot. Empty grid cells are **unknown** (no other corpora).
+AgentClinic-style **OSCE case cards** sampled from **MedQA-US**, plus CRAFT-MD **disclosure constraints**, talking to TRI-BACK. Empty grid cells are **unknown** (no other corpora).
 
 ## Verify here
 
@@ -33,9 +33,9 @@ python screen_medqa.py --source hf --seed 42 --sample-n 20
 
 `--source hf` loads official MedQA-US English splits via `awinml/medqa` (`questions`: train+validation+test, n=12,723). Rebuild the briefing deck with `python build_briefing_pptx.py`.
 
-## Patient agent (Vertex = DigiMSK generator)
+## Patient agent (Vertex = TRI-BACK generator)
 
-Same GCP project, region, and Application Default Credentials as DigiMSKbot’s generator (`bot/.env`: `DIGIMSK_VERTEX_PROJECT_ID`, `DIGIMSK_VERTEX_LOCATION`, `DIGIMSK_GENERATOR_MODEL`). Overlay a different Gemini id with `--model` or `PATIENT_VERTEX_MODEL` (see `.env.example`).
+Same GCP project, region, and Application Default Credentials as TRI-BACK’s generator (`bot/.env`: `TRI_BACK_VERTEX_PROJECT_ID`, `TRI_BACK_VERTEX_LOCATION`, `TRI_BACK_GENERATOR_MODEL`). Overlay a different Gemini id with `--model` or `PATIENT_VERTEX_MODEL` (see `.env.example`).
 
 ```powershell
 python run_patient.py --card PATH --backend echo
@@ -43,7 +43,7 @@ python run_patient.py --card PATH --backend vertex --bot-url http://127.0.0.1:80
 python run_patient.py --card PATH --backend vertex --model gemini-2.0-flash
 ```
 
-Live runs assume DigiMSKbot on **port 8001**. The agent is given **only** `Patient_Actor`. `Hidden` (disposition target, labels, must-elicit) is never in the prompt.
+Live runs assume TRI-BACK on **port 8001**. The agent is given **only** `Patient_Actor`. `Hidden` (disposition target, labels, must-elicit) is never in the prompt.
 
 ## Papers
 

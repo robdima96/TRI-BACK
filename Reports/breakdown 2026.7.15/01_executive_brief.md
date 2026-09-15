@@ -1,6 +1,6 @@
-# DigiMSK — Executive Brief
+# TRI-BACK — Executive Brief
 
-DigiMSK is a **musculoskeletal triage chatbot** for a research study. A simple chat website talks to a clinical engine on our servers. That engine builds a **checklist** of what the person told us, asks follow-up questions when needed, then offers a **care recommendation**. Rules and evidence decide the path; an AI language model (Google Vertex Gemini, or a local backup model) only helps with **wording**.
+TRI-BACK is a **musculoskeletal triage chatbot** for a research study. A simple chat website talks to a clinical engine on our servers. That engine builds a **checklist** of what the person told us, asks follow-up questions when needed, then offers a **care recommendation**. Rules and evidence decide the path; an AI language model (Google Vertex Gemini, or a local backup model) only helps with **wording**.
 
 ## What happens in a conversation
 

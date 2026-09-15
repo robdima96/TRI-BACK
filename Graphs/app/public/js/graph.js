@@ -1,4 +1,4 @@
-/* global cytoscape, DigiMskCy */
+/* global cytoscape, TriBackCy, DigiMskCy */
 
 const state = {
   cy: null,
@@ -95,9 +95,16 @@ function runLayout(cy) {
   });
 }
 
+function presentationCy() {
+  if (typeof TriBackCy !== "undefined") return TriBackCy;
+  if (typeof DigiMskCy !== "undefined") return DigiMskCy;
+  return undefined;
+}
+
 async function initCytoscape(elements) {
-  if (typeof DigiMskCy === "undefined") {
-    throw new Error("DigiMskCy presentation module is not loaded.");
+  const Cy = presentationCy();
+  if (typeof Cy === "undefined") {
+    throw new Error("TriBackCy presentation module is not loaded.");
   }
   if (state.cy) {
     state.cy.destroy();
@@ -107,7 +114,7 @@ async function initCytoscape(elements) {
   state.cy = cytoscape({
     container: document.getElementById("cy"),
     elements,
-    style: DigiMskCy.cytoscapeStyle({
+    style: Cy.cytoscapeStyle({
       edgeWidth: 1.5,
       conditionFontSize: 9,
       baseFontSize: 10,
@@ -264,7 +271,9 @@ async function loadGraph(options = {}) {
     if (!res.ok) throw new Error(data.error || "Failed to load graph");
 
     indexGraphData(data);
-    const elements = DigiMskCy.toElements({
+    const Cy = presentationCy();
+    if (!Cy) throw new Error("TriBackCy presentation module is not loaded.");
+    const elements = Cy.toElements({
       nodes: data.nodes,
       edges: data.edges,
       options: { truncateChunk: 40 },

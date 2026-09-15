@@ -53,7 +53,7 @@ class BayesianConditionScorer:
     def score(self, segments: list[PathSegment]) -> list[ConditionRisk]:
         _ = segments
         raise BayesianNotConfiguredError(
-            "DIGIMSK_GRAPH_INFERENCE=bayesian is not configured yet. "
+            "TRI_BACK_GRAPH_INFERENCE=bayesian is not configured yet. "
             "Provide reviewed priors/CPTs (or a calibrated noisy-OR model) "
             "before enabling Bayesian condition scoring."
         )

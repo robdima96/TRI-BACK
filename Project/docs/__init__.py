@@ -1,1 +1,1 @@
-# DigiMSKbot project docs package (PDF helpers).
+# TRI-BACK project docs package (PDF helpers).

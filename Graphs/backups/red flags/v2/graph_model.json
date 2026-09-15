@@ -1,7 +1,7 @@
 {
   "name": "red_flags",
   "version": "v1",
-  "description": "Low-back red flags knowledge graph for DigiMSK triage (screening, discrimination, disposition)",
+  "description": "Low-back red flags knowledge graph for TRI-BACK triage (screening, discrimination, disposition)",
   "verified": true,
 
   "nodes": [

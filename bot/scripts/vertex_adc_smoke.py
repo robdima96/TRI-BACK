@@ -11,17 +11,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--project",
-        help="GCP project ID (default: DIGIMSK_VERTEX_PROJECT_ID from .env)",
+        help="GCP project ID (default: TRI_BACK_VERTEX_PROJECT_ID from .env)",
     )
     parser.add_argument(
         "--location",
         default=None,
-        help="Vertex region (default: DIGIMSK_VERTEX_LOCATION from .env)",
+        help="Vertex region (default: TRI_BACK_VERTEX_LOCATION from .env)",
     )
     parser.add_argument(
         "--model",
         default=None,
-        help="Gemini model id (default: DIGIMSK_GENERATOR_MODEL from .env)",
+        help="Gemini model id (default: TRI_BACK_GENERATOR_MODEL from .env)",
     )
     parser.add_argument(
         "--prompt",
@@ -55,7 +55,7 @@ def main() -> int:
 
     if not project or not location:
         print(
-            "Set DIGIMSK_VERTEX_PROJECT_ID and DIGIMSK_VERTEX_LOCATION in bot/.env",
+            "Set TRI_BACK_VERTEX_PROJECT_ID and TRI_BACK_VERTEX_LOCATION in bot/.env",
             file=sys.stderr,
         )
         return 1

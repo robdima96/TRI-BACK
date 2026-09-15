@@ -3,20 +3,19 @@
 #
 # Usage:
 #   .\bot\app\services\public_host\cloud_run\scripts\deploy_bot.ps1
-#   .\bot\app\services\public_host\cloud_run\scripts\deploy_bot.ps1 -Service digimskbot
 #   .\bot\app\services\public_host\cloud_run\scripts\deploy_bot.ps1 -Image "us-central1-docker.pkg.dev/.../tri-back-bot:latest"
 
 param(
-  [string]$ProjectId = $(if ($env:TRI_BACK_GCP_PROJECT) { $env:TRI_BACK_GCP_PROJECT } elseif ($env:DIGIMSK_GCP_PROJECT) { $env:DIGIMSK_GCP_PROJECT } else { "YOUR_GCP_PROJECT" }),
+  [string]$ProjectId = $(if ($env:TRI_BACK_GCP_PROJECT) { $env:TRI_BACK_GCP_PROJECT } else { "YOUR_GCP_PROJECT" }),
   [string]$Region = "us-central1",
   [string]$Service = "tri-back",
-  [string]$Bucket = $(if ($env:TRI_BACK_GCS_BUCKET) { $env:TRI_BACK_GCS_BUCKET } elseif ($env:DIGIMSK_GCS_BUCKET) { $env:DIGIMSK_GCS_BUCKET } else { "digimsk-cloudrun-$ProjectId" }),
+  [string]$Bucket = $(if ($env:TRI_BACK_GCS_BUCKET) { $env:TRI_BACK_GCS_BUCKET } else { "digimsk-cloudrun-$ProjectId" }),
   [string]$Image = "",
   [string]$Memory = "8Gi",
   [string]$Cpu = "4",
   [int]$MaxInstances = 1,
   [int]$MinInstances = 0,
-  [string]$BotApiKey = $(if ($env:TRI_BACK_BOT_API_KEY) { $env:TRI_BACK_BOT_API_KEY } elseif ($env:DIGIMSK_BOT_API_KEY) { $env:DIGIMSK_BOT_API_KEY } else { "" }),
+  [string]$BotApiKey = $(if ($env:TRI_BACK_BOT_API_KEY) { $env:TRI_BACK_BOT_API_KEY } else { "" }),
   [string]$ServiceAccount = "runtime-sa@$ProjectId.iam.gserviceaccount.com"
 )
 
@@ -30,7 +29,6 @@ Write-Host "Deploying $Service"
 Write-Host "  image:  $Image"
 Write-Host "  bucket: gs://$Bucket -> /mnt/tri-back"
 Write-Host "  max-instances: $MaxInstances  min-instances: $MinInstances"
-Write-Host "  (override -Service digimskbot to refresh the old Cloud Run name)"
 
 $envVars = @(
   "TRI_BACK_RAG=0",

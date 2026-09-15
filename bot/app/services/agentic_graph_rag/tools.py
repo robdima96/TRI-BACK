@@ -362,7 +362,7 @@ _BAYESIAN_TOOL_NAMES = frozenset({"score_conditions_bayesian"})
 
 
 def _active_tool_specs() -> tuple[ToolSpec, ...]:
-    """Filter the static catalog by runtime DIGIMSK_RAG / DIGIMSK_GRAPH_RAG toggles."""
+    """Filter the static catalog by runtime TRI_BACK_RAG / TRI_BACK_GRAPH_RAG toggles."""
     from app.config import settings
 
     out: list[ToolSpec] = []

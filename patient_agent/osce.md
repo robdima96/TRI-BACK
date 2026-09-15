@@ -94,7 +94,7 @@ They do **not** fine-tune a patient model. Grounding is the OSCE card plus the p
 - N = 10 turns cut accuracy from 52% to 25%; N = 30 slightly *hurt* (context length). Turn budget is a design parameter.
 - Clinician realism of the patient actor was only **6.7/10**. The OSCE card grounds *content*; it does not automatically produce genuine speech.
 
-### Persona (PatientSim axes, DigiMSK card)
+### Persona (PatientSim axes, TRI-BACK card)
 
 AgentClinic’s published `Patient_Actor` has no persona object. We add a closed `persona` block after sampling, following PatientSim (Kyung et al., NeurIPS 2025): talking style is orthogonal to the clinical profile.
 
@@ -107,8 +107,8 @@ AgentClinic’s published `Patient_Actor` has no persona object. We add a closed
 
 Default on stub cards: `neutral` / `advanced` / `high_recall` / `normal`. Persona must not add clinical facts.
 
-`Hidden.reference_labels` is a closed scoring family. Allowed: `mechanical`, `CES`, `fracture`, `malignancy`, `infection`, `vascular`. Leave `[]` until a clinician assigns. DigiMSK Hidden does **not** include `objective_for_bot`, exam, labs, or `correct_diagnosis`.
+`Hidden.reference_labels` is a closed scoring family. Allowed: `mechanical`, `CES`, `fracture`, `malignancy`, `infection`, `vascular`. Leave `[]` until a clinician assigns. TRI-BACK Hidden does **not** include `objective_for_bot`, exam, labs, or `correct_diagnosis`.
 
-## What this is not (for DigiMSK)
+## What this is not (for TRI-BACK)
 
-AgentClinic’s OSCE is a **diagnostic clinic**: doctor + labs + images + open-ended disease label. DigiMSKbot is a **text-only LBP triage chatbot**: it asks until coverage slots are filled, then gives a disposition (home / pharmacy / GP / urgent / ED). We should keep the OSCE *partition* (actor card vs hidden answer) and drop the parts that assume a physician with a measurement agent.
+AgentClinic’s OSCE is a **diagnostic clinic**: doctor + labs + images + open-ended disease label. TRI-BACK is a **text-only LBP triage chatbot**: it asks until coverage slots are filled, then gives a disposition (home / pharmacy / GP / urgent / ED). We should keep the OSCE *partition* (actor card vs hidden answer) and drop the parts that assume a physician with a measurement agent.

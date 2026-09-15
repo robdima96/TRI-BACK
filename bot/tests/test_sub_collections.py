@@ -51,7 +51,7 @@ def test_validate_sub_collection_accepts_display_style_aliases():
 
 def test_validate_sub_collection_rejects_unknown():
     with pytest.raises(ValueError, match="Unknown sub-collection"):
-        validate_sub_collection("digimsk_evidence")
+        validate_sub_collection("not_a_real_collection")
 
 
 def test_chunk_registry_paths_and_format_detection():
@@ -100,7 +100,7 @@ def detect_registry_format_from_csv(path: Path) -> str:
 
 def _cmd_counts(chroma_path: str | None) -> int:
     if chroma_path:
-        os.environ["DIGIMSK_CHROMA_PATH"] = chroma_path
+        os.environ["TRI_BACK_CHROMA_PATH"] = chroma_path
 
     from app.config import settings
 
@@ -129,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--chroma-path",
         metavar="PATH",
-        help="Override DIGIMSK_CHROMA_PATH (counts command only)",
+        help="Override TRI_BACK_CHROMA_PATH (counts command only)",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 

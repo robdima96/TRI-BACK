@@ -1,4 +1,4 @@
-# DigiMSK Red Flags Graph Explorer
+# TRI-BACK Red Flags Graph Explorer
 
 Password-protected web app for interactively exploring the red flags Neo4j knowledge graph (v1). Built with **Express**, the official **neo4j-driver**, and **Cytoscape.js**.
 
@@ -24,7 +24,7 @@ npm start
 
 Open: **http://localhost:3847**
 
-Default dev password (change in `Graphs/app/.env`): `digimsk`
+Set `APP_PASSWORD` in `Graphs/app/.env` (required; `.env.example` uses `change-me`).
 
 ## Configuration
 
@@ -81,6 +81,7 @@ Graphs/app/
     index.html        Graph explorer
     login.html        Password gate
     css/styles.css
+    js/tri_back_cytoscape.js  Shared Cytoscape kernel
     js/graph.js       Cytoscape rendering + filters
     js/login.js
 ```

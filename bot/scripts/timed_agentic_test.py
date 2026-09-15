@@ -4,7 +4,7 @@ every turn, so we can measure the added latency of the agentic disposition path.
 The script talks to the live FastAPI server (``uvicorn app.main:app`` on
 ``127.0.0.1:8001`` by default) over HTTP using only the standard library, so it
 exercises the real generator backend (Vertex Gemini) and whatever
-``DIGIMSK_DISPOSITION_MODE`` the server was started with.
+``TRI_BACK_DISPOSITION_MODE`` the server was started with.
 
 For each turn it records wall-clock round-trip time and, when the turn reaches the
 disposition step, the agent-trace status / step count returned in

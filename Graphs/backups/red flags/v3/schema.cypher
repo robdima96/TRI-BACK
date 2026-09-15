@@ -1,4 +1,4 @@
-// DigiMSK Red Flags — graph schema (constraints applied automatically on import)
+// TRI-BACK Red Flags — graph schema (constraints applied automatically on import)
 
 // Backup: red flags v1
 

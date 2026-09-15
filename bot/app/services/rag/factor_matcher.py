@@ -1,6 +1,6 @@
 """Map encoder checklist items to red-flag graph Factor names (regex-first).
 
-When ``DIGIMSK_LLM_FACTOR_MATCH=1``, unmatched (non-gated) rows get one batched
+When ``TRI_BACK_LLM_FACTOR_MATCH=1``, unmatched (non-gated) rows get one batched
 LLM cross-check against the inventory Factor list before GraphRAG traversal.
 """
 

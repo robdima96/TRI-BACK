@@ -1,4 +1,4 @@
-"""DigiMSK session log browser — lightweight local debug UI.
+"""TRI-BACK session log browser — lightweight local debug UI.
 
 Run from repo root or from Testing/:
   cd Testing
@@ -28,7 +28,7 @@ from session_index import (
 HERE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
 
-app = FastAPI(title="DigiMSK Session Lab", docs_url="/api/docs")
+app = FastAPI(title="TRI-BACK Session Lab", docs_url="/api/docs")
 app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 
 

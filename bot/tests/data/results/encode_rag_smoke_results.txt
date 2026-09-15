@@ -9,10 +9,10 @@ generated_utc: 2026-05-29T23:04:04.462539+00:00
   rag_load:                 True
   ner_load:                 True
   gliner_load:              True
-  encoder_model_dir (RAG):  E:\DigiMSKbot\Clinical_sBERT
+  encoder_model_dir (RAG):  E:\TRI-BACK\Clinical_sBERT
   rag_embedding_backend:    sentence_transformers
   encoder_embedding_dim:    768
-  gliner_model_dir (NER):   E:\DigiMSKbot\GliNER-BioMed
+  gliner_model_dir (NER):   E:\TRI-BACK\GliNER-BioMed
   gliner configured:        True
   gliner loaded this run:   True
   chroma_persist_path:      data/chroma

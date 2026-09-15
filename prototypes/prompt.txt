@@ -2,7 +2,7 @@
 
 1. Authentication & User Management:
 Implement a secure login page.
-Admin Account: username 'admin', password 'digimsk' (hardcoded for simplicity, but please structure it for easy migration to a secure database later).
+Admin Account: username 'admin', password 'tri-back' (hardcoded for simplicity, but please structure it for easy migration to a secure database later).
 User Accounts: A backend list or SQLite database storing 90 unique user credentials.
 Access Control: Create a 'used' flag in the user database. Users are restricted to one session (the admin can toggle this flag to reset access).
 Role-Based Routing: Upon login, identify the user type. Admins get an overview dashboard; standard users are directed to their assigned chatbot interface.

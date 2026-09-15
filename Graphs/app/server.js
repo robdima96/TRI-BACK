@@ -10,7 +10,7 @@ const app = express();
 app.use(express.json());
 app.use(
   session({
-    name: "digimsk.graph.sid",
+    name: "tri_back.graph.sid",
     secret: config.sessionSecret,
     resave: false,
     saveUninitialized: false,
@@ -105,7 +105,7 @@ app.get("/", requireAuth, (_req, res) => {
 });
 
 app.listen(config.port, async () => {
-  console.log(`DigiMSK Graph Explorer: http://localhost:${config.port}`);
+  console.log(`TRI-BACK Graph Explorer: http://localhost:${config.port}`);
   if (!config.appPassword) {
     console.warn("WARNING: APP_PASSWORD is not set. Copy .env.example to .env");
   }

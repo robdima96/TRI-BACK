@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -231,7 +232,7 @@ def test_make_backend_vertex_alias():
     try:
         backend = make_backend("gemini", {}, model="gemini-2.5-flash")
     except RuntimeError as exc:
-        if "DIGIMSK_VERTEX_PROJECT_ID" in str(exc):
+        if "TRI_BACK_VERTEX_PROJECT_ID" in str(exc) or "TRI_BACK_VERTEX_PROJECT_ID" in str(exc):
             return
         raise
     assert isinstance(backend, VertexBackend)

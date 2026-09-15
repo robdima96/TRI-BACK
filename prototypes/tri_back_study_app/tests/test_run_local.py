@@ -6,7 +6,7 @@ import importlib.util
 from pathlib import Path
 
 _RUN_LOCAL = Path(__file__).resolve().parents[1] / "scripts" / "run_local.py"
-_SPEC = importlib.util.spec_from_file_location("digimsk_run_local", _RUN_LOCAL)
+_SPEC = importlib.util.spec_from_file_location("tri-back_run_local", _RUN_LOCAL)
 assert _SPEC and _SPEC.loader
 run_local = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(run_local)

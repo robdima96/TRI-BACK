@@ -7,18 +7,10 @@ CLOUD_RUN_PORT="${PORT:-8080}"
 # `--backend-only` ("Cannot specify --frontend-port when not running frontend").
 unset PORT
 
-# Prefer TRI_BACK_*; fall back to DIGIMSK_* and the existing GCS study DB filename.
+# Prefer TRI_BACK_*; default to the GCS study DB.
 if [ -z "${TRI_BACK_STUDY_DB:-}" ]; then
-  if [ -n "${DIGIMSK_STUDY_DB:-}" ]; then
-    export TRI_BACK_STUDY_DB="$DIGIMSK_STUDY_DB"
-  else
-    export TRI_BACK_STUDY_DB="/mnt/tri-back/study/tri_back.db"
-  fi
+  export TRI_BACK_STUDY_DB="/mnt/tri-back/study/tri_back.db"
 fi
-if [ ! -f "$TRI_BACK_STUDY_DB" ] && [ -f /mnt/tri-back/study/digimsk.db ]; then
-  export TRI_BACK_STUDY_DB=/mnt/tri-back/study/digimsk.db
-fi
-export DIGIMSK_STUDY_DB="${DIGIMSK_STUDY_DB:-$TRI_BACK_STUDY_DB}"
 # Keep Granian light on Cloud Run CPU
 export REFLEX_GRANIAN_WORKERS="${REFLEX_GRANIAN_WORKERS:-1}"
 export WEB_CONCURRENCY="${WEB_CONCURRENCY:-1}"

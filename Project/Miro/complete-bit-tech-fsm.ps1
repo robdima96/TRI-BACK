@@ -281,7 +281,7 @@ $null = New-Sticky -Content "Future planner: return-visit / 48h follow-up; post-
 $null = New-Sticky -Content "Future repository: video/audio assets, body-map / diagram variants, clinic-directory, Pain BC / Arthritis resources." -X 2050 -Y 3920 -FillColor $empty
 $null = New-Sticky -Content "Future UI: body map, diagrams, audio/video, clinician / human-in-the-loop view." -X 2850 -Y 3920 -FillColor $empty
 
-$null = New-Sticky -Content "Keep Mohr's four components. DigiMSK Encoder / Orchestrator / Generator implement sensing, Phi, and acting. Do not rename Profiler to Encoder." -X 1650 -Y 4160 -FillColor $question
+$null = New-Sticky -Content "Keep Mohr's four components. TRI-BACK Encoder / Orchestrator / Generator implement sensing, Phi, and acting. Do not rename Profiler to Encoder." -X 1650 -Y 4160 -FillColor $question
 
 Write-Host "=== 6. Draw Mohr E+C FSM in frame 7 ===" -ForegroundColor Cyan
 

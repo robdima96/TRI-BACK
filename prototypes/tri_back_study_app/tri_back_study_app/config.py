@@ -26,11 +26,6 @@ except ImportError:
 
 
 def env_candidates(name: str) -> tuple[str, ...]:
-    """Prefer ``TRI_BACK_*``; fall back to ``DIGIMSK_*`` (legacy)."""
-    if name.startswith("TRI_BACK_"):
-        return (name, "DIGIMSK_" + name[len("TRI_BACK_") :])
-    if name.startswith("DIGIMSK_"):
-        return ("TRI_BACK_" + name[len("DIGIMSK_") :], name)
     return (name,)
 
 
@@ -69,17 +64,13 @@ def _env_bool(key: str, default: bool = False) -> bool:
 
 
 def _default_study_db() -> Path:
-    branded = _DATA / "tri_back.db"
-    legacy = _DATA / "digimsk.db"
-    if not branded.exists() and legacy.exists():
-        return legacy
-    return branded
+    return _DATA / "tri_back.db"
 
 
 STUDY_DB_PATH = Path(_env_str("TRI_BACK_STUDY_DB", str(_default_study_db())))
 SESSIONS_DIR = Path(_env_str("TRI_BACK_SESSIONS_DIR", str(_default_sessions_dir())))
 CHATBOT_BASE_URL = _env_str("CHATBOT_BASE_URL", "http://127.0.0.1:8001").rstrip("/")
-# Same secret as bot ``TRI_BACK_BOT_API_KEY`` (legacy ``DIGIMSK_BOT_API_KEY``).
+# Same secret as bot ``TRI_BACK_BOT_API_KEY``.
 BOT_API_KEY = (env_lookup("TRI_BACK_BOT_API_KEY") or "").strip()
 TRAVERSAL_MODE = _env_str("TRAVERSAL_MODE", "bot")
 IDLE_TIMEOUT_SEC = _env_int("IDLE_TIMEOUT_SEC", 60)
@@ -106,5 +97,5 @@ SESSION_COOKIE_MAX_AGE = 12 * 60 * 60 if PUBLIC_ACCESS else 7 * 24 * 60 * 60
 if PUBLIC_ACCESS and not BOT_API_KEY:
     raise RuntimeError(
         "TRI_BACK_PUBLIC_ACCESS=1 requires TRI_BACK_BOT_API_KEY "
-        "(legacy DIGIMSK_BOT_API_KEY still works; study UI must authenticate to the bot API)."
+        "(study UI must authenticate to the bot API)."
     )

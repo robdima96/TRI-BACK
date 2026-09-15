@@ -8,15 +8,13 @@ digimsk-cloudrun-<PROJECT_ID>
 
 Example: `digimsk-cloudrun-YOUR_GCP_PROJECT`
 
-Override with `TRI_BACK_GCS_BUCKET` (legacy `DIGIMSK_GCS_BUCKET`).
+Override with `TRI_BACK_GCS_BUCKET`.
 
-New Cloud Run services mount the **entire bucket** at:
+Services mount the **entire bucket** at:
 
 ```text
 /mnt/tri-back
 ```
-
-Legacy `digimskbot` / `digimsk-study` still mount the same objects at `/mnt/digimsk` until those services are deleted.
 
 (`readonly=false` so `sessions/` is writable; model/graph trees should be treated as read-mostly.)
 
@@ -34,7 +32,7 @@ gs://<bucket>/
     v2/                     # leftover from earlier deploys; not used by tri-back
   sessions/                 # bot TRI_BACK_SESSION_STORE_DIR + study sessions dir
   study/
-    digimsk.db              # existing SQLite object name (keep)
+    tri_back.db              # study SQLite
   checkpoints/              # optional; prefer local /tmp until SQLite-on-FUSE is validated
 ```
 
@@ -48,8 +46,6 @@ gs://<bucket>/
 | `TRI_BACK_GRAPH_INVENTORY` | `/mnt/tri-back/graph/v4/red_flags_inventory_v4_2026.9.10.json` |
 | `TRI_BACK_SESSION_STORE_DIR` | `/mnt/tri-back/sessions` |
 | `TRI_BACK_CHECKPOINT_SQLITE` | `/tmp/langgraph_checkpoints.sqlite` (v1 default; requires **max-instances=1**) |
-
-(`DIGIMSK_*` aliases still read; old services used `/mnt/digimsk/...`.)
 
 ## IAM
 

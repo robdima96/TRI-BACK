@@ -12,11 +12,6 @@ except ImportError:
 
 
 def env_candidates(name: str) -> tuple[str, ...]:
-    """Prefer ``TRI_BACK_*``; fall back to ``DIGIMSK_*`` (legacy)."""
-    if name.startswith("TRI_BACK_"):
-        return (name, "DIGIMSK_" + name[len("TRI_BACK_") :])
-    if name.startswith("DIGIMSK_"):
-        return ("TRI_BACK_" + name[len("DIGIMSK_") :], name)
     return (name,)
 
 
@@ -68,15 +63,12 @@ def _first_existing(*paths: str) -> str:
 # Span NER (GliNER zero-shot) and RAG embeddings use different local model dirs.
 DEFAULT_GLINER_MODEL_DIR = _first_existing(
     r"E:\TRI-BACK\GliNER-BioMed",
-    r"E:\DigiMSKbot\GliNER-BioMed",
 )
 DEFAULT_RAG_EMBEDDING_MODEL_DIR = _first_existing(
     r"E:\TRI-BACK\Clinical_sBERT",
-    r"E:\DigiMSKbot\Clinical_sBERT",
 )
 DEFAULT_GENERATOR_MODEL_DIR = _first_existing(
     r"E:\TRI-BACK\Mistral7Binstruct",
-    r"E:\DigiMSKbot\Mistral7Binstruct",
 )
 DEFAULT_GENERATOR_BACKEND = "local"
 DEFAULT_LOCAL_MODEL_LABEL = "mistral-local"
@@ -262,6 +254,5 @@ def validate_retrieval_paths() -> None:
     """At least one evidence path (RAG or graph RAG) must be enabled."""
     if not settings.rag_load and not settings.graphrag_load:
         raise ValueError(
-            "At least one of TRI_BACK_RAG or TRI_BACK_GRAPH_RAG must be enabled "
-            "(legacy DIGIMSK_RAG / DIGIMSK_GRAPH_RAG still work)."
+            "At least one of TRI_BACK_RAG or TRI_BACK_GRAPH_RAG must be enabled."
         )

@@ -27,4 +27,4 @@ cd Graphs
 python import_red_flags.py --csv "backups/red flags/v4/source/red_flags_edges_v4_2026.9.10.csv" --wipe
 ```
 
-Chatbot GraphRAG reads this pack via ``DIGIMSK_GRAPH_CSV`` / ``DIGIMSK_GRAPH_INVENTORY`` / ``DIGIMSK_GRAPH_FACTORS`` in ``bot/.env`` (local CSV; Neo4j optional). The factors sheet is node metadata for intake and is **not** imported as extra Neo4j relationships.
+Chatbot GraphRAG reads this pack via ``TRI_BACK_GRAPH_CSV`` / ``TRI_BACK_GRAPH_INVENTORY`` / ``TRI_BACK_GRAPH_FACTORS`` in ``bot/.env`` (local CSV; Neo4j optional). The factors sheet is node metadata for intake and is **not** imported as extra Neo4j relationships.

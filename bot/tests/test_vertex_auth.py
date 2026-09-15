@@ -42,7 +42,7 @@ def test_vertex_adc_ok_when_credentials_load(monkeypatch: pytest.MonkeyPatch):
 
 def test_vertex_adc_ok_on_cloud_run_metadata(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
-    monkeypatch.setenv("K_SERVICE", "digimskbot")
+    monkeypatch.setenv("K_SERVICE", "tri-back")
     mock_creds = MagicMock()
     with patch("app.services.vertex_auth._adc_file_path", return_value=None):
         with patch("google.auth.default", return_value=(mock_creds, "project-x")):

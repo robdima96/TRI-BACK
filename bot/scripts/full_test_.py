@@ -407,10 +407,10 @@ def main() -> int:
     args = parser.parse_args()
     _configure_logging(verbose=args.verbose)
 
-    os.environ.setdefault("DIGIMSK_LOAD_RAG", "1")
-    os.environ.setdefault("DIGIMSK_LOAD_NER", "1")
+    os.environ.setdefault("TRI_BACK_LOAD_RAG", "1")
+    os.environ.setdefault("TRI_BACK_LOAD_NER", "1")
     # Keep batch stable/safe on CPU-only runs: use deterministic fallback generator.
-    os.environ.setdefault("DIGIMSK_GENERATOR_DIR", "__fulltest_no_generator__")
+    os.environ.setdefault("TRI_BACK_GENERATOR_DIR", "__fulltest_no_generator__")
 
     if args.message.strip():
         report = run_full_pipeline_trace(args.message.strip())

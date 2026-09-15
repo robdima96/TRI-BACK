@@ -12,7 +12,7 @@ Run from repo root::
 
 
 
-Uses ``DIGIMSK_CHROMA_PATH`` via ``settings``.
+Uses ``TRI_BACK_CHROMA_PATH`` via ``settings``.
 
 
 

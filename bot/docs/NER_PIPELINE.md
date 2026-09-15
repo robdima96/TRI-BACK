@@ -12,14 +12,14 @@ The encoder builds a **clinical checklist** from three layers:
 
 | Role | Default path | Env |
 |------|--------------|-----|
-| Sentence embeddings | `E:\TRI-BACK\Clinical_sBERT` (fallback `E:\DigiMSKbot\…`) | `TRI_BACK_ENCODER_DIR`, `TRI_BACK_RAG_EMBEDDING_BACKEND`, `TRI_BACK_ENCODER_DIM` |
-| Span NER | `E:\TRI-BACK\GliNER-BioMed` (fallback `E:\DigiMSKbot\…`) | `TRI_BACK_GLINER_MODEL_DIR` |
+| Sentence embeddings | `E:\TRI-BACK\Clinical_sBERT` (fallback `E:\TRI-BACK\…`) | `TRI_BACK_ENCODER_DIR`, `TRI_BACK_RAG_EMBEDDING_BACKEND`, `TRI_BACK_ENCODER_DIM` |
+| Span NER | `E:\TRI-BACK\GliNER-BioMed` (fallback `E:\TRI-BACK\…`) | `TRI_BACK_GLINER_MODEL_DIR` |
 
 Production loads Clinical_sBERT with `sentence_transformers` (`encode()` + optional L2 normalize).
 GliNER-BioMed is **not** used for vectors unless you set `TRI_BACK_RAG_EMBEDDING_BACKEND=hf_mean_pool`
 and point `TRI_BACK_ENCODER_DIR` at a Hugging Face / GliNER backbone folder.
 
-Legacy `DIGIMSK_*` names still resolve.
+Legacy `TRI_BACK_*` names still resolve.
 
 After changing the RAG model, empty Chroma and re-ingest:
 

@@ -35,7 +35,13 @@ from vignettes import load_scenarios
 UV_DIR = Path(__file__).resolve().parent
 DEFAULT_CSV = UV_DIR / "LBPvignettes_conv.csv"
 DEFAULT_PROMPT = UV_DIR / "system_prompt_1.txt"
-DEFAULT_MODEL = Path(r"E:\DigiMSKbot\Mistral7Binstruct")
+
+
+def _default_model() -> Path:
+    return Path(r"E:\TRI-BACK\Mistral7Binstruct")
+
+
+DEFAULT_MODEL = _default_model()
 DEFAULT_OUTPUT = UV_DIR / "output"
 
 

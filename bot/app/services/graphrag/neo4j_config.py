@@ -21,7 +21,7 @@ _DEFAULT_FACTORS = _KB_MANUAL / "red_flags_factors_v4_2026.9.10.csv"
 
 
 def _resolve_env_path(var_name: str, fallback: Path) -> Path:
-    """Resolve ``TRI_BACK_GRAPH_*`` (or legacy ``DIGIMSK_GRAPH_*``) from ``bot/.env``."""
+    """Resolve ``TRI_BACK_GRAPH_*`` from ``bot/.env``."""
     from app.config import env_lookup
 
     # bot/.env is authoritative for TRI-BACK graph pointers; do not override

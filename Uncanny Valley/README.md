@@ -23,7 +23,7 @@ cd "Uncanny Valley"
 pip install -r requirements.txt
 ```
 
-Model path default: `E:\DigiMSKbot\Mistral7Binstruct` (must contain `*.safetensors`).
+Model path default: `E:\TRI-BACK\Mistral7Binstruct` (must contain `*.safetensors`).
 
 ## Run
 

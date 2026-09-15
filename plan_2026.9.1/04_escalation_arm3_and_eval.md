@@ -85,9 +85,9 @@ The clear in `generate_question_node` is deliberate: it stops a previous turn's 
 
 ### 7. Widen the schema literals in both hand-mirrored files
 
-`mode` is `Literal["traversal"]` in `bot/app/services/graphrag/schemas.py` **and** in the duplicated study-app copy `prototypes/digimsk_study_app/digimsk_study_app/graph/schemas.py`. `TraversalAction` is likewise a closed literal in both.
+`mode` is `Literal["traversal"]` in `bot/app/services/graphrag/schemas.py` **and** in the duplicated study-app copy `prototypes/tri_back_study_app/tri_back_study_app/graph/schemas.py`. `TraversalAction` is likewise a closed literal in both.
 
-Adding `intake_gap` plus the new step actions (`graph_gap`, `ask_factor`, `deny_factor`) without editing **both** will fail Pydantic validation in the study app. `scripts/sync_digimsk_cytoscape.py` syncs the Cytoscape JS but **not** these schemas — the mirror is manual.
+Adding `intake_gap` plus the new step actions (`graph_gap`, `ask_factor`, `deny_factor`) without editing **both** will fail Pydantic validation in the study app. `scripts/sync_tri_back_cytoscape.py` syncs the Cytoscape JS but **not** these schemas — the mirror is manual.
 
 ### 8. Persistence
 
