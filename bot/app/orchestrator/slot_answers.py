@@ -1,9 +1,14 @@
-"""Credit free-text answers to the intake slot the assistant just asked.
+"""Credit free-text answers to intake slots the patient already answered.
 
 When the patient answers a palliative/provocative (etc.) question with a short
 phrase like "Exercise", pattern cues such as "better with" are often absent.
 Without this fallback, coverage keeps the slot missing and the planner re-asks
 — even when the patient already answered clearly.
+
+The asked slot still gets that free-text credit. Other still-missing creditable
+slots are filled only when the same message independently answers them (so a
+compact reply like ``60M`` can close age *and* sex without dumping the whole
+utterance into quality/palliative).
 """
 
 from __future__ import annotations
@@ -57,6 +62,10 @@ _EMPTY_ANSWER = re.compile(
     re.I,
 )
 
+# Compact clinical token: digits plus an optional leftover used with _SEX_CANONICAL.
+_COMPACT_AGE = re.compile(r"^(\d{1,3})(.*)$", re.I)
+_LEADING_AGE = re.compile(r"^\s*(\d{1,3})\b")
+
 
 def _has_kind_label(
     checklist: list[dict[str, str]], *, kind: str, label: str
@@ -85,6 +94,115 @@ def _slot_already_filled(checklist: list[dict[str, str]], slot: SlotName) -> boo
     return False
 
 
+def _snippet(text: str) -> str:
+    return text if len(text) <= 120 else text[:117].rstrip() + "..."
+
+
+def _row_for_slot(slot: SlotName, text: str, *, source: str = "slot_answer") -> ChecklistItem | None:
+    kind_label = _SLOT_KIND_LABEL.get(slot)
+    if not kind_label or not text.strip():
+        return None
+    kind, label = kind_label
+    return ChecklistItem(
+        text=_snippet(text.strip()),
+        kind=kind,
+        source=source,
+        label=label,
+    )
+
+
+def _age_years(raw: str) -> str | None:
+    try:
+        years = int(raw)
+    except ValueError:
+        return None
+    if 1 <= years <= 120:
+        return str(years)
+    return None
+
+
+def _sex_from_canonical_leftover(leftover: str) -> str | None:
+    from app.services.encoder import _SEX_CANONICAL, _canonical_sex_text
+
+    token = leftover.strip(" .,-/")
+    if not token:
+        return None
+    low = token.casefold()
+    if low in _SEX_CANONICAL:
+        return _SEX_CANONICAL[low]
+    mapped = _canonical_sex_text(token)
+    if mapped and mapped.casefold() in _SEX_CANONICAL.values():
+        return mapped
+    return None
+
+
+def _independent_items(slot: SlotName, message: str) -> list[ChecklistItem]:
+    """Fill ``slot`` only when the message independently answers it."""
+    from app.services.encoder import (
+        _SEX_VALUE_WORDS,
+        _canonical_sex_text,
+        _pattern_demographics_age,
+        _pattern_demographics_sex,
+        _pattern_durations,
+        _pattern_pall,
+        _pattern_provoc,
+        _pattern_quality,
+        _pattern_severity,
+    )
+
+    text = (message or "").strip()
+    if not text:
+        return []
+
+    if slot == "age":
+        items = list(_pattern_demographics_age(text))
+        if items:
+            return items
+        compact = _COMPACT_AGE.match(text.replace(" ", ""))
+        if compact:
+            years = _age_years(compact.group(1))
+            leftover = compact.group(2) or ""
+            # Only treat as age when leftover is empty or a sex letter (60 / 60M),
+            # not units like mg/ml.
+            if years and (not leftover or _sex_from_canonical_leftover(leftover)):
+                row = _row_for_slot("age", years)
+                return [row] if row else []
+        leading = _LEADING_AGE.match(text)
+        if leading and _pattern_demographics_age(text):
+            return _pattern_demographics_age(text)
+        return []
+
+    if slot == "sex":
+        items = list(_pattern_demographics_sex(text))
+        if items:
+            return items
+        word = re.search(rf"\b({_SEX_VALUE_WORDS})\b", text, re.I)
+        if word:
+            mapped = _canonical_sex_text(word.group(1))
+            row = _row_for_slot("sex", mapped)
+            return [row] if row else []
+        compact = _COMPACT_AGE.match(text.replace(" ", ""))
+        if compact:
+            leftover = compact.group(2) or ""
+            mapped = _sex_from_canonical_leftover(leftover)
+            if mapped and _age_years(compact.group(1)):
+                row = _row_for_slot("sex", mapped)
+                return [row] if row else []
+        return []
+
+    if slot == "symptom_quality":
+        return list(_pattern_quality(text))
+    if slot == "symptom_severity":
+        return list(_pattern_severity(text))
+    if slot == "symptom_duration":
+        return list(_pattern_durations(text))
+    if slot == "provocative":
+        return list(_pattern_provoc(text))
+    if slot == "palliative":
+        return list(_pattern_pall(text))
+    return []
+
+
 def credit_asked_slot_answer(
     *,
     message: str,
@@ -100,17 +218,57 @@ def credit_asked_slot_answer(
     if _slot_already_filled(checklist, last_asked_slot):
         return []
 
-    kind_label = _SLOT_KIND_LABEL.get(last_asked_slot)
-    if not kind_label:
+    independent = _independent_items(last_asked_slot, text)
+    if independent:
+        return independent
+
+    row = _row_for_slot(last_asked_slot, text)
+    return [row] if row else []
+
+
+def credit_volunteered_slots(
+    *,
+    message: str,
+    last_asked_slot: SlotName | None,
+    checklist: list[dict[str, str]],
+) -> list[ChecklistItem]:
+    """Credit the asked slot plus any other missing slots the message answers."""
+    text = (message or "").strip()
+    if not text or _EMPTY_ANSWER.match(text):
         return []
-    kind, label = kind_label
-    # Keep short, readable answers; truncate runaway paste.
-    snippet = text if len(text) <= 120 else text[:117].rstrip() + "..."
-    return [
-        ChecklistItem(
-            text=snippet,
-            kind=kind,
-            source="slot_answer",
-            label=label,
-        )
-    ]
+
+    out: list[ChecklistItem] = []
+    working = list(checklist)
+
+    asked = credit_asked_slot_answer(
+        message=text,
+        last_asked_slot=last_asked_slot,
+        checklist=working,
+    )
+    for item in asked:
+        out.append(item)
+        working.append(item.model_dump())
+
+    for slot in (
+        "age",
+        "sex",
+        "symptom_anchor",
+        "symptom_quality",
+        "symptom_severity",
+        "symptom_duration",
+        "provocative",
+        "palliative",
+    ):
+        if slot == last_asked_slot:
+            continue
+        if slot not in _CREDITABLE_SLOTS:
+            continue
+        if _slot_already_filled(working, slot):
+            continue
+        extra = _independent_items(slot, text)
+        for item in extra:
+            if _slot_already_filled(working, slot):
+                break
+            out.append(item)
+            working.append(item.model_dump())
+    return out

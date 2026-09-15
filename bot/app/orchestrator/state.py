@@ -48,6 +48,9 @@ class ChatState(TypedDict):
     questions_asked: NotRequired[int]
     last_asked_slot: NotRequired[SlotName | None]
     slot_being_asked: NotRequired[SlotName | None]
+    # intake until a disposition/escalation is issued; then dormant until symptoms change.
+    session_phase: NotRequired[str]
+    symptoms_changed: NotRequired[bool]
     # Canonical Factor name last asked (parallel to last_asked_slot). None on slot turns.
     asked_factor: NotRequired[str | None]
     # Coherence guard: previous ranker topic + tier (survives question turns).

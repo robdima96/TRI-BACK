@@ -1,6 +1,7 @@
 from langgraph.graph import END, START, StateGraph
 
 from app.orchestrator.nodes import (
+    dormant_reply_node,
     encode_input_node,
     enrich_checklist_node,
     evaluate_coverage_node,
@@ -37,9 +38,13 @@ def _disposition_entry() -> str:
 
 
 def _route_after_encode(state: ChatState) -> str:
-    """Skip intake LLM work when a hard risk pattern already fired."""
+    """Skip intake LLM work when a hard risk pattern already fired or session is dormant."""
     if state.get("risk_hits"):
         return "policy_gate"
+    from app.orchestrator.dormant import is_dormant_phase
+
+    if is_dormant_phase(state) and not state.get("symptoms_changed"):
+        return "dormant_reply"
     return "enrich_checklist"
 
 
@@ -66,6 +71,7 @@ def build_chat_graph(checkpointer=None):
     graph.add_node("evaluate_coverage", evaluate_coverage_node)
     graph.add_node("plan_question", plan_question_node)
     graph.add_node("generate_question", generate_question_node)
+    graph.add_node("dormant_reply", dormant_reply_node)
     graph.add_node("retrieve_evidence", retrieve_evidence_node)
     graph.add_node("graph_traversal", graph_traversal_node)
     graph.add_node("generate_draft", generate_draft_node)
@@ -82,6 +88,7 @@ def build_chat_graph(checkpointer=None):
         {
             "policy_gate": "policy_gate",
             "enrich_checklist": "enrich_checklist",
+            "dormant_reply": "dormant_reply",
         },
     )
     graph.add_edge("enrich_checklist", "evaluate_coverage")
@@ -97,6 +104,7 @@ def build_chat_graph(checkpointer=None):
         },
     )
     graph.add_edge("generate_question", "finalize_response")
+    graph.add_edge("dormant_reply", "finalize_response")
     graph.add_edge("retrieve_evidence", "graph_traversal")
     graph.add_edge("graph_traversal", "generate_draft")
     graph.add_edge("generate_draft", "policy_gate")

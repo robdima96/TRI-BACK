@@ -18,6 +18,7 @@ from app.session_enrichment import (
     exposed_chat_graph_fields,
 )
 from app.session_store import save_session
+from app.orchestrator.session_resume import maybe_resume_from_session
 from app.services.public_host.api_auth import (
     enforce_chat_rate_limit,
     require_bot_api_key,
@@ -68,6 +69,7 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
     sid = req.session_id.strip()
     enforce_chat_rate_limit(request, sid)
     config = {"configurable": {"thread_id": sid}} # LangGraph thread_id maps to chat session_id
+    maybe_resume_from_session(chat_graph, config, sid)
 
     state = chat_graph.invoke( # invoke the chat graph with the session_id and the user message
                                # all other vars restored from SQLite checkpoint using thread_id
@@ -101,6 +103,7 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
         "extraction_history": extraction_history,
         "orchestrator": orchestrator,
         "factor_states": dict(state.get("factor_states") or {}),
+        "session_phase": state.get("session_phase") or "intake",
     }
     if disposition is not None:
         save_kwargs["disposition"] = disposition

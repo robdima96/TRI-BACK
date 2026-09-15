@@ -10,18 +10,47 @@ from tri_back_study_app.graph import BotTraversalClient, reasoning_text
 from tri_back_study_app.graph.cytoscape_builder import arm3_keyed_json
 from tri_back_study_app.models.chat_types import filter_display_citations
 
-_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+_SENTENCE_SPLIT = re.compile(r"(?<!\d)(?<=[.!?])\s+")
+_NUMBERED_ITEM = re.compile(r"^\s*\d+\.\s")
+_INSTRUCTION_HEADING = re.compile(
+    r"accuracy|graph disposition brief|no diagnosis/prescription|"
+    r"step-by-step derivation|strictly follow",
+    re.I,
+)
+_TRIAGE_SPEECH = re.compile(
+    r"\b("
+    r"emergency department|emergency room|\bed\b|urgent care|self-care|"
+    r"see a (?:doctor|clinician|physician)|go to (?:the )?(?:er|hospital)|"
+    r"in-person assessment"
+    r")\b",
+    re.I,
+)
 
 
 def simplify_disposition(text: str, *, max_sentences: int = 2) -> str:
-    """Arm 1: keep the triage recommendation, drop elongated explanation."""
+    """Arm 1: keep the triage recommendation, drop elongated explanation.
+
+    Numbered-list periods (``2. ``) are not sentence boundaries. Instruction
+    headings and tiny fragments are skipped so a leaked CoT cannot collapse to
+    `` `. 2. ``. If nothing usable remains, keep the original text.
+    """
     cleaned = (text or "").strip()
     if not cleaned:
         return cleaned
     parts = [p.strip() for p in _SENTENCE_SPLIT.split(cleaned) if p.strip()]
-    if len(parts) <= max_sentences:
+    usable: list[str] = []
+    for part in parts:
+        if _NUMBERED_ITEM.match(part):
+            continue
+        if len(part) <= 3 and not _TRIAGE_SPEECH.search(part):
+            continue
+        if _INSTRUCTION_HEADING.search(part) and not _TRIAGE_SPEECH.search(part):
+            continue
+        usable.append(part)
+    if not usable:
         return cleaned
-    return " ".join(parts[:max_sentences])
+    chosen = usable[:max_sentences]
+    return " ".join(chosen)
 
 
 class PresentationAdapter:

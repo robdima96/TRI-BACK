@@ -29,32 +29,38 @@ GENERATOR_SYSTEM_FAILURE_REASON = "system_failure:generator_unavailable"
 _tok_gen: Any = None  # tokenizer
 _mdl_gen: Any = None  # model
 
-# define chatbot role, constraints, and behavior
-# CoT: Chain of Thought added
+# Role constraints for the wording model (Vertex system_instruction / local system turn).
+# Gemini 2.5 already has native thinking parts; do not ask for <thinking>/<answer> tags.
 _SYSTEM_INSTRUCTION = (
     "You are a helpful, respectful, musculoskeletal health information assistant. "
-    "To ensure absolute accuracy, you must think through problems step-by-step before providing a final answer"
-    "Structure your response into two distinct sections:"
-    "1. <thinking>"
-    "Break down the user's request."
-    "List the constraints, variables, or core logic rules."
-    "Show your step-by-step work, calculations, or logical deductions."
-    "Challenge your own assumptions and check for errors."
-    "2. <answer>"
-    "State the clear, direct final answer based strictly on the reasoning inside the <thinking> block."
-    "Never skip the <thinking> process, even for simple-looking requests."
-    "Keep the <thinking> section focused purely on logic and calculation and the Evidence provided."
     "If the evidence does not cover the question, say you don't have enough information. "
     "Never diagnose. Never prescribe. "
     "For disposition turns, give a clear triage recommendation on whether the patient should "
     "attend the emergency department (ED) now, seek urgent or routine in-person care, or "
     "manage with self-care while monitoring for red flags. "
+    "Write only the patient-facing recommendation: short paragraphs, no numbered protocol, "
+    "no prompt restatement, no chain-of-thought. "
     "For all queries, keep in mind that your role is to support the individual's "
-    "capacity to cope with life autonomously — not to provide a formal diagnosis or treatment. "
-    ""
+    "capacity to cope with life autonomously — not to provide a formal diagnosis or treatment."
 )
 
 _ANSWER_TAG_RE = re.compile(r"<answer>\s*(.*?)\s*</answer>", re.DOTALL | re.IGNORECASE)
+_ANSWER_OPEN_RE = re.compile(r"<answer>\s*(.*)", re.DOTALL | re.IGNORECASE)
+_THINKING_BLOCK_RE = re.compile(r"<thinking>.*?</thinking>", re.DOTALL | re.IGNORECASE)
+_THINKING_OPEN_RE = re.compile(r"<thinking>.*", re.DOTALL | re.IGNORECASE)
+_SCAFFOLD_RE = re.compile(
+    r"graph disposition brief|\*\*Accuracy\*\*|Step-by-step derivation|"
+    r"No Diagnosis/Prescription|Strictly follow the",
+    re.I,
+)
+_TRIAGE_SPEECH_RE = re.compile(
+    r"\b("
+    r"emergency department|emergency room|\bed\b|urgent care|self-care|"
+    r"see a (?:doctor|clinician|physician)|go to (?:the )?(?:er|hospital)|"
+    r"in-person assessment"
+    r")\b",
+    re.I,
+)
 
 
 def _generator_path_looks_valid(generator_dir: str) -> bool:
@@ -104,11 +110,34 @@ def generator_status_detail() -> str:
 
 
 def extract_answer_text(text: str) -> str:
-    """Prefer content inside ``<answer>`` when the model uses CoT tags."""
-    match = _ANSWER_TAG_RE.search(text)
-    if match:
-        return match.group(1).strip()
-    return text.strip()
+    """Prefer content inside ``<answer>`` when the model uses CoT tags.
+
+    Accepts an unclosed ``<answer>`` through end-of-string and strips
+    ``<thinking>`` even when the close tag is missing.
+    """
+    raw = (text or "").strip()
+    if not raw:
+        return ""
+    closed = _ANSWER_TAG_RE.search(raw)
+    if closed:
+        return closed.group(1).strip()
+    opened = _ANSWER_OPEN_RE.search(raw)
+    if opened:
+        body = opened.group(1).strip()
+        body = re.sub(r"</answer>\s*$", "", body, flags=re.I).strip()
+        if body:
+            return body
+    cleaned = _THINKING_BLOCK_RE.sub("", raw).strip()
+    cleaned = _THINKING_OPEN_RE.sub("", cleaned).strip()
+    return cleaned or raw
+
+
+def looks_like_instruction_echo(text: str) -> bool:
+    """True when the draft restates prompt protocol and has no patient-facing triage."""
+    blob = (text or "").strip()
+    if not blob or not _SCAFFOLD_RE.search(blob):
+        return False
+    return not _TRIAGE_SPEECH_RE.search(blob)
 
 
 def _generate_local_messages(
@@ -207,13 +236,14 @@ def _build_messages_for_chat(
     if brief_block:
         brief_block = f"{brief_block}\n\n"
     current_content = (
-        f"{_SYSTEM_INSTRUCTION}\n\n"
         f"{intake_block}"
         f"{brief_block}"
         f"Evidence:\n{block}\n\n"
         f"Current user message: {query}"
     )
-    messages: list[dict[str, str]] = []
+    messages: list[dict[str, str]] = [
+        {"role": "system", "content": _SYSTEM_INSTRUCTION},
+    ]
     for turn in conversation_history or []:
         role = turn.get("role", "user")
         content = turn.get("content", "")
@@ -263,6 +293,9 @@ def generate_response(
         text = extract_answer_text(raw)
         if not text.strip():
             _log.warning("generator returned empty text; treating as system failure")
+            return _generator_unavailable_stub(query, evidence, conversation_history)
+        if looks_like_instruction_echo(text):
+            _log.warning("generator echoed prompt scaffolding; treating as system failure")
             return _generator_unavailable_stub(query, evidence, conversation_history)
         return text
     except Exception as e:

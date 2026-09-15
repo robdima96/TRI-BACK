@@ -53,6 +53,23 @@ def _ensure_vertex() -> None:
     _vertex_initialized = True
 
 
+def _split_system_messages(
+    messages: list[dict[str, str]],
+) -> tuple[str | None, list[dict[str, str]]]:
+    """Peel ``role=system`` turns into a Vertex system_instruction string."""
+    parts: list[str] = []
+    rest: list[dict[str, str]] = []
+    for turn in messages:
+        if turn.get("role") == "system":
+            content = (turn.get("content") or "").strip()
+            if content:
+                parts.append(content)
+        else:
+            rest.append(turn)
+    instruction = "\n\n".join(parts) if parts else None
+    return instruction, rest
+
+
 def generate_vertex(
     messages: list[dict[str, str]],
     *,
@@ -67,10 +84,14 @@ def generate_vertex(
             "google-cloud-aiplatform not installed; pip install -e '.[generator-api]'"
         ) from exc
 
-    history, last_message = _vertex_history(messages)
-    if not last_message and messages:
-        last_message = messages[-1].get("content", "")
-    model = GenerativeModel(settings.generator_model)
+    system_instruction, chat_messages = _split_system_messages(messages)
+    history, last_message = _vertex_history(chat_messages)
+    if not last_message and chat_messages:
+        last_message = chat_messages[-1].get("content", "")
+    model_kwargs: dict[str, Any] = {}
+    if system_instruction:
+        model_kwargs["system_instruction"] = system_instruction
+    model = GenerativeModel(settings.generator_model, **model_kwargs)
     generation_config = GenerationConfig(
         max_output_tokens=max_new_tokens,
         temperature=temperature,

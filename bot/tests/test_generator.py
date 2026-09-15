@@ -105,11 +105,27 @@ def test_build_messages_includes_disposition_brief():
         None,
         disposition_brief=brief,
     )
-    assert len(messages) == 1
-    content = messages[0]["content"]
-    assert "Graph disposition brief (AUTHORITATIVE" in content
-    assert "Primary condition: Fracture" in content
-    assert "Evidence:" in content
+    assert messages[0]["role"] == "system"
+    assert "<thinking>" not in messages[0]["content"]
+    user_content = messages[-1]["content"]
+    assert "Graph disposition brief (AUTHORITATIVE" in user_content
+    assert "Primary condition: Fracture" in user_content
+    assert "Evidence:" in user_content
+    assert "<thinking>" not in user_content
+
+
+def test_extract_answer_text_unclosed_answer_and_echo_guard():
+    from app.services.generator import extract_answer_text, looks_like_instruction_echo
+
+    leaked = (
+        "`.\n2.  **Accuracy:** Strictly follow the `graph disposition brief`.\n"
+        "</thinking>\n<answer>\nPlease go to the emergency department now."
+    )
+    assert extract_answer_text(leaked) == "Please go to the emergency department now."
+    assert looks_like_instruction_echo(leaked) is False
+    assert looks_like_instruction_echo(
+        "2. **Accuracy:** Strictly follow the graph disposition brief."
+    )
 
 
 def test_extract_response_text_raises_on_empty_max_tokens():

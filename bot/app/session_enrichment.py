@@ -23,7 +23,9 @@ DISPOSITION_SNAPSHOT_KEYS: tuple[str, ...] = (
 # Question-turn graph payload. Empty incoming values must not wipe a prior slice.
 INTAKE_SNAPSHOT_KEYS: tuple[str, ...] = ("intake_traversal",)
 
-PRESERVE_IF_EMPTY_KEYS: tuple[str, ...] = DISPOSITION_SNAPSHOT_KEYS + INTAKE_SNAPSHOT_KEYS
+PRESERVE_IF_EMPTY_KEYS: tuple[str, ...] = (
+    DISPOSITION_SNAPSHOT_KEYS + INTAKE_SNAPSHOT_KEYS + ("clinical_checklist",)
+)
 
 
 def exposed_chat_graph_fields(
@@ -278,6 +280,7 @@ def build_orchestrator_snapshot(state: dict[str, Any], *, turn_index: int) -> di
         "coverage": slim_coverage(coverage if isinstance(coverage, dict) else None),
         "generator_failed": bool(state.get("generator_failed")),
         "comorbidities_acknowledged": bool(state.get("comorbidities_acknowledged")),
+        "session_phase": state.get("session_phase") or "intake",
         "factor_states": dict(state.get("factor_states") or {}),
         "intake_traversal": compact_graph_for_session(
             state.get("intake_traversal") if isinstance(state.get("intake_traversal"), dict) else None
@@ -415,4 +418,5 @@ def default_session_fields(session_id: str) -> dict[str, Any]:
         "agent_trace": None,
         "graph_traversal": None,
         "intake_traversal": None,
+        "session_phase": "intake",
     }

@@ -18,7 +18,15 @@ from app.orchestrator.messages import conversation_history_before_last_user
 
 from app.orchestrator.question_planner import plan_forced_factor_question, plan_next_question
 
-from app.orchestrator.slot_answers import credit_asked_slot_answer
+from app.orchestrator.dormant import (
+    DORMANT_PHASE,
+    DORMANT_REPLY,
+    INTAKE_PHASE,
+    detect_symptom_change,
+    is_dormant_phase,
+)
+
+from app.orchestrator.slot_answers import credit_volunteered_slots
 
 from app.orchestrator.factor_answers import credit_asked_factor_answer
 
@@ -106,6 +114,15 @@ def encode_input_node(state: ChatState) -> ChatState:
 
     state["encoder_pooled_embedding"] = enc.pooled_embedding
 
+    changed = detect_symptom_change(
+        message=state.get("message") or "",
+        prior_checklist=prior,
+        merged_checklist=merged,
+    )
+    state["symptoms_changed"] = changed
+    if changed and is_dormant_phase(state):
+        state["session_phase"] = INTAKE_PHASE
+
     return state
 
 
@@ -129,7 +146,7 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
     if asked_factor:
         last_asked = None
     else:
-        slot_credit = credit_asked_slot_answer(
+        slot_credit = credit_volunteered_slots(
             message=latest_message,
             last_asked_slot=last_asked,
             checklist=encoder_merged,
@@ -574,6 +591,25 @@ def policy_gate_node(state: ChatState) -> ChatState:
 
     state["final_response"] = final_response
 
+    if state.get("risk_hits") or not state.get("question_mode"):
+        state["question_mode"] = False
+        state["session_phase"] = DORMANT_PHASE
+
+    return state
+
+
+def dormant_reply_node(state: ChatState) -> ChatState:
+    """Canned post-disposition reply; skip enricher / planner / RAG / generator."""
+    state["session_phase"] = DORMANT_PHASE
+    state["question_mode"] = False
+    state["final_response"] = DORMANT_REPLY
+    state["draft_response"] = DORMANT_REPLY
+    state["escalated"] = False
+    state["safety_reason"] = None
+    state["evidence"] = []
+    state["next_question"] = None
+    state["slot_being_asked"] = None
+    state["asked_factor"] = None
     return state
 
 

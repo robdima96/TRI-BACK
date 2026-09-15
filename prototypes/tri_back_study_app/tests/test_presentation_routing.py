@@ -38,6 +38,17 @@ def test_simplify_disposition_trims_long_explanation():
     assert out.count(".") == 2
 
 
+def test_simplify_disposition_does_not_collapse_numbered_cot_leak():
+    leaked = (
+        "`.\n2.  **Accuracy:** Strictly follow the `graph disposition brief` "
+        "and `Evidence`.\n3.  **No Diagnosis/Prescription:** Do not diagnose.\n"
+        "Please go to the emergency department now for an in-person assessment."
+    )
+    out = simplify_disposition(leaked)
+    assert out != "`. 2."
+    assert "emergency department" in out.casefold()
+
+
 def test_reasoning_is_narrative_not_debug_dump():
     trace = GraphTraversalTrace(
         trace_id="t1",

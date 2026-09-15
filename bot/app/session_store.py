@@ -167,6 +167,39 @@ def merge_messages_preserving_study(
     return prefix + new
 
 
+def _merge_turn_histories(
+    existing: list[dict[str, Any]] | None,
+    incoming: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """Keep earlier turns when a reset checkpoint would send a shorter history.
+
+    Same ``turn_index`` is replaced. If incoming looks like a restarted thread
+    (max index behind existing), append the latest incoming row as the next turn.
+    """
+    prior = [row for row in (existing or []) if isinstance(row, dict)]
+    new = [row for row in (incoming or []) if isinstance(row, dict)]
+    if not new:
+        return prior
+    if not prior:
+        return new
+    exist_max = max(int(row.get("turn_index") or 0) for row in prior)
+    inc_max = max(int(row.get("turn_index") or 0) for row in new)
+    if inc_max >= exist_max and len(new) >= len(prior):
+        by_index: dict[int, dict[str, Any]] = {}
+        for row in prior:
+            idx = row.get("turn_index")
+            if idx is not None:
+                by_index[int(idx)] = row
+        for row in new:
+            idx = row.get("turn_index")
+            if idx is not None:
+                by_index[int(idx)] = row
+        return [by_index[k] for k in sorted(by_index)]
+    last = dict(new[-1])
+    last["turn_index"] = exist_max + 1
+    return prior + [last]
+
+
 def merge_session_fields(existing: dict[str, Any], fields: dict[str, Any]) -> dict[str, Any]:
     """Merge a turn update into the session snapshot without wiping disposition.
 
@@ -192,6 +225,16 @@ def merge_session_fields(existing: dict[str, Any], fields: dict[str, Any]) -> di
         prior_states = merged.get("factor_states")
         prior = prior_states if isinstance(prior_states, dict) else {}
         incoming["factor_states"] = {**prior, **incoming["factor_states"]}
+
+    if "extraction_history" in incoming:
+        incoming["extraction_history"] = _merge_turn_histories(
+            merged.get("extraction_history")
+            if isinstance(merged.get("extraction_history"), list)
+            else None,
+            incoming.get("extraction_history")
+            if isinstance(incoming.get("extraction_history"), list)
+            else None,
+        )
 
     # Never let callers null-out durable graph snapshots.
     for key in PRESERVE_IF_EMPTY_KEYS:

@@ -94,6 +94,7 @@ _BOT_OWNED_KEYS = frozenset(
         "intake_traversal",
         "intake_history",
         "factor_states",
+        "session_phase",
     }
 )
 
