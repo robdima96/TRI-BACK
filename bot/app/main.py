@@ -76,6 +76,7 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
         {
             "session_id": req.session_id,
             "messages": [HumanMessage(content=req.message)],
+            "requested_triage_profile_id": (req.triage_profile_id or "").strip(),
         },
         config,
     )
@@ -104,6 +105,7 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
         "orchestrator": orchestrator,
         "factor_states": dict(state.get("factor_states") or {}),
         "session_phase": state.get("session_phase") or "intake",
+        "triage_profile_id": state.get("triage_profile_id") or "low_back",
     }
     if disposition is not None:
         save_kwargs["disposition"] = disposition

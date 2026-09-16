@@ -53,6 +53,9 @@ def resume_values_from_session(stored: dict[str, Any]) -> dict[str, Any]:
 
     values: dict[str, Any] = {
         "session_id": stored.get("session_id") or "",
+        "triage_profile_id": stored.get("triage_profile_id")
+        or orch.get("triage_profile_id")
+        or "low_back",
         "clinical_checklist": list(stored.get("clinical_checklist") or []),
         "extraction_history": list(stored.get("extraction_history") or []),
         "factor_states": dict(stored.get("factor_states") or orch.get("factor_states") or {}),

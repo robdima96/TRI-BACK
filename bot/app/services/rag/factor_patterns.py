@@ -397,7 +397,7 @@ def _sex_factor(text: str) -> str | None:
     return None
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=4)
 def load_factor_names(inventory_path: str) -> tuple[str, ...]:
     path = Path(inventory_path)
     if not path.is_file():
@@ -456,7 +456,7 @@ def _cooccur_pattern(anchor: str, cue: str) -> re.Pattern[str]:
     )
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=4)
 def build_factor_patterns(inventory_path: str) -> tuple[FactorPattern, ...]:
     factors = load_factor_names(inventory_path)
     factor_set = set(factors)

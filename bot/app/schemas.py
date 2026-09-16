@@ -55,6 +55,9 @@ class EncoderOutput(BaseModel):
 class ChatRequest(BaseModel):
     session_id: str
     message: str
+    # First turn stamps this on ChatState; later turns are ignored.
+    # Future body-area UI can pass a registered id (default: low_back).
+    triage_profile_id: str = "low_back"
 
 
 class ChatResponse(BaseModel):

@@ -36,26 +36,47 @@ def test_skips_when_palliative_already_present():
     assert items == []
 
 
-def test_skips_empty_non_answers():
-    assert (
-        credit_asked_slot_answer(
-            message="I don't know",
-            last_asked_slot="palliative",
-            checklist=[],
-        )
-        == []
+def test_empty_non_answers_fill_asked_slot_as_na():
+    items = credit_asked_slot_answer(
+        message="I don't know",
+        last_asked_slot="palliative",
+        checklist=[],
     )
+    assert len(items) == 1
+    assert items[0].kind == "palliative"
+    assert items[0].text == "N/A"
 
 
-def test_skips_bare_no_on_slot_questions():
-    assert (
-        credit_asked_slot_answer(
-            message="no",
-            last_asked_slot="palliative",
-            checklist=[],
-        )
-        == []
+def test_bare_no_on_slot_questions_fills_na():
+    items = credit_asked_slot_answer(
+        message="no",
+        last_asked_slot="palliative",
+        checklist=[],
     )
+    assert len(items) == 1
+    assert items[0].text == "N/A"
+
+
+def test_nothing_fills_provocative_as_na():
+    items = credit_asked_slot_answer(
+        message="nothing",
+        last_asked_slot="provocative",
+        checklist=[],
+    )
+    assert len(items) == 1
+    assert items[0].kind == "provocative"
+    assert items[0].label == "provocative"
+    assert items[0].text == "N/A"
+    checklist = [
+        {"text": "low back pain", "kind": "ner_entity", "source": "gliner", "label": "symptom"},
+        items[0].model_dump(),
+    ]
+    report, _, _ = evaluate_checklist_coverage(
+        checklist=checklist,
+        comorbidities_acknowledged=True,
+    )
+    missing = {m["slot"] for m in report["missing_slots"]}
+    assert "provocative" not in missing
 
 
 def test_credited_row_satisfies_coverage():
@@ -127,15 +148,16 @@ def test_volunteered_rejects_60mg():
     assert not any(it.label == "sex" for it in items)
 
 
-def test_volunteered_skips_question_mark():
-    assert (
-        credit_volunteered_slots(
-            message="?",
-            last_asked_slot="age",
-            checklist=[],
-        )
-        == []
+def test_volunteered_question_mark_fills_asked_slot_as_na():
+    items = credit_volunteered_slots(
+        message="?",
+        last_asked_slot="age",
+        checklist=[],
     )
+    assert len(items) == 1
+    assert items[0].label == "age"
+    assert items[0].text == "N/A"
+    assert not any(it.label == "sex" for it in items)
 
 
 def test_volunteered_mixed_one_liner_fills_several_floor_slots():

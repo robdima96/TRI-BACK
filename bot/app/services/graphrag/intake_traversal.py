@@ -265,6 +265,7 @@ def build_intake_gap_trace(
     slot_being_asked: str | None = None,
     title: str = "Intake planner slice",
     ontology: RedFlagOntology | None = None,
+    graph_csv=None,
 ) -> GraphTraversalTrace:
     """Build the accumulating planner subgraph for a question turn."""
     ont = ontology or load_ontology()
@@ -276,7 +277,7 @@ def build_intake_gap_trace(
             ask_target = None
 
     seed_names = list(dict.fromkeys([*affirmed, *denied, *([ask_target] if ask_target else [])]))
-    client = get_graph_client()
+    client = get_graph_client(csv_path=graph_csv)
     segments: list[PathSegment] = []
     if seed_names:
         segments = _dedupe_segments(client.paths_for_factors(seed_names))
@@ -424,12 +425,17 @@ def build_intake_gap_trace(
 
 
 def intake_trace_from_state(state: dict[str, Any]) -> GraphTraversalTrace:
+    from app.triage_profiles import load_ontology_for_profile, profile_from_state
+
+    profile = profile_from_state(state)
     return build_intake_gap_trace(
         factor_states=state.get("factor_states"),
         asked_factor=state.get("asked_factor"),
         question_reason=state.get("question_reason"),
         slot_being_asked=state.get("slot_being_asked"),
         title=f"Intake planner: {state.get('session_id', '')}",
+        ontology=load_ontology_for_profile(profile),
+        graph_csv=profile.graph_csv,
     )
 
 
@@ -439,12 +445,17 @@ def final_intake_trace_from_state(state: dict[str, Any]) -> GraphTraversalTrace:
     Built at disposition / escalate so Arm 3 can show the question path once,
     after advice, without highlighting a factor that was already answered.
     """
+    from app.triage_profiles import load_ontology_for_profile, profile_from_state
+
+    profile = profile_from_state(state)
     return build_intake_gap_trace(
         factor_states=state.get("factor_states"),
         asked_factor=None,
         question_reason=None,
         slot_being_asked=None,
         title=f"Intake path: {state.get('session_id', '')}",
+        ontology=load_ontology_for_profile(profile),
+        graph_csv=profile.graph_csv,
     )
 
 

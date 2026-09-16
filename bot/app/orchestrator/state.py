@@ -13,6 +13,10 @@ ChecklistKeyTuple = tuple[str, str, str, str]
 # single shared state object that every node in the graph reads from and writes to
 class ChatState(TypedDict):
     session_id: str
+    # Stamped on first ingest; later turns keep this even if the request differs.
+    triage_profile_id: NotRequired[str]
+    # Incoming request id (not persisted as the session contract).
+    requested_triage_profile_id: NotRequired[str]
     # First-class chat transcript; add_messages merges incremental updates per turn.
     messages: Annotated[list[AnyMessage], add_messages]
     # Latest raw user text (set in preprocess from trailing HumanMessage).

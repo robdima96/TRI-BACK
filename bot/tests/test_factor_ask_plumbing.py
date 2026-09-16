@@ -76,10 +76,12 @@ def test_bare_no_to_factor_is_not_credited_to_slot():
         factor_states={},
     )
     assert states["Saddle anaesthesia"] == "denied"
+    # A slot "no" closes that floor slot as N/A. The live path never calls this
+    # while a graph factor is asked (last_asked_slot is parked to None).
     assert (
         credit_asked_slot_answer(
             message="no",
-            last_asked_slot="palliative",
+            last_asked_slot=None,
             checklist=[],
         )
         == []

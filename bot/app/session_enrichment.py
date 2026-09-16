@@ -281,6 +281,7 @@ def build_orchestrator_snapshot(state: dict[str, Any], *, turn_index: int) -> di
         "generator_failed": bool(state.get("generator_failed")),
         "comorbidities_acknowledged": bool(state.get("comorbidities_acknowledged")),
         "session_phase": state.get("session_phase") or "intake",
+        "triage_profile_id": state.get("triage_profile_id") or "low_back",
         "factor_states": dict(state.get("factor_states") or {}),
         "intake_traversal": compact_graph_for_session(
             state.get("intake_traversal") if isinstance(state.get("intake_traversal"), dict) else None
@@ -419,4 +420,5 @@ def default_session_fields(session_id: str) -> dict[str, Any]:
         "graph_traversal": None,
         "intake_traversal": None,
         "session_phase": "intake",
+        "triage_profile_id": "low_back",
     }

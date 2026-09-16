@@ -23,6 +23,7 @@ def _coverage(**kwargs) -> CoverageReport:
 
 
 def test_planner_asks_symptom_anchor_before_age():
+    """Unassumed coverage (no profile seed) still elicits a chief complaint first."""
     cov = _coverage(
         missing_slots=[
             {"slot": "age", "satisfied": False},

@@ -27,9 +27,10 @@ from app.orchestrator.relevance_ranker import (
 )
 from app.services.agentic_graph_rag.ontology import (
     FactorQuestionSpec,
+    RedFlagOntology,
     get_factor_question_spec,
-    load_ontology,
 )
+from app.triage_profiles import TriageProfile, load_ontology_for_profile
 from app.services.intake_llm import _question_matches_slot, _sanitize_question
 
 INSUFFICIENT_INFO_REASON = "insufficient_info_time_critical"
@@ -77,6 +78,7 @@ def plan_next_question(
     matched_factors: list[str] | None = None,
     last_rank_topic: str | None = None,
     last_rank_tier: int | None = None,
+    profile: TriageProfile | None = None,
 ) -> PlannedQuestion:
     """
     Decide whether to ask one intake question or proceed to disposition.
@@ -90,7 +92,7 @@ def plan_next_question(
     if risk_hits:
         return _disposition("risk_escalation", coverage)
 
-    ontology = load_ontology()
+    ontology = load_ontology_for_profile(profile)
     remaining_floor = remaining_floor_count(coverage)
     floor_only = floor_budget_exhausted(
         questions_asked=questions_asked,
@@ -105,11 +107,15 @@ def plan_next_question(
         last_topic=last_rank_topic,
         last_tier=last_rank_tier,
         floor_only=floor_only,
+        profile=profile,
     )
 
     if questions_asked >= settings.max_questions:
         if has_unknown_time_critical(
-            factor_states, matched_factors=matched_factors, ontology=ontology
+            factor_states,
+            matched_factors=matched_factors,
+            ontology=ontology,
+            profile=profile,
         ):
             return _disposition(INSUFFICIENT_INFO_REASON, coverage)
         return _disposition("max_questions_reached", coverage)
@@ -125,6 +131,7 @@ def plan_next_question(
             winner,
             coverage,
             pending_question=pending_question,
+            ontology=ontology,
         )
     return _plan_slot_question(
         winner,
@@ -179,8 +186,9 @@ def _plan_factor_question(
     coverage: CoverageReport,
     *,
     pending_question: str | None,
+    ontology: RedFlagOntology,
 ) -> PlannedQuestion:
-    spec = get_factor_question_spec(winner.name)
+    spec = get_factor_question_spec(winner.name, ontology=ontology)
     if spec is None or not spec.askable or not spec.fallback:
         return _disposition("no_plannable_gap", coverage)
     question, phrasing = _factor_question_text(

@@ -134,6 +134,16 @@ def test_gliner_hurts_plus_back_display_name():
     assert report["symptom_instances"][0]["display_name"] == "back pain"
 
 
+def test_profile_seed_satisfies_anchor_and_stays_sticky():
+    checklist = [
+        _row("low back pain", "ner_entity", "symptom", "profile"),
+        _row("sciatica", "ner_entity", "symptom", "gliner"),
+    ]
+    report, _, _ = evaluate_checklist_coverage(checklist=checklist)
+    assert "symptom_anchor" not in {m["slot"] for m in report["missing_slots"]}
+    assert report["symptom_instances"][0]["display_name"] == "low back pain"
+
+
 def test_gliner_hurts_alone_becomes_pain():
     checklist = [_row("hurts", "ner_entity", "symptom", "gliner")]
     report, _, _ = evaluate_checklist_coverage(checklist=checklist)

@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from typing import Iterable, Literal, Sequence
 
 from app.orchestrator.intake_models import CoverageReport, SlotName
-from app.services.agentic_graph_rag.ontology import RedFlagOntology, load_ontology
+from app.services.agentic_graph_rag.ontology import RedFlagOntology
+from app.triage_profiles import TriageProfile, get_triage_profile, load_ontology_for_profile
 from app.services.rag.factor_polarity import (
     FACTOR_STATE_AFFIRMED,
     FACTOR_STATE_DENIED,
@@ -34,13 +35,12 @@ NON_SEED_FACTORS: tuple[str, ...] = (
 # Backward-compatible alias for the same exclusion set.
 DEMOGRAPHIC_SEED_FACTORS: frozenset[str] = frozenset(NON_SEED_FACTORS)
 
-TIME_CRITICAL_CONDITIONS: tuple[str, ...] = ("CES", "AAA", "DVT")
+# LBP defaults; live ranking reads the same names from the active TriageProfile.
+TIME_CRITICAL_CONDITIONS: tuple[str, ...] = get_triage_profile().time_critical_conditions
 OTHER_HIGH_ACUITY_CONDITIONS: tuple[str, ...] = (
-    "Fracture",
-    "Malignancy",
-    "Infection",
+    get_triage_profile().other_high_acuity_conditions
 )
-MECHANICAL_CONDITION = "Non-specific Mechanical Cause"
+MECHANICAL_CONDITION = get_triage_profile().mechanical_condition
 
 TIER_ANCHOR = 0
 TIER_TIME_CRITICAL = 1
@@ -70,11 +70,12 @@ TIER4_SLOT_ORDER: tuple[SlotName, ...] = (
     "symptom_duration",
 )
 
-_CONDITION_TIER: dict[str, int] = {
-    **{name: TIER_TIME_CRITICAL for name in TIME_CRITICAL_CONDITIONS},
-    **{name: TIER_OTHER_HIGH_ACUITY for name in OTHER_HIGH_ACUITY_CONDITIONS},
-    MECHANICAL_CONDITION: TIER_MECHANICAL,
-}
+def _condition_tier_map(profile: TriageProfile) -> dict[str, int]:
+    return {
+        **{name: TIER_TIME_CRITICAL for name in profile.time_critical_conditions},
+        **{name: TIER_OTHER_HIGH_ACUITY for name in profile.other_high_acuity_conditions},
+        profile.mechanical_condition: TIER_MECHANICAL,
+    }
 
 
 def _state_of(factor_states: dict[str, str] | None, factor: str) -> str:
@@ -103,8 +104,10 @@ def conditions_for_factor(factor: str, ontology: RedFlagOntology) -> tuple[str, 
     )
 
 
-def condition_tier(condition: str) -> int:
-    return _CONDITION_TIER.get(condition, TIER_MECHANICAL)
+def condition_tier(condition: str, profile: TriageProfile | None = None) -> int:
+    return _condition_tier_map(profile or get_triage_profile()).get(
+        condition, TIER_MECHANICAL
+    )
 
 
 def best_condition_for_factor(
@@ -112,6 +115,7 @@ def best_condition_for_factor(
     ontology: RedFlagOntology,
     *,
     prefer: Sequence[str] | None = None,
+    profile: TriageProfile | None = None,
 ) -> str | None:
     conditions = conditions_for_factor(factor, ontology)
     if not conditions:
@@ -121,7 +125,7 @@ def best_condition_for_factor(
         conditions,
         key=lambda name: (
             0 if name in preferred else 1,
-            condition_tier(name),
+            condition_tier(name, profile),
             ontology.conditions.index(name)
             if name in ontology.conditions
             else len(ontology.conditions),
@@ -141,7 +145,7 @@ def clinical_finding_seeds(
     ``NON_SEED_FACTORS`` (demographics, hypertension, severe pain, …) are
     excluded: they remain matched for disposition but do not open new asks.
     """
-    ont = ontology or load_ontology()
+    ont = ontology or load_ontology_for_profile()
     names: list[str] = []
     seen: set[str] = set()
 
@@ -192,7 +196,7 @@ def eligible_neighbour_factors(
     Non-askable mediators are dropped; their askable sources already sit on
     the same condition via mediated edge rows, so they remain candidates.
     """
-    ont = ontology or load_ontology()
+    ont = ontology or load_ontology_for_profile()
     seeds = clinical_finding_seeds(
         factor_states, matched_factors, ontology=ont
     )
@@ -314,6 +318,7 @@ def factor_candidates(
     factor_states: dict[str, str] | None,
     ontology: RedFlagOntology,
     matched_factors: Iterable[str] | None = None,
+    profile: TriageProfile | None = None,
 ) -> list[RankedCandidate]:
     seeds = clinical_finding_seeds(
         factor_states, matched_factors, ontology=ontology
@@ -333,11 +338,14 @@ def factor_candidates(
         conds = conditions_for_factor(factor, ontology)
         touched_for_factor = [c for c in conds if c in set(touched)]
         primary = best_condition_for_factor(
-            factor, ontology, prefer=touched_for_factor
+            factor, ontology, prefer=touched_for_factor, profile=profile
         )
         if primary is None:
             continue
-        tier = min((condition_tier(c) for c in (touched_for_factor or conds)), default=TIER_MECHANICAL)
+        tier = min(
+            (condition_tier(c, profile) for c in (touched_for_factor or conds)),
+            default=TIER_MECHANICAL,
+        )
         hits = max((matched_on.get(c, 0) for c in touched_for_factor), default=0)
         out.append(
             RankedCandidate(
@@ -392,8 +400,9 @@ def rank_question_candidates(
     last_topic: str | None = None,
     last_tier: int | None = None,
     floor_only: bool = False,
+    profile: TriageProfile | None = None,
 ) -> list[RankedCandidate]:
-    ont = ontology or load_ontology()
+    ont = ontology or load_ontology_for_profile(profile)
     slots = slot_candidates(coverage)
     factors: list[RankedCandidate] = []
     if not floor_only:
@@ -405,6 +414,7 @@ def rank_question_candidates(
             factor_states=factor_states,
             ontology=ont,
             matched_factors=matched_factors,
+            profile=profile,
         )
     pool = [*slots, *factors]
     pool.sort(key=lambda c: c.sort_key(same_topic=c.topic == last_topic))
@@ -421,17 +431,16 @@ def has_unknown_time_critical(
     *,
     matched_factors: Iterable[str] | None = None,
     ontology: RedFlagOntology | None = None,
+    profile: TriageProfile | None = None,
 ) -> bool:
-    ont = ontology or load_ontology()
+    ont = ontology or load_ontology_for_profile(profile)
+    critical = (profile or get_triage_profile()).time_critical_conditions
     for factor in eligible_neighbour_factors(
         factor_states, matched_factors=matched_factors, ontology=ont
     ):
-        primary = best_condition_for_factor(factor, ont)
-        if primary in TIME_CRITICAL_CONDITIONS:
+        primary = best_condition_for_factor(factor, ont, profile=profile)
+        if primary in critical:
             return True
-        if any(
-            c in TIME_CRITICAL_CONDITIONS
-            for c in conditions_for_factor(factor, ont)
-        ):
+        if any(c in critical for c in conditions_for_factor(factor, ont)):
             return True
     return False

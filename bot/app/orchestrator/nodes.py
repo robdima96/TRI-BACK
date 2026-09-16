@@ -4,7 +4,10 @@ import logging
 
 from app.orchestrator.checklist import ensure_checklist_ids, merge_checklist_items
 from app.session_enrichment import append_turn_extraction, build_turn_extraction_record
-from app.services.intake_enricher import propose_checklist_enrichment
+from app.services.intake_enricher import (
+    apply_factor_state_updates,
+    propose_checklist_enrichment,
+)
 
 from app.orchestrator.coverage import (
 
@@ -31,6 +34,7 @@ from app.orchestrator.slot_answers import credit_volunteered_slots
 from app.orchestrator.factor_answers import credit_asked_factor_answer
 
 from app.orchestrator.state import ChatState
+from app.triage_profiles import graph_client_for_profile, profile_from_state
 
 
 from app.services.encoder import encode_user_message
@@ -82,10 +86,12 @@ def preprocess_input_node(state: ChatState) -> ChatState:
 
 
 
-# stub- future implementation may include logging, DB, abuse detection, validation
-
 def ingest_input_node(state: ChatState) -> ChatState:
+    """Bind the session triage profile and seed an assumed chief complaint."""
+    from app.triage_profiles import bind_triage_profile, seed_profile_symptom
 
+    bind_triage_profile(state)
+    seed_profile_symptom(state)
     return state
 
 
@@ -164,6 +170,8 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
         comorbidities_acknowledged=bool(state.get("comorbidities_acknowledged")),
         session_id=state.get("session_id", ""),
         turn_index=turn_index,
+        factor_states=state.get("factor_states"),
+        profile=profile_from_state(state),
     )
 
     final_checklist = ensure_checklist_ids([dict(x) for x in encoder_merged])
@@ -183,16 +191,23 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
     if enrichment.comorbidities_acknowledged:
         state["comorbidities_acknowledged"] = True
 
-    from app.services.rag.factor_matcher import update_factor_states_from_checklist
-
-    update_factor_states_from_checklist(state, skip_llm=True)
-    if asked_factor:
-        # Explicit yes/no/unknown for the asked factor wins over matcher noise.
-        state["factor_states"] = credit_asked_factor_answer(
-            message=latest_message,
-            asked_factor=asked_factor,
-            factor_states=state.get("factor_states"),
+    if enrichment.llm_ran:
+        # Enricher owns Factor polarity when it returned parseable JSON.
+        state["factor_states"] = apply_factor_state_updates(
+            state.get("factor_states"),
+            enrichment.factor_matches,
         )
+    else:
+        from app.services.rag.factor_matcher import update_factor_states_from_checklist
+
+        update_factor_states_from_checklist(state, skip_llm=True)
+        if asked_factor:
+            # Fallback yes/no/unknown for the asked factor when the enricher is down.
+            state["factor_states"] = credit_asked_factor_answer(
+                message=latest_message,
+                asked_factor=asked_factor,
+                factor_states=state.get("factor_states"),
+            )
 
     # Stash the co-generated next question for the planner (one LLM call per turn).
     state["pending_intake_question"] = enrichment.next_question
@@ -221,6 +236,8 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
 
 def evaluate_coverage_node(state: ChatState) -> ChatState:
 
+    profile = profile_from_state(state)
+
     coverage, assignments, ack = evaluate_checklist_coverage(
 
         checklist=state.get("clinical_checklist") or [],
@@ -236,6 +253,8 @@ def evaluate_coverage_node(state: ChatState) -> ChatState:
         latest_user_message=state.get("message_normalized", ""),
 
         symptom_slot_assignments=state.get("symptom_slot_assignments"),
+
+        preferred_body_parts=profile.preferred_body_parts,
 
     )
 
@@ -315,6 +334,8 @@ def plan_question_node(state: ChatState) -> ChatState:
         last_rank_topic=state.get("last_rank_topic"),
 
         last_rank_tier=state.get("last_rank_tier"),
+
+        profile=profile_from_state(state),
 
     )
 
@@ -477,12 +498,18 @@ def graph_traversal_node(state: ChatState) -> ChatState:
     )
 
     from app.services.rag.factor_matcher import (
-        apply_factor_states,
         build_factor_matching_audit,
+        drop_denied_factor_matches,
+        gap_fill_factor_states,
     )
 
     factor_audit = build_factor_matching_audit(seeds.factor_matches)
-    apply_factor_states(state, seeds.factor_matches)
+    state["factor_states"] = gap_fill_factor_states(
+        state.get("factor_states"), seeds.factor_matches
+    )
+    traversal_matches = drop_denied_factor_matches(
+        seeds.factor_matches, state.get("factor_states")
+    )
     _log.info(
         "factor_matching_audit: matched=%s gaps=%s methods=%s",
         factor_audit["summary"]["matched_factors"],
@@ -496,9 +523,11 @@ def graph_traversal_node(state: ChatState) -> ChatState:
 
         chunk_matches=chunk_matches,
 
-        factor_matches=seeds.factor_matches,
+        factor_matches=traversal_matches,
 
         title=f"Chat turn: {state.get('session_id', '')}",
+
+        graph_client=graph_client_for_profile(profile_from_state(state)),
 
     )
 

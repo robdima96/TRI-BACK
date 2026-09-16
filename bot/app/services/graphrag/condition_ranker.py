@@ -21,8 +21,8 @@ _REL_WEIGHT: dict[str, float] = {
     "TRIGGER_FOR": 2.0,
     "SUGGESTIVE_OF": 1.5,
     "RISK_FACTOR_FOR": 1.0,
-    "ASSOCIATED_WITH": 0.8,
-    "CONTRIBUTES_TO": 1.0,
+    "ASSOCIATED_WITH": 0.5,
+    "CONTRIBUTES_TO": 0.5,
 }
 
 # "Ask about this" edges. Keep them in traversal / coverage / neighbourhood;

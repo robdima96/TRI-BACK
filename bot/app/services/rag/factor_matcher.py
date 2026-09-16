@@ -105,6 +105,42 @@ def merge_factor_states(
     return out
 
 
+def gap_fill_factor_states(
+    existing: dict[str, str] | None,
+    matches: list[FactorMatch],
+) -> dict[str, str]:
+    """Add regex polarities only for Factors the LLM (or prior state) did not name."""
+    out = dict(existing or {})
+    incoming = merge_factor_states({}, matches)
+    for name, polarity in incoming.items():
+        if name not in out:
+            out[name] = polarity
+    return out
+
+
+def drop_denied_factor_matches(
+    matches: list[FactorMatch],
+    factor_states: dict[str, str] | None,
+) -> list[FactorMatch]:
+    """Keep traversal from seeding Factors the session already denied."""
+    denied = {
+        name
+        for name, polarity in (factor_states or {}).items()
+        if polarity == FACTOR_STATE_DENIED
+    }
+    if not denied:
+        return matches
+    kept: list[FactorMatch] = []
+    for match in matches:
+        if match.factor_name in denied:
+            continue
+        mentions = [m for m in match.mentions if m.factor_name not in denied]
+        if mentions != list(match.mentions):
+            match = match.model_copy(update={"mentions": mentions})
+        kept.append(match)
+    return kept
+
+
 def apply_factor_states(state: dict, matches: list[FactorMatch]) -> dict[str, str]:
     merged = merge_factor_states(state.get("factor_states"), matches)
     state["factor_states"] = merged

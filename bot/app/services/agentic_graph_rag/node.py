@@ -20,10 +20,7 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
     from app.config import settings
     from app.schemas import ChunkMatch
     from app.services.agentic_graph_rag.agent import run_disposition_agent
-    from app.services.agentic_graph_rag.ontology import (
-        load_ontology,
-        tally_touched_conditions,
-    )
+    from app.services.agentic_graph_rag.ontology import tally_touched_conditions
     from app.services.generator import generator_model_configured
     from app.orchestrator.coverage import coverage_intake_summary
     from app.orchestrator.messages import conversation_history_before_last_user
@@ -33,6 +30,7 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
         evidence_from_chunk_ids,
     )
     from app.services.rag.fusion import build_traversal_seeds
+    from app.triage_profiles import load_ontology_for_profile, profile_from_state
 
     query = state["message_normalized"]
     checklist = state.get("clinical_checklist") or []
@@ -55,14 +53,24 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
         source_message=state.get("message") or state.get("message_normalized"),
     )
     from app.services.rag.factor_matcher import (
-        apply_factor_states,
         build_factor_matching_audit,
+        drop_denied_factor_matches,
+        gap_fill_factor_states,
     )
 
     factor_audit = build_factor_matching_audit(seeds.factor_matches)
-    apply_factor_states(state, seeds.factor_matches)
-    matched_factors = seeds.matched_factor_names
-    ontology = load_ontology()
+    state["factor_states"] = gap_fill_factor_states(
+        state.get("factor_states"), seeds.factor_matches
+    )
+    traversal_matches = drop_denied_factor_matches(
+        seeds.factor_matches, state.get("factor_states")
+    )
+    matched_factors = [
+        name
+        for name in seeds.matched_factor_names
+        if (state.get("factor_states") or {}).get(name) != "denied"
+    ]
+    ontology = load_ontology_for_profile(profile_from_state(state))
     touched_conditions = tally_touched_conditions(matched_factors, ontology)
     baseline_evidence = build_generator_evidence(
         trace=None,
@@ -84,7 +92,7 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
             state=state,
             checklist=checklist,
             chunk_matches=chunk_matches,
-            factor_matches=list(seeds.factor_matches),
+            factor_matches=list(traversal_matches),
             factor_audit=factor_audit,
             matched_factors=matched_factors,
             baseline_evidence=baseline_evidence,
@@ -96,7 +104,7 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
             query=query,
             checklist=checklist,
             chunk_matches=chunk_matches,
-            factor_matches=list(seeds.factor_matches),
+            factor_matches=list(traversal_matches),
             factor_audit=factor_audit,
             history=history,
             intake=intake,
@@ -114,7 +122,7 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
         intake_summary=intake,
         conversation_history=history,
         max_steps=max(1, int(settings.agentic_max_steps)),
-        precomputed_factor_matches=list(seeds.factor_matches),
+        precomputed_factor_matches=list(traversal_matches),
         graph_enabled=settings.graphrag_load,
     )
 
@@ -124,7 +132,7 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
             query=query,
             checklist=checklist,
             chunk_matches=chunk_matches,
-            factor_matches=list(seeds.factor_matches),
+            factor_matches=list(traversal_matches),
             factor_audit=factor_audit,
             history=history,
             intake=intake,

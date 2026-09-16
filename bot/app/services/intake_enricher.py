@@ -17,7 +17,13 @@ from app.orchestrator.coverage import coverage_intake_summary, evaluate_checklis
 from app.orchestrator.intake_models import SlotName
 from app.orchestrator.intake_slots import select_next_missing_slot
 from app.schemas import ChecklistItem
+from app.triage_profiles import TriageProfile, get_triage_profile
 from app.services.generator import generate_from_messages, generator_model_configured
+from app.services.rag.factor_polarity import (
+    FACTOR_STATE_AFFIRMED,
+    FACTOR_STATE_DENIED,
+    FACTOR_STATE_UNKNOWN,
+)
 from app.session_enrichment import checklist_item_dict
 
 _log = logging.getLogger(__name__)
@@ -79,6 +85,26 @@ _LABELS_BY_KIND: dict[str, frozenset[str]] = {
 }
 
 OpName = Literal["add", "modify", "delete"]
+
+_ALLOWED_POLARITIES: frozenset[str] = frozenset(
+    {FACTOR_STATE_AFFIRMED, FACTOR_STATE_DENIED, FACTOR_STATE_UNKNOWN}
+)
+_ENRICHER_LLM_OK = frozenset({"applied", "no_changes", "rejected_all"})
+
+
+@dataclass(frozen=True)
+class FactorStateUpdate:
+    """Ontology-gated Factor polarity from the intake enricher."""
+
+    factor: str
+    polarity: str
+    reason: str = ""
+
+    def to_log_dict(self) -> dict[str, str]:
+        out = {"factor": self.factor, "polarity": self.polarity}
+        if self.reason:
+            out["reason"] = self.reason
+        return out
 
 
 @dataclass
@@ -146,7 +172,13 @@ class IntakeEnrichmentResult:
     # Set when the model proposes next_intake that skips a still-missing higher
     # priority gap after ops (does not invent checklist rows).
     consistency_warning: dict[str, Any] | None = None
+    factor_matches: list[FactorStateUpdate] = field(default_factory=list)
     raw_response: str = ""
+
+    @property
+    def llm_ran(self) -> bool:
+        """True when the generator returned parseable JSON (matches are authoritative)."""
+        return self.status in _ENRICHER_LLM_OK
 
     @property
     def applied_items(self) -> list[ChecklistItem]:
@@ -168,6 +200,7 @@ class IntakeEnrichmentResult:
             "modified": list(self.modified),
             "deleted": list(self.deleted),
             "rejected": list(self.rejected),
+            "factor_matches": [m.to_log_dict() for m in self.factor_matches],
         }
         if self.consistency_warning:
             out["consistency_warning"] = dict(self.consistency_warning)
@@ -194,12 +227,14 @@ def _coverage_gap_summary(
     comorbidities_acknowledged: bool,
     last_asked_slot: SlotName | None,
     latest_user_message: str,
+    preferred_body_parts: tuple[str, ...] | None = None,
 ) -> str:
     coverage, _, _ = evaluate_checklist_coverage(
         checklist=checklist,
         comorbidities_acknowledged=comorbidities_acknowledged,
         last_asked_slot=last_asked_slot,
         latest_user_message=latest_user_message,
+        preferred_body_parts=preferred_body_parts,
     )
     return coverage_intake_summary(coverage)
 
@@ -212,6 +247,7 @@ def _apply_next_slot_consistency_guard(
     latest_user_message: str,
     next_slot: SlotName | None,
     next_question: str | None,
+    preferred_body_parts: tuple[str, ...] | None = None,
 ) -> tuple[SlotName | None, str | None, dict[str, Any] | None]:
     """
     If the model proposes next_intake that is not the planner's next missing slot
@@ -225,6 +261,7 @@ def _apply_next_slot_consistency_guard(
         comorbidities_acknowledged=comorbidities_acknowledged,
         last_asked_slot=last_asked_slot,
         latest_user_message=latest_user_message,
+        preferred_body_parts=preferred_body_parts,
     )
     authoritative_slot, _ = select_next_missing_slot(
         coverage, comorbidities_acknowledged=comorbidities_acknowledged
@@ -581,6 +618,103 @@ def apply_checklist_operations(
     return resulting, applied, modified, deleted, rejected
 
 
+def _inventory_factor_names(profile: TriageProfile | None = None) -> tuple[str, ...]:
+    """Canonical Factor names from the inventory JSON, with ontology fallback."""
+    from app.services.rag.factor_patterns import load_factor_names
+    from app.triage_profiles import load_ontology_for_profile
+
+    pack = profile or get_triage_profile()
+    names = load_factor_names(str(pack.graph_inventory))
+    if names:
+        return names
+    try:
+        return load_ontology_for_profile(pack).all_factors
+    except Exception:
+        return ()
+
+
+def _canonical_inventory_factor(
+    name: str, inventory: tuple[str, ...]
+) -> str | None:
+    key = (name or "").strip().casefold()
+    if not key or not inventory:
+        return None
+    by_cf = {item.casefold(): item for item in inventory}
+    return by_cf.get(key)
+
+
+def parse_factor_matches(
+    payload: dict[str, Any],
+    *,
+    inventory: tuple[str, ...],
+) -> tuple[list[FactorStateUpdate], int]:
+    """Return accepted updates and a count of dropped/invalid entries."""
+    raw = payload.get("factor_matches")
+    if raw is None:
+        raw = payload.get("factor_updates")
+    if not isinstance(raw, list):
+        return [], 0
+    accepted: list[FactorStateUpdate] = []
+    rejected = 0
+    seen: set[str] = set()
+    for entry in raw:
+        if not isinstance(entry, dict):
+            rejected += 1
+            continue
+        canonical = _canonical_inventory_factor(
+            str(entry.get("factor") or entry.get("factor_name") or ""),
+            inventory,
+        )
+        polarity = str(entry.get("polarity") or "").strip().casefold()
+        if canonical is None or polarity not in _ALLOWED_POLARITIES:
+            rejected += 1
+            continue
+        if canonical in seen:
+            # Later row for the same factor wins.
+            accepted = [item for item in accepted if item.factor != canonical]
+        seen.add(canonical)
+        accepted.append(
+            FactorStateUpdate(
+                factor=canonical,
+                polarity=polarity,
+                reason=str(entry.get("reason") or "").strip(),
+            )
+        )
+    return accepted, rejected
+
+
+def apply_factor_state_updates(
+    existing: dict[str, str] | None,
+    updates: list[FactorStateUpdate],
+) -> dict[str, str]:
+    """Merge LLM Factor polarities. ``unknown`` does not clear a sticky state."""
+    out = dict(existing or {})
+    for upd in updates:
+        if upd.polarity == FACTOR_STATE_UNKNOWN:
+            out.setdefault(upd.factor, FACTOR_STATE_UNKNOWN)
+        else:
+            out[upd.factor] = upd.polarity
+    return out
+
+
+def _format_factor_states_block(factor_states: dict[str, str] | None) -> str:
+    if not factor_states:
+        return "(none yet)"
+    lines: list[str] = []
+    for name in sorted(factor_states):
+        polarity = factor_states[name]
+        if polarity not in _ALLOWED_POLARITIES:
+            continue
+        lines.append(f"  - {name}: {polarity}")
+    return "\n".join(lines) if lines else "(none yet)"
+
+
+def _format_inventory_block(inventory: tuple[str, ...]) -> str:
+    if not inventory:
+        return "(inventory unavailable)"
+    return "\n".join(f"  - {name}" for name in inventory)
+
+
 def _parse_next_intake(
     payload: dict[str, Any],
 ) -> tuple[str | None, SlotName | None]:
@@ -621,6 +755,25 @@ def _last_assistant_from_history(history: list[dict[str, str]]) -> str:
     return ""
 
 
+def _next_intake_slot_rules(profile: TriageProfile | None) -> str:
+    """Slot-priority hint for the combined intake LLM prompt."""
+    assumed = (profile.symptom_text.strip() if profile and profile.assumes_symptom else "")
+    if assumed:
+        return (
+            f"- The chief complaint is already assumed to be {assumed}. Do not ask "
+            "what body area or main symptom is bothering them, and do not choose "
+            "symptom_anchor as next_intake.slot.\n"
+            "- Slot priority order: age → sex → comorbidities → "
+            "symptom_quality → symptom_severity → provocative → palliative → "
+            "symptom_duration.\n"
+        )
+    return (
+        "- Slot priority order: symptom_anchor → age → sex → comorbidities → "
+        "symptom_quality → symptom_severity → provocative → palliative → "
+        "symptom_duration.\n"
+    )
+
+
 def _build_enrichment_messages(
     *,
     checklist: list[dict[str, Any]],
@@ -629,6 +782,9 @@ def _build_enrichment_messages(
     comorbidities_acknowledged: bool,
     last_assistant_message: str = "",
     last_asked_factor: str | None = None,
+    factor_states: dict[str, str] | None = None,
+    inventory: tuple[str, ...] = (),
+    profile: TriageProfile | None = None,
 ) -> list[dict[str, str]]:
     slot_hint = last_asked_slot or "(none)"
     factor_hint = last_asked_factor or "(none)"
@@ -637,6 +793,7 @@ def _build_enrichment_messages(
         comorbidities_acknowledged=comorbidities_acknowledged,
         last_asked_slot=last_asked_slot,
         latest_user_message=latest_user_message,
+        preferred_body_parts=(profile.preferred_body_parts if profile else None),
     )
     exchange = _format_last_exchange_block(
         last_assistant_message=last_assistant_message,
@@ -645,21 +802,27 @@ def _build_enrichment_messages(
     instruction = (
         "You are a careful overseer of a structured clinical intake checklist for a "
         "musculoskeletal triage chatbot.\n\n"
-        "In ONE response you must (1) maintain the checklist and (2) draft the next "
-        "intake question if coverage will still be incomplete after your updates.\n\n"
-        "Read the last exchange, existing checklist, coverage gaps, and the latest "
-        "patient message. Prior turns are already captured on the checklist—do not "
-        "require the full transcript. Maintain the checklist so it stays accurate "
-        "and cumulative: add missing facts, correct rows that are wrong or outdated, "
-        "and delete rows that the patient clearly retracted or that were recorded in "
-        "error.\n\n"
+        "In ONE response you must (1) maintain the checklist, (2) match the checklist "
+        "and latest patient message onto inventory graph Factors with polarity, and "
+        "(3) draft the next intake question if coverage will still be incomplete "
+        "after your updates.\n\n"
+        "Read the last exchange, existing checklist, coverage gaps, prior factor "
+        "states, and the latest patient message. Prior turns are already captured on "
+        "the checklist—do not require the full transcript. Maintain the checklist so "
+        "it stays accurate and cumulative: add missing facts, correct rows that are "
+        "wrong or outdated, and delete rows that the patient clearly retracted or "
+        "that were recorded in error.\n\n"
         "Volunteered facts (critical):\n"
         "- Last intake slot asked is a HINT about what the assistant was seeking, NOT a "
         "limit on what you may add or edit.\n"
         "- If a graph factor was asked (Last graph factor asked is not (none)), the "
-        "patient's yes / no / not sure answers THAT factor only. Do not treat a bare "
+        "patient's yes / no / not sure answers THAT factor (and any other inventory "
+        "factors the same message clearly affirms or denies). Do not treat a bare "
         "no as filling an HPI slot (palliative, provocative, quality, etc.). Do not "
-        "add a checklist row for a denied factor.\n"
+        "add a checklist row for a denied factor — put denials only in factor_matches.\n"
+        "- If the last asked floor slot is palliative, provocative, quality, severity, "
+        "duration, age, or sex, and the patient answers nothing / none / n/a / "
+        "I don't know / no, add a row for THAT slot with text N/A so coverage closes.\n"
         "- Pattern extractors and GliNER often miss or mislabel facts. If the patient "
         "clearly stated something clinically relevant in the last exchange and it is "
         "not already on the checklist with the correct kind/label, you MUST add or "
@@ -677,6 +840,18 @@ def _build_enrichment_messages(
         "'hard to sit') as kind=provocative, label=provocative; delete mislabeled "
         "body-part rows like 'chair'/'work' if present; only then may next_intake "
         "advance to palliative if provocative is covered.\n\n"
+        "Graph factor matching (critical):\n"
+        "- After imagining checklist_operations applied, map the updated checklist AND "
+        "the latest patient message onto inventory Factor names.\n"
+        "- Use ONLY names from the inventory list (exact spelling).\n"
+        "- polarity is affirmed, denied, or unknown.\n"
+        "- One utterance may affirm one inventory factor and deny another.\n"
+        "- If the patient rules out a finding, also deny more-specific inventory "
+        "factors that cannot still be true. Do not invent Factor names.\n"
+        "- Include the asked graph factor when Last graph factor asked is not (none).\n"
+        "- Restate prior factor_states that this turn changes; unchanged sticky "
+        "states may be omitted.\n"
+        "- Use an empty factor_matches list only when nothing maps to the inventory.\n\n"
         "Important rules for checklist_operations:\n"
         "- Prefer evidence already stated by the patient; do not invent medications, "
         "diagnoses, or unrelated conditions.\n"
@@ -693,7 +868,8 @@ def _build_enrichment_messages(
         "- If the assistant asked for confirmation (e.g. chief complaint) and the "
         "patient answered yes/affirmed, add the chief complaint as a symptom row.\n"
         "- If the patient restated their main symptom, add or correct it as "
-        "kind=ner_entity, label=symptom.\n"
+        "kind=ner_entity, label=symptom. Do not replace a profile-seeded chief "
+        "complaint with a different body area.\n"
         "- Delete only when clearly unsupported now (explicit correction, clear "
         "negation of that fact, or obvious extractor error). Do not delete uncertain "
         "rows. Do not delete trauma/mechanism rows unless the patient explicitly "
@@ -713,9 +889,7 @@ def _build_enrichment_messages(
         "Rules for next_intake (the follow-up question):\n"
         "- After imagining your checklist_operations applied, pick the single highest-"
         "priority still-missing slot and write ONE plain, conversational question for it.\n"
-        "- Slot priority order: symptom_anchor → age → sex → comorbidities → "
-        "symptom_quality → symptom_severity → provocative → palliative → "
-        "symptom_duration.\n"
+        f"{_next_intake_slot_rules(profile)}"
         "- This order is a hint. The planner may ask a graph-adjacent red-flag "
         "factor instead; still draft the next floor slot so a fallback exists.\n"
         "- Allowed slot values: age | sex | comorbidities | symptom_anchor | "
@@ -729,6 +903,9 @@ def _build_enrichment_messages(
         "set next_intake to null.\n\n"
         f"Last intake slot asked by assistant: {slot_hint}\n"
         f"Last graph factor asked by assistant: {factor_hint}\n"
+        f"Prior factor_states:\n{_format_factor_states_block(factor_states)}\n\n"
+        f"Inventory Factors (use these names only in factor_matches):\n"
+        f"{_format_inventory_block(inventory)}\n\n"
         f"Coverage before enrichment:\n{gap_summary}\n\n"
         f"Existing checklist (modify/delete by id in brackets; numbers are display-only):\n"
         f"{_format_checklist_block(checklist)}\n\n"
@@ -743,9 +920,14 @@ def _build_enrichment_messages(
         '"reason": "..."},\n'
         '    {"op": "delete", "id": "cl_...", "reason": "..."}\n'
         "  ],\n"
+        '  "factor_matches": [\n'
+        '    {"factor": "Neuro motor deficit", "polarity": "affirmed", "reason": "..."},\n'
+        '    {"factor": "Neuro sensory deficit", "polarity": "denied", "reason": "..."}\n'
+        "  ],\n"
         '  "next_intake": {"slot": "age", "question": "How old are you?"}\n'
         "}\n"
-        "Use an empty checklist_operations list when no changes are needed.\n"
+        "Use an empty checklist_operations list when no checklist changes are needed.\n"
+        "Use an empty factor_matches list when nothing maps to the inventory.\n"
         "Set comorbidities_acknowledged to true only when the patient clearly denies "
         "other health conditions after being asked (e.g. none / no conditions).\n"
         "Set next_intake to null when no further intake question is needed."
@@ -764,10 +946,13 @@ def propose_checklist_enrichment(
     session_id: str = "",
     turn_index: int = 0,
     last_assistant_message: str = "",
+    factor_states: dict[str, str] | None = None,
+    inventory: tuple[str, ...] | None = None,
+    profile: TriageProfile | None = None,
 ) -> IntakeEnrichmentResult:
     """
-    Ask the generator LLM to oversee checklist rows (add / modify / delete)
-    and draft the next intake question in the same call.
+    Ask the generator LLM to oversee checklist rows (add / modify / delete),
+    match inventory graph Factors, and draft the next intake question.
 
     Uses a slim single-message prompt (last exchange + checklist + gaps), not
     full transcript replay.
@@ -775,6 +960,7 @@ def propose_checklist_enrichment(
     checklist = ensure_checklist_ids([dict(r) for r in checklist])
     history = conversation_history or []
     assistant_msg = last_assistant_message.strip() or _last_assistant_from_history(history)
+    inventory_names = inventory if inventory is not None else _inventory_factor_names(profile)
 
     if not generator_model_configured():
         return IntakeEnrichmentResult(
@@ -790,6 +976,9 @@ def propose_checklist_enrichment(
             comorbidities_acknowledged=comorbidities_acknowledged,
             last_assistant_message=assistant_msg,
             last_asked_factor=last_asked_factor,
+            factor_states=factor_states,
+            inventory=inventory_names,
+            profile=profile,
         )
         raw = generate_from_messages(
             messages,
@@ -835,10 +1024,13 @@ def propose_checklist_enrichment(
     resulting, applied, modified, deleted, rejected = apply_checklist_operations(
         checklist, proposed
     )
+    factor_matches, factor_rejected = parse_factor_matches(
+        payload, inventory=inventory_names
+    )
 
     changed = bool(applied or modified or deleted)
-    status = "applied" if changed or ack else "no_changes"
-    if proposed and not changed and not ack:
+    status = "applied" if changed or ack or factor_matches else "no_changes"
+    if proposed and not changed and not ack and not factor_matches:
         status = "rejected_all"
 
     post_checklist = resulting if changed else list(checklist)
@@ -850,6 +1042,7 @@ def propose_checklist_enrichment(
         latest_user_message=latest_user_message,
         next_slot=next_slot,
         next_question=next_question,
+        preferred_body_parts=(profile.preferred_body_parts if profile else None),
     )
     if consistency_warning:
         _log.info(
@@ -872,12 +1065,13 @@ def propose_checklist_enrichment(
         next_question=next_question,
         next_slot=next_slot,
         consistency_warning=consistency_warning,
+        factor_matches=factor_matches,
         raw_response=raw[:2000],
     )
     _log.info(
         "intake_enrichment session=%s turn=%s status=%s reason=%r proposed=%d "
         "added=%d modified=%d deleted=%d rejected=%d invalid=%d ack=%s "
-        "next_slot=%s consistency_warning=%s",
+        "factor_matches=%d factor_rejected=%d next_slot=%s consistency_warning=%s",
         session_id,
         turn_index,
         result.status,
@@ -889,6 +1083,8 @@ def propose_checklist_enrichment(
         len(rejected),
         invalid_count,
         ack,
+        len(factor_matches),
+        factor_rejected,
         next_slot,
         bool(consistency_warning),
     )

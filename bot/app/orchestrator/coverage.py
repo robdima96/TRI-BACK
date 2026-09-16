@@ -49,6 +49,7 @@ def _is_symptom_entity_row(row: dict[str, str]) -> bool:
 _PAIN_VERBS = frozenset({"hurt", "hurts", "hurting"})
 _PAIN_HINTS = ("pain", "ache", "hurt")
 _PREFERRED_BODY_PARTS = ("low back", "lower back", "lumbar", "spine", "back")
+_PROFILE_SOURCE = "profile"
 
 
 def _normalize_pain_word(text: str) -> str:
@@ -75,11 +76,14 @@ def _body_part_texts(checklist: list[dict[str, str]]) -> list[str]:
     return parts
 
 
-def _preferred_body_part(parts: list[str]) -> str | None:
+def _preferred_body_part(
+    parts: list[str],
+    preferred: tuple[str, ...] | None = None,
+) -> str | None:
     if not parts:
         return None
     folded = [p.casefold() for p in parts]
-    for want in _PREFERRED_BODY_PARTS:
+    for want in preferred or _PREFERRED_BODY_PARTS:
         for part, key in zip(parts, folded):
             if key == want or want in key:
                 return part
@@ -87,14 +91,17 @@ def _preferred_body_part(parts: list[str]) -> str | None:
 
 
 def _compose_symptom_display_name(
-    text: str, *, body_parts: list[str]
+    text: str,
+    *,
+    body_parts: list[str],
+    preferred_body_parts: tuple[str, ...] | None = None,
 ) -> str:
     """Turn GliNER spans like ``hurts`` + ``back`` into ``back pain``."""
     label = _normalize_pain_word(text)
     if not label:
         return "pain"
     folded = label.casefold()
-    part = _preferred_body_part(body_parts)
+    part = _preferred_body_part(parts=body_parts, preferred=preferred_body_parts)
     if not part:
         return label
     part_key = part.casefold()
@@ -122,10 +129,26 @@ def _rows_for_kind_label(
 
 
 # rebuild symptom instances from merged checklist (one row per distinct symptom entity text)
+def _is_profile_seed_row(row: dict[str, str]) -> bool:
+    return (
+        _is_symptom_entity_row(row)
+        and str(row.get("source") or "") == _PROFILE_SOURCE
+    )
+
+
+def _instance_has_profile_seed(inst: SymptomInstance) -> bool:
+    for key in inst.get("checklist_keys") or []:
+        normalized = _normalize_key(key)
+        if len(normalized) >= 3 and normalized[2] == _PROFILE_SOURCE:
+            return True
+    return False
+
+
 def build_symptom_instances(
     checklist: list[dict[str, str]],
     *,
     prior_instances: list[SymptomInstance] | None = None,
+    preferred_body_parts: tuple[str, ...] | None = None,
 ) -> list[SymptomInstance]:
     """
     Derive symptom instances from checklist rows.
@@ -148,7 +171,14 @@ def build_symptom_instances(
         text = (row.get("text") or "").strip()
         if not text:
             continue
-        display = _compose_symptom_display_name(text, body_parts=body_parts)
+        if _is_profile_seed_row(row):
+            display = text
+        else:
+            display = _compose_symptom_display_name(
+                text,
+                body_parts=body_parts,
+                preferred_body_parts=preferred_body_parts,
+            )
         key = display.casefold()
         if key in seen_text:
             continue
@@ -182,19 +212,25 @@ def consolidate_symptom_instances(
     Intake focuses on one chief complaint.
 
     GliNER may emit several ``symptom`` spans (pain, bruising, tenderness, …).
-    For questioning we keep a single primary instance (prefer pain/ache wording).
+    For questioning we keep a single primary instance (prefer a profile-seeded
+    chief complaint when present, else pain/ache wording).
     """
     if len(instances) <= 1:
         return instances
 
-    pain_related = [
-        inst
-        for inst in instances
-        if any(token in inst["display_name"].casefold() for token in _PAIN_HINTS)
-    ]
-    pool = pain_related if pain_related else instances
-    primary = max(pool, key=lambda inst: len(inst["display_name"]))
-    primary_id = pool[0]["symptom_id"]
+    seeded = [inst for inst in instances if _instance_has_profile_seed(inst)]
+    if seeded:
+        primary = seeded[0]
+        primary_id = primary["symptom_id"]
+    else:
+        pain_related = [
+            inst
+            for inst in instances
+            if any(token in inst["display_name"].casefold() for token in _PAIN_HINTS)
+        ]
+        pool = pain_related if pain_related else instances
+        primary = max(pool, key=lambda inst: len(inst["display_name"]))
+        primary_id = pool[0]["symptom_id"]
 
     merged_keys: list[ChecklistKey] = []
     seen: set[ChecklistKey] = set()
@@ -426,6 +462,7 @@ def evaluate_checklist_coverage(
     last_asked_slot: SlotName | None = None,
     latest_user_message: str = "",
     symptom_slot_assignments: dict[str, dict[str, list[ChecklistKey]]] | None = None,
+    preferred_body_parts: tuple[str, ...] | None = None,
 ) -> tuple[
     CoverageReport,
     dict[str, dict[str, list[ChecklistKey]]],
@@ -449,7 +486,9 @@ def evaluate_checklist_coverage(
         ack = True
 
     raw_instances = build_symptom_instances(
-        checklist, prior_instances=symptom_instances
+        checklist,
+        prior_instances=symptom_instances,
+        preferred_body_parts=preferred_body_parts,
     )
     instances = consolidate_symptom_instances(raw_instances)
     merged_prior = _merge_assignments_after_consolidation(

@@ -53,9 +53,9 @@ _GLINER_LABELS: dict[SlotName, frozenset[str]] = {
     "palliative": frozenset({"symptom palliative factor"}),
 }
 
-# Non-answers that should not close a clinical slot.
-# A bare "no" is a real answer to a factor question (see factor_answers) and a
-# non-answer to a slot question — keep that split here, not in a shared regex.
+# Empty / none-style replies. On an asked floor slot these close coverage as N/A.
+# A bare "no" is a real answer to a factor question (see factor_answers) and must
+# not reach this helper while a graph factor is being asked.
 _EMPTY_ANSWER = re.compile(
     r"^\s*(?:i\s+don'?t\s+know|idk|unsure|not\s+sure|n/?a|nothing|none|"
     r"no\s+idea|\?+|no|nope|nah)\s*$",
@@ -213,8 +213,13 @@ def credit_asked_slot_answer(
     if not last_asked_slot or last_asked_slot not in _CREDITABLE_SLOTS:
         return []
     text = (message or "").strip()
-    if not text or _EMPTY_ANSWER.match(text):
+    if not text:
         return []
+    if _EMPTY_ANSWER.match(text):
+        if _slot_already_filled(checklist, last_asked_slot):
+            return []
+        row = _row_for_slot(last_asked_slot, "N/A")
+        return [row] if row else []
     if _slot_already_filled(checklist, last_asked_slot):
         return []
 
@@ -234,7 +239,7 @@ def credit_volunteered_slots(
 ) -> list[ChecklistItem]:
     """Credit the asked slot plus any other missing slots the message answers."""
     text = (message or "").strip()
-    if not text or _EMPTY_ANSWER.match(text):
+    if not text:
         return []
 
     out: list[ChecklistItem] = []
@@ -248,6 +253,9 @@ def credit_volunteered_slots(
     for item in asked:
         out.append(item)
         working.append(item.model_dump())
+
+    if _EMPTY_ANSWER.match(text):
+        return out
 
     for slot in (
         "age",

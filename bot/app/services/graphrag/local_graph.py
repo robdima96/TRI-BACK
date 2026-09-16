@@ -44,7 +44,7 @@ def _segment_key(seg: PathSegment) -> tuple[str, str, str, str, str]:
     )
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=4)
 def _load_graph_rows(csv_path: str) -> tuple[ChunkRow, ...]:
     return tuple(load_chunks(Path(csv_path)))
 
