@@ -49,6 +49,25 @@ def test_session_atomic_write_and_feedback(sessions_dir):
     assert payload["session_id"] == "425_1"
 
 
+def test_save_session_retries_stale_loads_before_refusing(sessions_dir, monkeypatch):
+    path = sessions_dir / "admin_8.json"
+    path.write_text('{"session_id": "admin_8", "keep": true}', encoding="utf-8")
+    attempts = {"n": 0}
+
+    def flaky_load(_sid):
+        attempts["n"] += 1
+        if attempts["n"] < 3:
+            return None
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr("tri_back_study_app.session_store.load_session", flaky_load)
+    save_session("admin_8", messages=[{"role": "assistant", "content": "hi"}])
+    assert attempts["n"] >= 3
+    reloaded = json.loads(path.read_text(encoding="utf-8"))
+    assert reloaded["keep"] is True
+    assert reloaded["messages"][0]["content"] == "hi"
+
+
 def test_save_session_refuses_to_clobber_unreadable_file(sessions_dir, monkeypatch):
     path = sessions_dir / "admin_7.json"
     path.write_text('{"session_id": "admin_7", "keep": true}', encoding="utf-8")

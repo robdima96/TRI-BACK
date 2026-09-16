@@ -157,7 +157,6 @@ class AuthState(rx.State):
         self.role = ""
         self.group_id = 1
         self.session_id = ""
-        self._legacy_sid = ""
         self.login_count = 0
         self.login_at = ""
         return rx.redirect("/")

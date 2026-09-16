@@ -79,14 +79,15 @@ LOGIN_RATE_LIMIT = 8
 LOGIN_RATE_WINDOW_SEC = 300
 
 # Study-only welcome (not sent to the bot intake pipeline).
+# Default copy must match bot ``app.triage_profiles.LOW_BACK_INTRO_MESSAGE``.
 INTRO_MESSAGE_ID = "msg_intro"
-INTRO_DELAY_SEC = _env_int("TRI_BACK_INTRO_DELAY_SEC", 10)
+INTRO_DELAY_SEC = _env_int("TRI_BACK_INTRO_DELAY_SEC", 5)
 INTRO_MESSAGE = _env_str(
     "TRI_BACK_INTRO_MESSAGE",
-    "Hi, I'm TRI-BACK. I'll ask a few questions about your musculoskeletal concern "
-    "to help guide next steps. This is not a medical diagnosis—if you think you "
-    "have an emergency, seek urgent care right away. When you're ready, tell me "
-    "what's bothering you.",
+    "Hi, I'm TRI-BACK. I'm designed to help rule out any concerning patterns "
+    "with your low back pain. This is not a medical diagnosis. If you "
+    "think you have an emergency, seek urgent care right away. When you're ready, "
+    "let's start with your age and the sex you were assigned at birth.",
 )
 
 PUBLIC_ACCESS = _env_bool("TRI_BACK_PUBLIC_ACCESS", False)

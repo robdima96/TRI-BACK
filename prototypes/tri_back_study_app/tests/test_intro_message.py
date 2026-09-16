@@ -10,6 +10,8 @@ def test_intro_constants():
     assert INTRO_MESSAGE_ID == "msg_intro"
     assert INTRO_DELAY_SEC == 10
     assert "TRI-BACK" in INTRO_MESSAGE
+    assert "low back pain" in INTRO_MESSAGE.casefold()
+    assert "concerning patterns" in INTRO_MESSAGE
 
 
 def test_should_play_intro_only_when_empty():

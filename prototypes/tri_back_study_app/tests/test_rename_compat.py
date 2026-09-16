@@ -15,6 +15,12 @@ def test_session_cookie_is_tri_back_sid():
     assert 'name="tri_back_sid"' in src
 
 
+def test_logout_does_not_set_undeclared_legacy_sid():
+    """Reflex raises SetUndefinedStateVarError if logout assigns _legacy_sid."""
+    src = inspect.getsource(AuthState)
+    assert "_legacy_sid" not in src
+
+
 def test_local_admin_accepts_triback(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("tri_back_study_app.config.PUBLIC_ACCESS", False)
     monkeypatch.delenv("TRI_BACK_ADMIN_PASSWORD", raising=False)

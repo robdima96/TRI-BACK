@@ -17,8 +17,8 @@ from typing import Any
 from tri_back_study_app.config import MAX_STORED_MESSAGES, SESSIONS_DIR
 
 _log = logging.getLogger(__name__)
-_STALE_RETRIES = 5
-_STALE_DELAY_SEC = 0.05
+_STALE_RETRIES = 10
+_STALE_DELAY_SEC = 0.1
 
 
 def _is_stale_handle(exc: BaseException) -> bool:

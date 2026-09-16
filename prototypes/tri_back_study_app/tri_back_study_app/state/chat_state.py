@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime, timezone
 
 import reflex as rx
@@ -307,6 +308,12 @@ class ChatState(AuthState):
         try:
             save_session(self.session_id, messages=messages, engagement=engagement)
         except OSError:
-            self.error = "Could not save that rating. Try again in a moment."
-            return
+            # Keep the in-memory rating. GCS FUSE can refuse overlay writes
+            # without the clinical transcript being lost.
+            logging.getLogger(__name__).warning(
+                "feedback save failed session=%s message_id=%s",
+                self.session_id,
+                message_id,
+                exc_info=True,
+            )
         self.error = ""
