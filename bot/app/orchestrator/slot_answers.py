@@ -30,6 +30,7 @@ _CREDITABLE_SLOTS: frozenset[SlotName] = frozenset(
         "symptom_anchor",
         "age",
         "sex",
+        "comorbidities",
     }
 )
 
@@ -42,6 +43,7 @@ _SLOT_KIND_LABEL: dict[SlotName, tuple[str, str]] = {
     "symptom_anchor": ("ner_entity", "symptom"),
     "age": ("demographic", "age"),
     "sex": ("demographic", "sex"),
+    "comorbidities": ("comorbidity", "comorbidity"),
 }
 
 # GliNER labels that also satisfy attribute slots (mirrors coverage.py).
@@ -74,6 +76,7 @@ _FLOOR_SLOT_KINDS: frozenset[str] = frozenset(
         "severity",
         "duration",
         "demographic",
+        "comorbidity",
     }
 )
 

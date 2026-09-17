@@ -125,6 +125,18 @@ def test_comorbidity_none_acknowledged():
     assert "comorbidities" not in {m["slot"] for m in report["missing_slots"]}
 
 
+def test_comorbidity_i_dont_know_acknowledged():
+    checklist = [_row("40", "demographic", "age"), _row("male", "demographic", "sex")]
+    for message in ("i dont know", "I don't know", "idk", "not sure"):
+        report, _, ack = evaluate_checklist_coverage(
+            checklist=checklist,
+            last_asked_slot="comorbidities",
+            latest_user_message=message,
+        )
+        assert ack is True, message
+        assert "comorbidities" not in {m["slot"] for m in report["missing_slots"]}, message
+
+
 def test_gliner_hurts_plus_back_display_name():
     checklist = [
         _row("back", "ner_entity", "body part", "gliner"),

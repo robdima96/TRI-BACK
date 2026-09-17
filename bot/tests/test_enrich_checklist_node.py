@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from app.orchestrator.nodes import enrich_checklist_node
+from app.orchestrator.nodes import enrich_checklist_node, evaluate_coverage_node, plan_question_node
 from app.services.intake_enricher import IntakeEnrichmentResult
 from app.schemas import ChecklistItem
 
@@ -150,3 +150,43 @@ def test_enrich_checklist_node_applies_modify_and_delete():
     assert len(log["modified"]) == 1
     assert len(log["deleted"]) == 1
     assert out["extraction_history"][0]["by_source"]["llm"][0]["text"] == "low back pain"
+
+
+def test_enrich_credits_i_dont_know_on_comorbidities_without_llm_ack():
+    """Public Vertex often leaves comorbidities open; slot credit must close it."""
+    state = {
+        "session_id": "sess-comorbid-idk",
+        "message": "i dont know",
+        "message_normalized": "i dont know",
+        "turn_start_checklist": [
+            {"text": "30", "kind": "demographic", "source": "pattern", "label": "age"},
+            {"text": "male", "kind": "demographic", "source": "pattern", "label": "sex"},
+        ],
+        "clinical_checklist": [
+            {"text": "30", "kind": "demographic", "source": "pattern", "label": "age"},
+            {"text": "male", "kind": "demographic", "source": "pattern", "label": "sex"},
+        ],
+        "encoder_turn_items": [],
+        "extraction_history": [],
+        "messages": [],
+        "last_asked_slot": "comorbidities",
+        "asked_factor": None,
+        "comorbidities_acknowledged": False,
+    }
+    with patch(
+        "app.orchestrator.nodes.propose_checklist_enrichment",
+        return_value=IntakeEnrichmentResult(
+            status="no_changes",
+            summary_reason="Patient does not know; no checklist change.",
+        ),
+    ):
+        out = enrich_checklist_node(state)
+
+    comorb = [r for r in out["clinical_checklist"] if r.get("kind") == "comorbidity"]
+    assert len(comorb) == 1
+    assert comorb[0]["text"] == "N/A"
+
+    covered = evaluate_coverage_node(out)
+    assert covered["comorbidities_acknowledged"] is True
+    planned = plan_question_node(covered)
+    assert planned.get("slot_being_asked") != "comorbidities"

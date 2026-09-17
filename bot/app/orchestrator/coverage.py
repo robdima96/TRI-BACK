@@ -12,6 +12,7 @@ from app.orchestrator.intake_models import (
     SlotName,
     SymptomInstance,
 )
+from app.orchestrator.slot_answers import is_empty_slot_answer
 
 # checklist row identity (matches merge_checklist_items dedupe key)
 ChecklistKey = tuple[str, str, str, str]
@@ -481,7 +482,10 @@ def evaluate_checklist_coverage(
         not ack
         and last_asked_slot == "comorbidities"
         and latest_user_message.strip()
-        and _NONE_COMORBIDITY.search(latest_user_message)
+        and (
+            is_empty_slot_answer(latest_user_message)
+            or _NONE_COMORBIDITY.search(latest_user_message)
+        )
     ):
         ack = True
 

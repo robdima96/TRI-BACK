@@ -132,6 +132,30 @@ def test_credited_row_satisfies_coverage():
     assert report["symptoms_complete"] is True
 
 
+def test_empty_dont_know_fills_comorbidities_as_na():
+    items = credit_asked_slot_answer(
+        message="i dont know",
+        last_asked_slot="comorbidities",
+        checklist=[],
+    )
+    assert len(items) == 1
+    assert items[0].kind == "comorbidity"
+    assert items[0].label == "comorbidity"
+    assert items[0].text == "N/A"
+    checklist = [
+        {"text": "30", "kind": "demographic", "source": "pattern", "label": "age"},
+        {"text": "male", "kind": "demographic", "source": "pattern", "label": "sex"},
+        items[0].model_dump(),
+    ]
+    report, _, ack = evaluate_checklist_coverage(checklist=checklist)
+    assert ack is True
+    assert "comorbidities" not in {m["slot"] for m in report["missing_slots"]}
+    planned = plan_next_question(
+        report, risk_hits=[], questions_asked=1, comorbidities_acknowledged=ack
+    )
+    assert planned.slot != "comorbidities"
+
+
 def test_volunteered_60m_fills_age_and_sex_without_copying_into_other_slots():
     items = credit_volunteered_slots(
         message="60M",
