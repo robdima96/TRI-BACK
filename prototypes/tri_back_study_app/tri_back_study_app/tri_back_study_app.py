@@ -5,6 +5,7 @@ import reflex as rx
 from tri_back_study_app.pages.admin import admin_page
 from tri_back_study_app.pages.chat import chat_page
 from tri_back_study_app.pages.login import login_page
+from tri_back_study_app.state.chat_state import ChatState
 
 app = rx.App(
     stylesheets=["/theme.css"],
@@ -16,5 +17,10 @@ app = rx.App(
 )
 
 app.add_page(login_page, route="/", title="TRI-BACK Study — Login")
-app.add_page(chat_page, route="/chat", title="TRI-BACK Study — Chat")
+app.add_page(
+    chat_page,
+    route="/chat",
+    title="TRI-BACK Study — Chat",
+    on_load=ChatState.mount_chat,
+)
 app.add_page(admin_page, route="/admin", title="TRI-BACK Study — Admin")

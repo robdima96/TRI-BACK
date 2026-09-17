@@ -64,6 +64,12 @@ def _first_existing(*paths: str) -> str:
 DEFAULT_GLINER_MODEL_DIR = _first_existing(
     r"E:\TRI-BACK\GliNER-BioMed",
 )
+DEFAULT_QUERY_CLASSIFIER_DIR = _first_existing(
+    r"E:\TRI-BACK\miniBERT_query_classifier",
+)
+DEFAULT_SAT_SPLITTER_DIR = _first_existing(
+    r"E:\TRI-BACK\sat-3l-sm",
+)
 DEFAULT_RAG_EMBEDDING_MODEL_DIR = _first_existing(
     r"E:\TRI-BACK\Clinical_sBERT",
 )
@@ -72,8 +78,8 @@ DEFAULT_GENERATOR_MODEL_DIR = _first_existing(
 )
 DEFAULT_GENERATOR_BACKEND = "local"
 DEFAULT_LOCAL_MODEL_LABEL = "mistral-local"
-DEFAULT_VERTEX_MODEL = "gemini-2.5-flash"
-DEFAULT_VERTEX_LOCATION = "us-central1"
+DEFAULT_VERTEX_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_VERTEX_LOCATION = "us"
 
 
 def _normalize_generator_backend(raw: str | None) -> str:
@@ -152,6 +158,10 @@ class Settings(BaseModel):
     gliner_model_dir: str = DEFAULT_GLINER_MODEL_DIR
     gliner_load: bool = True
     gliner_ner_threshold: float = 0.5
+    query_classifier_dir: str = DEFAULT_QUERY_CLASSIFIER_DIR
+    query_classifier_load: bool = True
+    sat_splitter_dir: str = DEFAULT_SAT_SPLITTER_DIR
+    sat_splitter_load: bool = True
     # Path 1: Clinical_sBERT + Chroma semantic search + checklist→chunk lexical match → generator evidence.
     rag_load: bool = True
     # Path 2: Local graph traversal (checklist→factors; optional chunk seeds when RAG enabled).
@@ -166,8 +176,9 @@ class Settings(BaseModel):
     graph_inference: str = DEFAULT_GRAPH_INFERENCE
     # Future Bayesian agent tool registration; off until a model is configured.
     agentic_bayesian_tool: bool = False
-    # LLM cross-check for unmatched checklist → Factor mapping (pre-traversal).
+    # LLM cross-check for unmatched this-turn checklist deltas → Factor mapping.
     # When off, matching stays fully deterministic (regex / kind / fuzzy only).
+    # Disposition does not rematch old rows with llm_semantic.
     llm_factor_match: bool = True
     # Max deterministic intake questions per session before best-effort disposition.
     # Floor is ~9 slots; 20 leaves ~11 discretionary graph turns.
@@ -218,6 +229,14 @@ settings = Settings(
         "TRI_BACK_GLINER_NER_THRESHOLD",
         _env_float("TRI_BACK_NER_SCORE_THRESHOLD", 0.5),
     ),
+    query_classifier_dir=_env_str(
+        "TRI_BACK_QUERY_CLASSIFIER_DIR", DEFAULT_QUERY_CLASSIFIER_DIR
+    )
+    or DEFAULT_QUERY_CLASSIFIER_DIR,
+    query_classifier_load=_env_bool("TRI_BACK_LOAD_QUERY_CLASSIFIER", True),
+    sat_splitter_dir=_env_str("TRI_BACK_SAT_SPLITTER_DIR", DEFAULT_SAT_SPLITTER_DIR)
+    or DEFAULT_SAT_SPLITTER_DIR,
+    sat_splitter_load=_env_bool("TRI_BACK_LOAD_SAT_SPLITTER", True),
     rag_load=_env_bool(
         "TRI_BACK_RAG",
         _env_bool("TRI_BACK_LOAD_RAG", True),

@@ -95,11 +95,14 @@ _BOT_OWNED_KEYS = frozenset(
         "intake_history",
         "factor_states",
         "session_phase",
+        "generator_backend",
+        "generator_model",
     }
 )
 
 
-def _session_file_path(session_id: str) -> Path:
+def session_file_path(session_id: str) -> Path:
+    """Same on-disk path login, intro, chat turns, feedback, and logout use."""
     sid = session_id.strip()
     if _STUDY_SESSION_ID_RE.match(sid):
         return SESSIONS_DIR / f"{sid}.json"
@@ -107,6 +110,10 @@ def _session_file_path(session_id: str) -> Path:
 
     digest = hashlib.sha256(sid.encode("utf-8")).hexdigest()
     return SESSIONS_DIR / f"sess_{digest}.json"
+
+
+def _session_file_path(session_id: str) -> Path:
+    return session_file_path(session_id)
 
 
 def _now_iso() -> str:

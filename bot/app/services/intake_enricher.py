@@ -16,10 +16,15 @@ from app.orchestrator.checklist import (
 from app.orchestrator.coverage import coverage_intake_summary, evaluate_checklist_coverage
 from app.orchestrator.intake_models import SlotName
 from app.orchestrator.intake_slots import select_next_missing_slot
+from app.orchestrator.slot_answers import (
+    canonicalize_floor_slot_text,
+    is_na_slot_text,
+)
 from app.schemas import ChecklistItem
 from app.triage_profiles import TriageProfile, get_triage_profile
 from app.services.generator import generate_from_messages, generator_model_configured
 from app.services.rag.factor_polarity import (
+    ASKED_FACTOR_NOT_ANSWERED,
     FACTOR_STATE_AFFIRMED,
     FACTOR_STATE_DENIED,
     FACTOR_STATE_UNKNOWN,
@@ -28,7 +33,48 @@ from app.session_enrichment import checklist_item_dict
 
 _log = logging.getLogger(__name__)
 
-INTAKE_ENRICH_MAX_NEW_TOKENS = 1536
+INTAKE_ENRICH_MAX_NEW_TOKENS = 4096
+
+# Gemini 3.x ignores low temperature; mime+schema replaces that determinism lever.
+ENRICHMENT_RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "summary_reason": {"type": "STRING"},
+        "comorbidities_acknowledged": {"type": "BOOLEAN"},
+        "checklist_operations": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "op": {"type": "STRING"},
+                    "id": {"type": "STRING"},
+                    "text": {"type": "STRING"},
+                    "kind": {"type": "STRING"},
+                    "label": {"type": "STRING"},
+                    "reason": {"type": "STRING"},
+                },
+                "required": ["op", "reason"],
+            },
+        },
+        "next_intake": {
+            "type": "OBJECT",
+            "nullable": True,
+            "properties": {
+                "slot": {"type": "STRING"},
+                "question": {"type": "STRING"},
+            },
+        },
+        "asked_factor_reply": {
+            "type": "STRING",
+            "nullable": True,
+        },
+        "patient_answer": {
+            "type": "STRING",
+            "nullable": True,
+        },
+    },
+    "required": ["summary_reason", "checklist_operations"],
+}
 
 _JSON_FENCE_RE = re.compile(
     r"```(?:json)?\s*([\s\S]*?)\s*```",
@@ -88,6 +134,14 @@ OpName = Literal["add", "modify", "delete"]
 
 _ALLOWED_POLARITIES: frozenset[str] = frozenset(
     {FACTOR_STATE_AFFIRMED, FACTOR_STATE_DENIED, FACTOR_STATE_UNKNOWN}
+)
+_ALLOWED_ASKED_FACTOR_REPLIES: frozenset[str] = frozenset(
+    {
+        FACTOR_STATE_AFFIRMED,
+        FACTOR_STATE_DENIED,
+        FACTOR_STATE_UNKNOWN,
+        ASKED_FACTOR_NOT_ANSWERED,
+    }
 )
 _ENRICHER_LLM_OK = frozenset({"applied", "no_changes", "rejected_all"})
 
@@ -169,15 +223,16 @@ class IntakeEnrichmentResult:
     # deterministic planner picks a different slot after applying ops).
     next_question: str | None = None
     next_slot: SlotName | None = None
+    asked_factor_reply: str | None = None
+    patient_answer: str | None = None
     # Set when the model proposes next_intake that skips a still-missing higher
     # priority gap after ops (does not invent checklist rows).
     consistency_warning: dict[str, Any] | None = None
-    factor_matches: list[FactorStateUpdate] = field(default_factory=list)
     raw_response: str = ""
 
     @property
     def llm_ran(self) -> bool:
-        """True when the generator returned parseable JSON (matches are authoritative)."""
+        """True when the generator returned parseable JSON."""
         return self.status in _ENRICHER_LLM_OK
 
     @property
@@ -195,12 +250,13 @@ class IntakeEnrichmentResult:
             "comorbidities_acknowledged": self.comorbidities_acknowledged,
             "next_question": self.next_question,
             "next_slot": self.next_slot,
+            "asked_factor_reply": self.asked_factor_reply,
+            "patient_answer": self.patient_answer,
             "proposed": [op.to_log_dict() for op in self.proposed],
             "applied": [checklist_item_dict(item) for item in self.applied],
             "modified": list(self.modified),
             "deleted": list(self.deleted),
             "rejected": list(self.rejected),
-            "factor_matches": [m.to_log_dict() for m in self.factor_matches],
         }
         if self.consistency_warning:
             out["consistency_warning"] = dict(self.consistency_warning)
@@ -475,6 +531,14 @@ def apply_checklist_operations(
             )
             continue
         if op.op == "delete":
+            if is_na_slot_text(str(by_id[row_id].get("text") or "")):
+                rejected.append(
+                    {
+                        **op.to_log_dict(),
+                        "reject_reason": "na_slot_protected",
+                    }
+                )
+                continue
             delete_ids.add(row_id)
             modify_by_id.pop(row_id, None)
             continue
@@ -528,7 +592,7 @@ def apply_checklist_operations(
             op = modify_by_id[row_id]
             new_row: dict[str, Any] = {
                 "id": row_id,
-                "text": op.text,
+                "text": canonicalize_floor_slot_text(op.kind, op.text),
                 "kind": op.kind,
                 "source": "llm",
                 "label": op.label,
@@ -595,7 +659,7 @@ def apply_checklist_operations(
     for op in adds:
         row_id = new_checklist_id()
         item = ChecklistItem(
-            text=op.text,
+            text=canonicalize_floor_slot_text(op.kind, op.text),
             kind=op.kind,
             source="llm",
             label=op.label,
@@ -735,6 +799,28 @@ def _parse_next_intake(
     return question, slot_raw  # type: ignore[return-value]
 
 
+def _parse_asked_factor_reply(payload: dict[str, Any]) -> str | None:
+    raw = payload.get("asked_factor_reply")
+    if raw is None:
+        return None
+    value = str(raw).strip().casefold()
+    if value in {"", "null", "none"}:
+        return None
+    if value in _ALLOWED_ASKED_FACTOR_REPLIES:
+        return value
+    return None
+
+
+def _parse_patient_answer(payload: dict[str, Any]) -> str | None:
+    raw = payload.get("patient_answer")
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    if not value or value.casefold() in {"null", "none"}:
+        return None
+    return value
+
+
 def _format_last_exchange_block(
     *,
     last_assistant_message: str,
@@ -774,6 +860,32 @@ def _next_intake_slot_rules(profile: TriageProfile | None) -> str:
     )
 
 
+def _patient_answer_prompt_block(
+    question_spans: list[str] | None,
+    graph_packet: str | None,
+) -> str:
+    questions = [s.strip() for s in (question_spans or []) if s and s.strip()]
+    if not questions:
+        return (
+            "Rules for patient_answer:\n"
+            "- The patient did not ask a clarifying question. Set patient_answer to null.\n\n"
+        )
+    packet = (graph_packet or "").strip() or "(empty graph packet)"
+    quoted = " ".join(questions)
+    return (
+        "Rules for patient_answer (the patient's clarifying question):\n"
+        "- Write 1-3 sentences using ONLY the knowledge-graph packet below.\n"
+        "- Never recommend the emergency department, urgent care, self-care, or any "
+        "disposition. Never invent medications or tell the patient to do a self-exam.\n"
+        "- If they ask what you mean or 'like what', give 2-4 examples from the packet "
+        "that match the current topic, then stop.\n"
+        "- Do not treat the question spans as new checklist facts or as an answer to "
+        "the asked graph factor.\n"
+        f"- Patient question spans: {quoted}\n"
+        f"- Knowledge-graph packet:\n{packet}\n\n"
+    )
+
+
 def _build_enrichment_messages(
     *,
     checklist: list[dict[str, Any]],
@@ -783,8 +895,9 @@ def _build_enrichment_messages(
     last_assistant_message: str = "",
     last_asked_factor: str | None = None,
     factor_states: dict[str, str] | None = None,
-    inventory: tuple[str, ...] = (),
     profile: TriageProfile | None = None,
+    question_spans: list[str] | None = None,
+    graph_packet: str | None = None,
 ) -> list[dict[str, str]]:
     slot_hint = last_asked_slot or "(none)"
     factor_hint = last_asked_factor or "(none)"
@@ -802,10 +915,11 @@ def _build_enrichment_messages(
     instruction = (
         "You are a careful overseer of a structured clinical intake checklist for a "
         "musculoskeletal triage chatbot.\n\n"
-        "In ONE response you must (1) maintain the checklist, (2) match the checklist "
-        "and latest patient message onto inventory graph Factors with polarity, and "
-        "(3) draft the next intake question if coverage will still be incomplete "
-        "after your updates.\n\n"
+        "In ONE response you must (1) maintain the checklist, (2) draft the next "
+        "intake question if coverage will still be incomplete after your updates, "
+        "and (3) if the patient asked a clarifying question, write patient_answer "
+        "from the knowledge-graph packet only. "
+        "Do not map findings onto inventory graph Factors — matching is not your job.\n\n"
         "Read the last exchange, existing checklist, coverage gaps, prior factor "
         "states, and the latest patient message. Prior turns are already captured on "
         "the checklist—do not require the full transcript. Maintain the checklist so "
@@ -815,14 +929,16 @@ def _build_enrichment_messages(
         "Volunteered facts (critical):\n"
         "- Last intake slot asked is a HINT about what the assistant was seeking, NOT a "
         "limit on what you may add or edit.\n"
-        "- If a graph factor was asked (Last graph factor asked is not (none)), the "
-        "patient's yes / no / not sure answers THAT factor (and any other inventory "
-        "factors the same message clearly affirms or denies). Do not treat a bare "
+        "- If a graph factor was asked (Last graph factor asked is not (none)), set "
+        "asked_factor_reply to affirmed, denied, unknown, or not_answered. Use "
+        "not_answered when the statements do not answer that factor (leave it absent). "
+        "Use unknown when they say they do not know. Do not treat a bare "
         "no as filling an HPI slot (palliative, provocative, quality, etc.). Do not "
-        "add a checklist row for a denied factor — put denials only in factor_matches.\n"
+        "add a checklist row for a denied finding. Denials are not checklist rows.\n"
         "- If the last asked floor slot is palliative, provocative, quality, severity, "
         "duration, age, or sex, and the patient answers nothing / none / n/a / "
-        "I don't know / no, add a row for THAT slot with text N/A so coverage closes.\n"
+        "I don't know / no, add a row for THAT slot with text N/A so coverage closes. "
+        "Do not modify or delete an existing N/A row; leave the text as N/A.\n"
         "- Pattern extractors and GliNER often miss or mislabel facts. If the patient "
         "clearly stated something clinically relevant in the last exchange and it is "
         "not already on the checklist with the correct kind/label, you MUST add or "
@@ -840,18 +956,6 @@ def _build_enrichment_messages(
         "'hard to sit') as kind=provocative, label=provocative; delete mislabeled "
         "body-part rows like 'chair'/'work' if present; only then may next_intake "
         "advance to palliative if provocative is covered.\n\n"
-        "Graph factor matching (critical):\n"
-        "- After imagining checklist_operations applied, map the updated checklist AND "
-        "the latest patient message onto inventory Factor names.\n"
-        "- Use ONLY names from the inventory list (exact spelling).\n"
-        "- polarity is affirmed, denied, or unknown.\n"
-        "- One utterance may affirm one inventory factor and deny another.\n"
-        "- If the patient rules out a finding, also deny more-specific inventory "
-        "factors that cannot still be true. Do not invent Factor names.\n"
-        "- Include the asked graph factor when Last graph factor asked is not (none).\n"
-        "- Restate prior factor_states that this turn changes; unchanged sticky "
-        "states may be omitted.\n"
-        "- Use an empty factor_matches list only when nothing maps to the inventory.\n\n"
         "Important rules for checklist_operations:\n"
         "- Prefer evidence already stated by the patient; do not invent medications, "
         "diagnoses, or unrelated conditions.\n"
@@ -900,12 +1004,13 @@ def _build_enrichment_messages(
         "comorbidities.\n"
         "- Do not give triage advice or a diagnosis.\n"
         "- If coverage would be complete after your updates (ready for disposition), "
-        "set next_intake to null.\n\n"
+        "set next_intake to null.\n"
+        "- If severity is 7+ or described as severe, do not choose provocative as "
+        "next_intake; nothing can make severe pain worse.\n\n"
+        f"{_patient_answer_prompt_block(question_spans, graph_packet)}"
         f"Last intake slot asked by assistant: {slot_hint}\n"
         f"Last graph factor asked by assistant: {factor_hint}\n"
         f"Prior factor_states:\n{_format_factor_states_block(factor_states)}\n\n"
-        f"Inventory Factors (use these names only in factor_matches):\n"
-        f"{_format_inventory_block(inventory)}\n\n"
         f"Coverage before enrichment:\n{gap_summary}\n\n"
         f"Existing checklist (modify/delete by id in brackets; numbers are display-only):\n"
         f"{_format_checklist_block(checklist)}\n\n"
@@ -920,17 +1025,19 @@ def _build_enrichment_messages(
         '"reason": "..."},\n'
         '    {"op": "delete", "id": "cl_...", "reason": "..."}\n'
         "  ],\n"
-        '  "factor_matches": [\n'
-        '    {"factor": "Neuro motor deficit", "polarity": "affirmed", "reason": "..."},\n'
-        '    {"factor": "Neuro sensory deficit", "polarity": "denied", "reason": "..."}\n'
-        "  ],\n"
-        '  "next_intake": {"slot": "age", "question": "How old are you?"}\n'
+        '  "next_intake": {"slot": "age", "question": "How old are you?"},\n'
+        '  "asked_factor_reply": "not_answered",\n'
+        '  "patient_answer": null\n'
         "}\n"
         "Use an empty checklist_operations list when no checklist changes are needed.\n"
-        "Use an empty factor_matches list when nothing maps to the inventory.\n"
         "Set comorbidities_acknowledged to true only when the patient clearly denies "
         "other health conditions after being asked (e.g. none / no conditions).\n"
-        "Set next_intake to null when no further intake question is needed."
+        "Set next_intake to null when no further intake question is needed.\n"
+        "Set asked_factor_reply to affirmed | denied | unknown | not_answered | null. "
+        "Use not_answered or null when Last graph factor asked is (none) or the "
+        "patient did not answer that factor.\n"
+        "Set patient_answer to 1-3 graph-packet sentences when the patient asked a "
+        "clarifying question; otherwise null."
     )
     return [{"role": "user", "content": instruction}]
 
@@ -949,18 +1056,19 @@ def propose_checklist_enrichment(
     factor_states: dict[str, str] | None = None,
     inventory: tuple[str, ...] | None = None,
     profile: TriageProfile | None = None,
+    question_spans: list[str] | None = None,
+    graph_packet: str | None = None,
 ) -> IntakeEnrichmentResult:
     """
-    Ask the generator LLM to oversee checklist rows (add / modify / delete),
-    match inventory graph Factors, and draft the next intake question.
+    Ask the generator LLM to oversee checklist rows (add / modify / delete)
+    and draft the next floor-slot intake question.
 
     Uses a slim single-message prompt (last exchange + checklist + gaps), not
-    full transcript replay.
+    full transcript replay. Graph Factor matching is not this model's job.
     """
     checklist = ensure_checklist_ids([dict(r) for r in checklist])
     history = conversation_history or []
     assistant_msg = last_assistant_message.strip() or _last_assistant_from_history(history)
-    inventory_names = inventory if inventory is not None else _inventory_factor_names(profile)
 
     if not generator_model_configured():
         return IntakeEnrichmentResult(
@@ -977,13 +1085,16 @@ def propose_checklist_enrichment(
             last_assistant_message=assistant_msg,
             last_asked_factor=last_asked_factor,
             factor_states=factor_states,
-            inventory=inventory_names,
             profile=profile,
+            question_spans=question_spans,
+            graph_packet=graph_packet,
         )
         raw = generate_from_messages(
             messages,
             max_new_tokens=INTAKE_ENRICH_MAX_NEW_TOKENS,
             temperature=0.15,
+            response_mime_type="application/json",
+            response_schema=ENRICHMENT_RESPONSE_SCHEMA,
         )
     except Exception as exc:
         _log.exception("intake enrichment LLM failed session=%s: %s", session_id, exc)
@@ -1011,6 +1122,8 @@ def propose_checklist_enrichment(
     # sticky-ack comorbidities (Python ``bool("false")`` is True).
     ack = payload.get("comorbidities_acknowledged") is True
     next_question, next_slot = _parse_next_intake(payload)
+    asked_factor_reply = _parse_asked_factor_reply(payload)
+    patient_answer = _parse_patient_answer(payload)
     raw_ops = _collect_raw_operations(payload)
     proposed: list[ChecklistOperation] = []
     invalid_count = 0
@@ -1024,13 +1137,10 @@ def propose_checklist_enrichment(
     resulting, applied, modified, deleted, rejected = apply_checklist_operations(
         checklist, proposed
     )
-    factor_matches, factor_rejected = parse_factor_matches(
-        payload, inventory=inventory_names
-    )
 
     changed = bool(applied or modified or deleted)
-    status = "applied" if changed or ack or factor_matches else "no_changes"
-    if proposed and not changed and not ack and not factor_matches:
+    status = "applied" if changed or ack else "no_changes"
+    if proposed and not changed and not ack:
         status = "rejected_all"
 
     post_checklist = resulting if changed else list(checklist)
@@ -1064,14 +1174,15 @@ def propose_checklist_enrichment(
         comorbidities_acknowledged=ack,
         next_question=next_question,
         next_slot=next_slot,
+        asked_factor_reply=asked_factor_reply,
+        patient_answer=patient_answer,
         consistency_warning=consistency_warning,
-        factor_matches=factor_matches,
         raw_response=raw[:2000],
     )
     _log.info(
         "intake_enrichment session=%s turn=%s status=%s reason=%r proposed=%d "
         "added=%d modified=%d deleted=%d rejected=%d invalid=%d ack=%s "
-        "factor_matches=%d factor_rejected=%d next_slot=%s consistency_warning=%s",
+        "next_slot=%s consistency_warning=%s",
         session_id,
         turn_index,
         result.status,
@@ -1083,8 +1194,6 @@ def propose_checklist_enrichment(
         len(rejected),
         invalid_count,
         ack,
-        len(factor_matches),
-        factor_rejected,
         next_slot,
         bool(consistency_warning),
     )

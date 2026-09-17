@@ -349,3 +349,110 @@ def test_young_age_not_sent_to_llm_even_when_enabled(
     ]
     matches = match_checklist_to_factors(items)
     assert matches[0].factor_name is None
+
+
+def test_llm_match_one_to_many_with_polarity(
+    monkeypatch: pytest.MonkeyPatch,
+    enable_llm_factor_match: None,
+):
+    factors = load_factor_names(str(DEFAULT_INVENTORY_PATH))
+    needed = ("Lumbar stiffness", "Movement-related pain")
+    if any(name not in factors for name in needed):
+        pytest.skip("inventory lacks stiffness / movement factors")
+
+    matches = [
+        FactorMatch(
+            checklist_item={
+                "text": "It's pretty stiff so I don't move it a lot",
+                "kind": "symptom_quality",
+                "source": "test",
+                "label": "symptom_quality",
+            },
+            factor_name=None,
+            match_method="none",
+            match_score=0.0,
+        )
+    ]
+
+    monkeypatch.setattr(
+        "app.services.rag.llm_factor_match.generator_model_configured",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "app.services.rag.llm_factor_match.generate_from_messages",
+        lambda *a, **k: json.dumps(
+            {
+                "matches": [
+                    {
+                        "index": 1,
+                        "factor_name": "Lumbar stiffness",
+                        "polarity": "affirmed",
+                        "confidence": 0.93,
+                        "reason": "stiff",
+                    },
+                    {
+                        "index": 1,
+                        "factor_name": "Movement-related pain",
+                        "polarity": "affirmed",
+                        "confidence": 0.9,
+                        "reason": "guards against moving",
+                    },
+                ]
+            }
+        ),
+    )
+    out = llm_match_unmatched_factors(matches, factors)
+    names = {m.factor_name for m in [out[0], *()]}
+    mention_names = {m.factor_name: m.polarity for m in out[0].mentions}
+    assert out[0].factor_name in needed
+    assert out[0].polarity == "affirmed"
+    assert mention_names["Lumbar stiffness"] == "affirmed"
+    assert mention_names["Movement-related pain"] == "affirmed"
+    assert "Lumbar stiffness" in mention_names
+    assert names | set(mention_names) >= set(needed)
+
+
+def test_llm_match_rejects_palliative_onset(
+    monkeypatch: pytest.MonkeyPatch,
+    enable_llm_factor_match: None,
+):
+    factors = load_factor_names(str(DEFAULT_INVENTORY_PATH))
+    if "Activity-related onset" not in factors:
+        pytest.skip("inventory lacks Activity-related onset")
+
+    matches = [
+        FactorMatch(
+            checklist_item={
+                "text": "exercise",
+                "kind": "palliative",
+                "source": "test",
+                "label": "palliative",
+            },
+            factor_name=None,
+            match_method="none",
+            match_score=0.0,
+        )
+    ]
+    monkeypatch.setattr(
+        "app.services.rag.llm_factor_match.generator_model_configured",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "app.services.rag.llm_factor_match.generate_from_messages",
+        lambda *a, **k: json.dumps(
+            {
+                "matches": [
+                    {
+                        "index": 1,
+                        "factor_name": "Activity-related onset",
+                        "polarity": "affirmed",
+                        "confidence": 0.95,
+                        "reason": "exercise",
+                    }
+                ]
+            }
+        ),
+    )
+    out = llm_match_unmatched_factors(matches, factors)
+    assert out[0].factor_name is None
+    assert out[0].match_method == "none"

@@ -8,6 +8,8 @@
 param(
   [string]$ProjectId = $(if ($env:TRI_BACK_GCP_PROJECT) { $env:TRI_BACK_GCP_PROJECT } else { "YOUR_GCP_PROJECT" }),
   [string]$Region = "us-central1",
+  [string]$VertexLocation = $(if ($env:TRI_BACK_VERTEX_LOCATION) { $env:TRI_BACK_VERTEX_LOCATION } else { "us" }),
+  [string]$GeneratorModel = $(if ($env:TRI_BACK_GENERATOR_MODEL) { $env:TRI_BACK_GENERATOR_MODEL } else { "gemini-3.5-flash-lite" }),
   [string]$Service = "tri-back",
   [string]$Bucket = $(if ($env:TRI_BACK_GCS_BUCKET) { $env:TRI_BACK_GCS_BUCKET } else { "digimsk-cloudrun-$ProjectId" }),
   [string]$Image = "",
@@ -28,6 +30,7 @@ if (-not $Image) {
 Write-Host "Deploying $Service"
 Write-Host "  image:  $Image"
 Write-Host "  bucket: gs://$Bucket -> /mnt/tri-back"
+Write-Host "  vertex: $GeneratorModel @ $VertexLocation"
 Write-Host "  max-instances: $MaxInstances  min-instances: $MinInstances"
 
 $envVars = @(
@@ -35,16 +38,21 @@ $envVars = @(
   "TRI_BACK_GRAPH_RAG=1",
   "TRI_BACK_LOAD_RAG=0",
   "TRI_BACK_GENERATOR_BACKEND=vertex",
+  "TRI_BACK_GENERATOR_MODEL=$GeneratorModel",
   "TRI_BACK_VERTEX_PROJECT_ID=$ProjectId",
-  "TRI_BACK_VERTEX_LOCATION=$Region",
+  "TRI_BACK_VERTEX_LOCATION=$VertexLocation",
   "TRI_BACK_GLINER_MODEL_DIR=/mnt/tri-back/models/gliner",
+  "TRI_BACK_QUERY_CLASSIFIER_DIR=/mnt/tri-back/models/query_classifier",
+  "TRI_BACK_SAT_SPLITTER_DIR=/mnt/tri-back/models/sat_splitter",
   "TRI_BACK_GRAPH_CSV=/mnt/tri-back/graph/v4/red_flags_edges_v4_2026.9.10.csv",
   "TRI_BACK_GRAPH_FACTORS=/mnt/tri-back/graph/v4/red_flags_factors_v4_2026.9.10.csv",
   "TRI_BACK_GRAPH_INVENTORY=/mnt/tri-back/graph/v4/red_flags_inventory_v4_2026.9.10.json",
   "TRI_BACK_SESSION_STORE_DIR=/mnt/tri-back/sessions",
   "TRI_BACK_CHECKPOINT_SQLITE=/tmp/langgraph_checkpoints.sqlite",
   "TRI_BACK_LOAD_GLINER=1",
-  "TRI_BACK_LOAD_NER=1"
+  "TRI_BACK_LOAD_NER=1",
+  "TRI_BACK_LOAD_QUERY_CLASSIFIER=1",
+  "TRI_BACK_LOAD_SAT_SPLITTER=1"
 ) -join ","
 
 if ($BotApiKey) {

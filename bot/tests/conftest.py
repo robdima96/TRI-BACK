@@ -26,6 +26,10 @@ _force_env("GLINER_MODEL_DIR", "__pytest_no_gliner__")
 
 _force_env("LOAD_NER", "0")
 _force_env("LOAD_GLINER", "0")
+_force_env("LOAD_QUERY_CLASSIFIER", "0")
+_force_env("LOAD_SAT_SPLITTER", "0")
+_force_env("QUERY_CLASSIFIER_DIR", "__pytest_no_qc__")
+_force_env("SAT_SPLITTER_DIR", "__pytest_no_sat__")
 
 _force_env("GENERATOR_DIR", "__pytest_no_generator__")
 _force_env("GENERATOR_BACKEND", "local")

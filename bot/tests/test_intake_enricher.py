@@ -103,6 +103,74 @@ def test_apply_modify_and_delete_with_stable_ids():
     assert resulting[1]["id"] == "cl_sx"
 
 
+def test_apply_canonicalizes_empty_palliative_add_to_na():
+    resulting, applied, modified, deleted, rejected = apply_checklist_operations(
+        [],
+        [
+            ChecklistOperation(
+                op="add",
+                text="I don't know",
+                kind="palliative",
+                label="palliative",
+                reason="Patient could not name a relieving factor.",
+            )
+        ],
+    )
+    assert not rejected and not modified and not deleted
+    assert len(applied) == 1
+    assert applied[0].text == "N/A"
+    assert applied[0].kind == "palliative"
+    assert resulting[0]["text"] == "N/A"
+
+
+def test_apply_keeps_na_when_llm_modifies_to_nothing():
+    checklist = [
+        {
+            "id": "cl_pal",
+            "text": "N/A",
+            "kind": "palliative",
+            "source": "slot_answer",
+            "label": "palliative",
+        }
+    ]
+    resulting, applied, modified, deleted, rejected = apply_checklist_operations(
+        checklist,
+        [
+            ChecklistOperation(
+                op="modify",
+                id="cl_pal",
+                text="nothing",
+                kind="palliative",
+                label="palliative",
+                reason="Patient said nothing helps.",
+            )
+        ],
+    )
+    assert not applied and not deleted
+    assert resulting[0]["text"] == "N/A"
+    assert resulting[0]["kind"] == "palliative"
+    assert resulting[0]["id"] == "cl_pal"
+
+
+def test_apply_rejects_delete_of_na_slot_row():
+    checklist = [
+        {
+            "id": "cl_pal",
+            "text": "N/A",
+            "kind": "palliative",
+            "source": "slot_answer",
+            "label": "palliative",
+        }
+    ]
+    resulting, applied, modified, deleted, rejected = apply_checklist_operations(
+        checklist,
+        [ChecklistOperation(op="delete", id="cl_pal", reason="Uncertain row.")],
+    )
+    assert resulting[0]["text"] == "N/A"
+    assert not deleted and not applied and not modified
+    assert rejected and rejected[0]["reject_reason"] == "na_slot_protected"
+
+
 def test_apply_rejects_unknown_id_and_duplicate_add():
     checklist = [
         {"id": "cl_age", "text": "70", "kind": "demographic", "source": "pattern", "label": "age"},
@@ -260,7 +328,10 @@ def test_enrichment_uses_slim_single_message_prompt(mock_cfg, mock_gen):
     assert "assistant: What makes it worse?" in content
     assert "user: Sitting makes it worse" in content
     assert "Low back pain for 3 weeks" not in content
-    assert mock_gen.call_args.kwargs.get("max_new_tokens") == 1536
+    assert "If severity is 7+ or described as severe, do not choose provocative" in content
+    assert mock_gen.call_args.kwargs.get("max_new_tokens") == 4096
+    assert mock_gen.call_args.kwargs.get("response_mime_type") == "application/json"
+    assert mock_gen.call_args.kwargs.get("response_schema") is not None
 
 
 @patch("app.services.intake_enricher.generator_model_configured", return_value=False)
@@ -324,6 +395,56 @@ def test_enrichment_applies_symptom_from_confirmation(mock_cfg, mock_gen):
     )
     assert len(coverage["symptom_instances"]) == 1
     assert "symptom_anchor" not in {m["slot"] for m in coverage["missing_slots"]}
+
+
+@patch("app.services.intake_enricher.generate_from_messages")
+@patch("app.services.intake_enricher.generator_model_configured", return_value=True)
+def test_asked_factor_reply_is_parsed(mock_cfg, mock_gen):
+    mock_gen.return_value = json.dumps(
+        {
+            "summary_reason": "Patient is on steroids.",
+            "comorbidities_acknowledged": False,
+            "checklist_operations": [],
+            "asked_factor_reply": "affirmed",
+            "next_intake": None,
+        }
+    )
+    result = propose_checklist_enrichment(
+        checklist=[],
+        latest_user_message="I take prednisone daily",
+        last_asked_factor="Corticosteroids",
+    )
+    assert result.asked_factor_reply == "affirmed"
+    prompt = mock_gen.call_args[0][0][0]["content"]
+    assert "asked_factor_reply" in prompt
+
+
+@patch("app.services.intake_enricher.generate_from_messages")
+@patch("app.services.intake_enricher.generator_model_configured", return_value=True)
+def test_patient_answer_is_parsed_from_packet(mock_cfg, mock_gen):
+    mock_gen.return_value = json.dumps(
+        {
+            "summary_reason": "Recorded severe pain.",
+            "comorbidities_acknowledged": False,
+            "checklist_operations": [],
+            "asked_factor_reply": "not_answered",
+            "patient_answer": (
+                "Severe pain is on this graph; I am not giving a triage recommendation."
+            ),
+            "next_intake": None,
+        }
+    )
+    result = propose_checklist_enrichment(
+        checklist=[],
+        latest_user_message="my pain is severe",
+        question_spans=["is my back pain dangerous?"],
+        graph_packet="Current graph factor: Severe pain\n- Diabetes — a diagnosis of diabetes",
+    )
+    assert "severe pain" in (result.patient_answer or "").casefold()
+    prompt = mock_gen.call_args[0][0][0]["content"]
+    assert "patient_answer" in prompt
+    assert "is my back pain dangerous?" in prompt
+    assert "Diabetes" in prompt
 
 
 @patch("app.services.intake_enricher.generate_from_messages")

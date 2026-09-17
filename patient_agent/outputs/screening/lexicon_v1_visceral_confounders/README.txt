@@ -1,1 +1,0 @@
-﻿Prior lexicon: confounder_pancreas + confounder_radiating_abdomen. Replaced by confounder_dvt + confounder_abscess. Auto-eligible was 401. Keep for methods comparison; do not use as current Stage 3 sheet.

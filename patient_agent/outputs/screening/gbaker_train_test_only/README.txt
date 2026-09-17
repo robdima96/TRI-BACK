@@ -1,1 +1,0 @@
-﻿GBaker/MedQA-USMLE-4-options is train+test only (n=11451). Primary screen uses awinml/medqa questions (train+validation+test n=12723). Keep this folder as a sensitivity count, not the methods denominator.

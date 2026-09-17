@@ -41,7 +41,7 @@ def question_template(
     if slot == "symptom_anchor":
         return "What is your main symptom or body area of concern right now?"
     if slot == "symptom_duration":
-        return f"How long has it been since you've had {display_name}?"
+        return f"How long has it been since you've had this {display_name}?"
     if slot == "symptom_severity":
         return (
             f"On a scale from 0 to 10, how severe is your {display_name} right now?"
@@ -52,9 +52,9 @@ def question_template(
             "(for example sharp, dull, aching, burning, or something else)?"
         )
     if slot == "provocative":
-        return f"What makes your {display_name} worse?"
+        return f"Is there anything that makes your {display_name} worse?"
     if slot == "palliative":
-        return f"What helps your {display_name} feel better?"
+        return f"Is there anything that helps your {display_name} feel better?"
     return "Could you tell me a bit more about your symptoms?"
 
 

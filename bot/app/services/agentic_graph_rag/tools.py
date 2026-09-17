@@ -57,6 +57,10 @@ class ToolContext:
 from app.services.agentic_graph_rag.schemas import ToolResult  # noqa: E402
 
 
+class PrecomputedFactorMatchRequired(RuntimeError):
+    """Checklist rematch from agentic tools is disabled."""
+
+
 def _checklist_items(ctx: ToolContext) -> list[ChecklistItem]:
     out: list[ChecklistItem] = []
     for row in ctx.checklist:
@@ -96,26 +100,9 @@ def tool_get_matched_factors(ctx: ToolContext, **_: Any) -> ToolResult:
             factors=matched,
         )
 
-    from app.services.graphrag import match_checklist_to_factors
-
-    matches = match_checklist_to_factors(ctx.checklist)
-    from app.services.rag.factor_matcher import affirmed_factor_names, match_is_affirmed
-
-    matched = affirmed_factor_names(matches)
-    unmatched = [
-        (m.checklist_item.get("text") or "")
-        for m in matches
-        if not match_is_affirmed(m)
-    ]
-    obs = {
-        "matched_factors": matched,
-        "unmatched_checklist_text": [u for u in unmatched if u][:12],
-    }
-    return ToolResult(
-        name="get_matched_factors",
-        observation=_clip(json.dumps(obs, ensure_ascii=False)),
-        data=obs,
-        factors=matched,
+    raise PrecomputedFactorMatchRequired(
+        "get_matched_factors requires precomputed_matched_factors; "
+        "checklist rematch is disabled"
     )
 
 

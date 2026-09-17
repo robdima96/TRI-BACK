@@ -2,7 +2,7 @@
 
 **Status:** implementation in `public_host/cloud_run/`; operator runbook is **[STUDY_SERVICE.md](STUDY_SERVICE.md)**  
 **GCP project:** `YOUR_GCP_PROJECT` (same billing / Vertex as LLM calls)  
-**Region:** `us-central1`  
+**Region:** Cloud Run `us-central1`; Vertex Gemini location `us` (US multi-region; not the Cloud Run region)  
 **Storage strategy:** existing GCS bucket + Cloud Run volume mounts at `/mnt/tri-back` (not bake-into-image for GliNER/graph)
 
 ---
@@ -20,7 +20,7 @@ Browser
          models/gliner/     (read)
          graph/v2/          (read)   <- Graphs/backups/red flags/v2
          sessions/          (read/write)  <- TRI_BACK_SESSION_STORE_DIR
-       -> Vertex AI (runtime SA)
+       -> Vertex AI (runtime SA; model gemini-3.5-flash-lite, location us)
 ```
 
 ### Hosted retrieval defaults
@@ -32,6 +32,8 @@ Prefer `TRI_BACK_*`; legacy `TRI_BACK_*` still resolves.
 | `TRI_BACK_RAG` | `0` | No Chroma / Clinical_sBERT retrieval |
 | `TRI_BACK_GRAPH_RAG` | `1` | Local CSV GraphRAG (v2 pack on GCS) |
 | `TRI_BACK_GENERATOR_BACKEND` | `vertex` | Same project as today |
+| `TRI_BACK_GENERATOR_MODEL` | `gemini-3.5-flash-lite` | Wording LLM (google-genai SDK) |
+| `TRI_BACK_VERTEX_LOCATION` | `us` | Vertex US multi-region (independent of Cloud Run `$Region`) |
 | `TRI_BACK_GLINER_MODEL_DIR` | `/mnt/tri-back/models/gliner` | Unchanged GliNER code |
 | `TRI_BACK_GRAPH_CSV` | `/mnt/tri-back/graph/v2/red_flags_manual_v2.csv` | From v2 backup |
 | `TRI_BACK_GRAPH_INVENTORY` | `/mnt/tri-back/graph/v2/inventory.json` | From v2 backup |

@@ -78,6 +78,10 @@ class ChatState(TypedDict):
     # Separate from ChecklistItem so denied/affirmed rows do not collide on
     # content_dedupe_key. Denied factors must not appear in matched_factors.
     factor_states: NotRequired[dict[str, str]]
+    # Post-encode speech-act split (polarity / statement / question spans).
+    utterance_analysis: NotRequired[dict]
+    # Graph-grounded prefix prepended to the planner's next question.
+    patient_question_brief: NotRequired[str | None]
     candidate_conditions: NotRequired[list[str]]
     traversed_chunk_ids: NotRequired[list[str]]
     # Per-item factor matcher decisions + coverage gaps (also nested under graph_traversal).

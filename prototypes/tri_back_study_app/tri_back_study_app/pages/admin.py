@@ -6,6 +6,7 @@ import json
 
 import reflex as rx
 
+from tri_back_study_app.components.logout_button import logout_button
 from tri_back_study_app.db import login_events as login_db
 from tri_back_study_app.db import users as users_db
 from tri_back_study_app.session_store import list_session_files
@@ -62,7 +63,7 @@ def admin_page() -> rx.Component:
                 rx.heading("TRI-BACK Admin", size="5"),
                 rx.spacer(),
                 rx.link("Back to chat", href="/chat", class_name="btn-secondary"),
-                rx.button("Logout", on_click=AuthState.logout, class_name="btn-secondary"),
+                logout_button(),
                 class_name="topbar",
             ),
             rx.box(

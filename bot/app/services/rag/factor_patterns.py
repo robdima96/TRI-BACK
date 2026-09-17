@@ -35,6 +35,16 @@ _KIND_LABEL_FACTORS: dict[tuple[str, str], str] = {
     ("palliative", "rest"): "Constant pain",
 }
 
+# Kind-gated text aliases. Do not put these tokens in _TEXT_ALIASES — a
+# provocative "exercise makes it worse" must not map to conservative care.
+_KIND_SCOPED_ALIASES: tuple[tuple[str, tuple[str, ...], str], ...] = (
+    (
+        "palliative",
+        ("exercise", "activity", "physio", "physiotherapy"),
+        "Improves with conservative care",
+    ),
+)
+
 _TEXT_ALIASES: dict[str, str] = {
     "feverish": "Fever",
     "high temperature": "Fever",
@@ -473,6 +483,18 @@ def build_factor_patterns(inventory_path: str) -> tuple[FactorPattern, ...]:
                     priority=10,
                 )
             )
+
+    for kind, aliases, factor in _KIND_SCOPED_ALIASES:
+        if factor not in factor_set:
+            continue
+        patterns.append(
+            FactorPattern(
+                factor_name=factor,
+                patterns=[_alias_pattern(alias) for alias in aliases],
+                checklist_kinds=frozenset({kind}),
+                priority=8,
+            )
+        )
 
     alias_by_factor: dict[str, list[re.Pattern[str]]] = {}
     for alias, factor in _TEXT_ALIASES.items():

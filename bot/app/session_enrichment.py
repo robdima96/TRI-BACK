@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from app.config import settings
 from app.schemas import ChecklistItem, Evidence
 
 EXTRACTION_SOURCES: tuple[str, ...] = ("pattern", "gliner", "safety_phrase", "llm")
@@ -109,6 +110,7 @@ def build_turn_extraction_record(
     merged_checklist: list[dict[str, str]],
     timestamp: str | None = None,
     llm_enrichment: dict[str, Any] | None = None,
+    factor_matching: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Per-turn extraction snapshot.
 
@@ -139,6 +141,8 @@ def build_turn_extraction_record(
     }
     if llm_enrichment:
         record["llm_enrichment"] = llm_enrichment
+    if factor_matching:
+        record["factor_matching"] = list(factor_matching)
     return record
 
 
@@ -421,4 +425,6 @@ def default_session_fields(session_id: str) -> dict[str, Any]:
         "intake_traversal": None,
         "session_phase": "intake",
         "triage_profile_id": "low_back",
+        "generator_backend": settings.generator_backend,
+        "generator_model": settings.generator_model,
     }

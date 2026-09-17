@@ -1,9 +1,11 @@
 """LLM cross-check for unmatched checklist items → inventory Factor names.
 
-Runs only when ``settings.llm_factor_match`` is on and only for items the
-deterministic matcher left unmatched (not age/sex/severity gates). Proposals
-must name a Factor that exists in the inventory; abstention (null) is the
-correct outcome when no graph Factor fits.
+Runs when ``settings.llm_factor_match`` is on for unmatched (non-gated)
+checklist deltas during intake. This is the remaining semantic Factor path;
+disposition does not rematch old rows with ``llm_semantic``. Proposals must
+name a Factor that exists in the inventory; abstention (null) is the
+correct outcome when no graph Factor fits. One row may map to several
+Factors, each with polarity.
 """
 
 from __future__ import annotations
@@ -15,13 +17,49 @@ from typing import Any
 
 from app.schemas import ChecklistItem
 from app.services.generator import generate_from_messages, generator_model_configured
-from app.services.graphrag.schemas import FactorMatch
+from app.services.graphrag.schemas import FactorMatch, FactorMention
+from app.services.rag.factor_polarity import (
+    FACTOR_STATE_AFFIRMED,
+    FACTOR_STATE_DENIED,
+)
 
 _log = logging.getLogger(__name__)
 
 LLM_FACTOR_MATCH_MAX_TOKENS = 1024
 LLM_FACTOR_MATCH_TEMPERATURE = 0.1
 MIN_CONFIDENCE = 0.7
+
+_ALLOWED_POLARITIES = frozenset({FACTOR_STATE_AFFIRMED, FACTOR_STATE_DENIED})
+
+# Palliative rows must not be remapped onto provocative / onset Factors.
+_PALLIATIVE_INCOMPATIBLE: frozenset[str] = frozenset(
+    {
+        "Activity-related onset",
+        "Heavy lifting",
+        "Prolonged sitting aggravates",
+    }
+)
+
+FACTOR_MATCH_RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "matches": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "index": {"type": "INTEGER"},
+                    "factor_name": {"type": "STRING", "nullable": True},
+                    "polarity": {"type": "STRING", "nullable": True},
+                    "confidence": {"type": "NUMBER"},
+                    "reason": {"type": "STRING"},
+                },
+                "required": ["index", "factor_name", "confidence", "reason"],
+            },
+        }
+    },
+    "required": ["matches"],
+}
 
 _JSON_FENCE_RE = re.compile(
     r"```(?:json)?\s*([\s\S]*?)\s*```",
@@ -86,6 +124,12 @@ def _extract_json_object(text: str) -> dict[str, Any] | None:
     return None
 
 
+def _kind_compatible(kind: str, factor_name: str) -> bool:
+    if kind == "palliative" and factor_name in _PALLIATIVE_INCOMPATIBLE:
+        return False
+    return True
+
+
 def _build_messages(
     candidates: list[tuple[int, ChecklistItem]],
     factors: tuple[str, ...],
@@ -102,28 +146,38 @@ def _build_messages(
         "Rules:\n"
         "- Use ONLY Factor names from the inventory list below (exact spelling).\n"
         "- Map a row only when the patient statement clearly implies that Factor.\n"
-        "- Prefer factor_name=null (abstain) when no inventory Factor fits, when the "
-        "row is a body part / duration / generic symptom without a Factor twin, or "
-        "when the mapping would stretch meaning (e.g. standing intolerance is not "
-        "Prolonged sitting aggravates).\n"
+        "- One row may map to SEVERAL inventory Factors. Repeat the same index "
+        "once per Factor, each with its own polarity.\n"
+        "- polarity is affirmed or denied. Prefer factor_name=null (abstain) when "
+        "no inventory Factor fits, when the row is a body part / duration / "
+        "generic symptom without a Factor twin, or when the mapping would stretch "
+        "meaning (e.g. standing intolerance is not Prolonged sitting aggravates).\n"
+        "- Kind compatibility: a palliative (makes it better) row must not map to "
+        "Activity-related onset, Heavy lifting, or Prolonged sitting aggravates. "
+        "Abstain instead of remapping.\n"
+        "- Avoid span-negation mistakes: 'It's pretty stiff so I don't move it a "
+        "lot' affirms Lumbar stiffness AND Movement-related pain (guarding), not "
+        "a denial of movement-related pain.\n"
         "- Do not invent diagnoses or Factor names.\n"
         "- confidence is 0.0–1.0; only propose a Factor when confidence >= "
         f"{MIN_CONFIDENCE:.2f}.\n\n"
         "INVENTORY FACTORS:\n"
         f"{factor_block}\n\n"
-        "CHECKLIST ROWS TO JUDGE (1-based indexes must be echoed):\n"
+        "CHECKLIST ROWS TO JUDGE (1-based indexes; repeat an index for 1:many):\n"
         + "\n".join(rows)
         + "\n\n"
         "Respond with ONE JSON object only:\n"
         "{\n"
         '  "matches": [\n'
-        '    {"index": 1, "factor_name": "Prolonged sitting aggravates", '
-        '"confidence": 0.92, "reason": "chair intolerance implies sitting aggravates"},\n'
-        '    {"index": 2, "factor_name": null, "confidence": 0.0, '
+        '    {"index": 1, "factor_name": "Lumbar stiffness", "polarity": "affirmed", '
+        '"confidence": 0.92, "reason": "stiff implies lumbar stiffness"},\n'
+        '    {"index": 1, "factor_name": "Movement-related pain", "polarity": "affirmed", '
+        '"confidence": 0.88, "reason": "avoids moving because it hurts"},\n'
+        '    {"index": 2, "factor_name": null, "polarity": null, "confidence": 0.0, '
         '"reason": "body part only; no Factor"}\n'
         "  ]\n"
         "}\n"
-        "Include every input index exactly once."
+        "Include every input index at least once (null if abstaining)."
     )
     return [{"role": "user", "content": instruction}]
 
@@ -133,13 +187,15 @@ def _parse_proposals(
     *,
     valid_indexes: set[int],
     factors: tuple[str, ...],
-) -> dict[int, tuple[str, float]]:
-    """Return index → (canonical_factor, confidence) for accepted proposals only."""
+    items_by_index: dict[int, ChecklistItem],
+) -> dict[int, list[tuple[str, str, float]]]:
+    """Return index → [(canonical_factor, polarity, confidence), ...]."""
     raw_list = payload.get("matches")
     if not isinstance(raw_list, list):
         return {}
 
-    accepted: dict[int, tuple[str, float]] = {}
+    accepted: dict[int, list[tuple[str, str, float]]] = {}
+    seen: dict[int, set[str]] = {}
     for entry in raw_list:
         if not isinstance(entry, dict):
             continue
@@ -178,7 +234,28 @@ def _parse_proposals(
             )
             continue
 
-        accepted[idx] = (canonical, min(1.0, confidence))
+        polarity = str(entry.get("polarity") or FACTOR_STATE_AFFIRMED).strip().casefold()
+        if polarity not in _ALLOWED_POLARITIES:
+            continue
+
+        item = items_by_index.get(idx)
+        kind = str(getattr(item, "kind", None) or "")
+        if not _kind_compatible(kind, canonical):
+            _log.info(
+                "llm factor match rejected kind-incompatible idx=%s kind=%r name=%r",
+                idx,
+                kind,
+                canonical,
+            )
+            continue
+
+        names = seen.setdefault(idx, set())
+        if canonical in names:
+            continue
+        names.add(canonical)
+        accepted.setdefault(idx, []).append(
+            (canonical, polarity, min(1.0, confidence))
+        )
     return accepted
 
 
@@ -217,6 +294,8 @@ def llm_match_unmatched_factors(
             _build_messages(candidates, factors),
             max_new_tokens=LLM_FACTOR_MATCH_MAX_TOKENS,
             temperature=LLM_FACTOR_MATCH_TEMPERATURE,
+            response_mime_type="application/json",
+            response_schema=FACTOR_MATCH_RESPONSE_SCHEMA,
         )
     except Exception as exc:
         _log.exception("llm factor match call failed: %s", exc)
@@ -228,7 +307,13 @@ def llm_match_unmatched_factors(
         return matches
 
     valid_indexes = {idx for idx, _ in candidates}
-    accepted = _parse_proposals(payload, valid_indexes=valid_indexes, factors=factors)
+    items_by_index = {idx: item for idx, item in candidates}
+    accepted = _parse_proposals(
+        payload,
+        valid_indexes=valid_indexes,
+        factors=factors,
+        items_by_index=items_by_index,
+    )
     if not accepted:
         _log.info(
             "llm factor match: %d candidates, 0 accepted (abstention or reject)",
@@ -237,20 +322,35 @@ def llm_match_unmatched_factors(
         return matches
 
     out = list(matches)
-    for prompt_idx, (factor_name, confidence) in accepted.items():
+    accepted_names: list[str] = []
+    for prompt_idx, proposals in accepted.items():
         list_idx = prompt_idx - 1
         prior = out[list_idx]
+        mentions = [
+            FactorMention(
+                factor_name=name,
+                polarity=polarity,  # type: ignore[arg-type]
+                match_method="llm_semantic",
+                match_score=confidence,
+            )
+            for name, polarity, confidence in proposals
+        ]
+        affirmed = [p for p in proposals if p[1] == FACTOR_STATE_AFFIRMED]
+        denied = [p for p in proposals if p[1] == FACTOR_STATE_DENIED]
+        primary = (affirmed or denied)[0]
         out[list_idx] = FactorMatch(
             checklist_item=dict(prior.checklist_item or {}),
-            factor_name=factor_name,
+            factor_name=primary[0],
             match_method="llm_semantic",
-            match_score=confidence,
-            polarity="affirmed",
+            match_score=primary[2],
+            polarity=primary[1],  # type: ignore[arg-type]
+            mentions=mentions,
         )
+        accepted_names.extend(name for name, _, _ in proposals)
     _log.info(
         "llm factor match: %d candidates, %d accepted → %s",
         len(candidates),
-        len(accepted),
-        [name for name, _ in accepted.values()],
+        len(accepted_names),
+        accepted_names,
     )
     return out

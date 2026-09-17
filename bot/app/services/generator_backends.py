@@ -3,54 +3,34 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from app.config import settings
 
 _log = logging.getLogger(__name__)
 
-_vertex_initialized = False
+_MISSING_GENAI = "google-genai not installed; pip install -e '.[generator-api]'"
+
+# ``vertexai=True`` is the Vertex AI / Agent Platform client flag. Google's
+# current README also lists ``enterprise=True`` after the Agent Platform
+# rename; we keep ``vertexai=True`` and pass project+location explicitly so
+# ambient GOOGLE_CLOUD_* / GOOGLE_GENAI_USE_ENTERPRISE cannot override
+# TRI_BACK_VERTEX_*.
+_vertex_client: Any = None
+
+DEFAULT_THINKING_LEVEL = "MINIMAL"
+_ALLOWED_THINKING = frozenset({"MINIMAL", "LOW", "MEDIUM", "HIGH"})
+_RETRY_ATTEMPTS = 2
+_RETRY_SLEEP_SEC = 0.5
 
 
-def _vertex_history(messages: list[dict[str, str]]) -> tuple[list[Any], str]:
+def _genai_types() -> Any:
     try:
-        from vertexai.generative_models import Content, Part
+        from google.genai import types
     except ImportError as exc:
-        raise RuntimeError(
-            "google-cloud-aiplatform not installed; pip install -e '.[generator-api]'"
-        ) from exc
-
-    if not messages:
-        return [], ""
-    history: list[Content] = []
-    for turn in messages[:-1]:
-        role = "model" if turn.get("role") == "assistant" else "user"
-        history.append(
-            Content(role=role, parts=[Part.from_text(turn.get("content", ""))])
-        )
-    last = messages[-1].get("content", "")
-    return history, last
-
-
-def _ensure_vertex() -> None:
-    global _vertex_initialized
-    if _vertex_initialized:
-        return
-    if not settings.vertex_project_id or not settings.vertex_location:
-        raise RuntimeError(
-            "TRI_BACK_VERTEX_PROJECT_ID and TRI_BACK_VERTEX_LOCATION must be set"
-        )
-    try:
-        import vertexai
-    except ImportError as exc:
-        raise RuntimeError(
-            "google-cloud-aiplatform not installed; pip install -e '.[generator-api]'"
-        ) from exc
-    vertexai.init(
-        project=settings.vertex_project_id,
-        location=settings.vertex_location,
-    )
-    _vertex_initialized = True
+        raise RuntimeError(_MISSING_GENAI) from exc
+    return types
 
 
 def _split_system_messages(
@@ -70,45 +50,139 @@ def _split_system_messages(
     return instruction, rest
 
 
+def _to_contents(chat_messages: list[dict[str, str]], types: Any) -> list[Any]:
+    """Map TRI-BACK chat dicts to google-genai Content objects.
+
+    Last turn must be ``user`` — Gemini 3.5 Flash-Lite rejects a trailing
+    ``model`` role.
+    """
+    contents: list[Any] = []
+    for turn in chat_messages:
+        role = "model" if turn.get("role") == "assistant" else "user"
+        text = turn.get("content") or ""
+        contents.append(
+            types.Content(role=role, parts=[types.Part.from_text(text=text)])
+        )
+    if contents and getattr(contents[-1], "role", None) == "model":
+        raise ValueError(
+            "Vertex generate_content requires the last contents turn to be role=user"
+        )
+    return contents
+
+
+def _ensure_vertex_client() -> Any:
+    global _vertex_client
+    if _vertex_client is not None:
+        return _vertex_client
+    if not settings.vertex_project_id or not settings.vertex_location:
+        raise RuntimeError(
+            "TRI_BACK_VERTEX_PROJECT_ID and TRI_BACK_VERTEX_LOCATION must be set"
+        )
+    try:
+        from google import genai
+    except ImportError as exc:
+        raise RuntimeError(_MISSING_GENAI) from exc
+    _vertex_client = genai.Client(
+        vertexai=True,
+        project=settings.vertex_project_id,
+        location=settings.vertex_location,
+    )
+    return _vertex_client
+
+
+def _normalize_thinking_level(thinking_level: str | None) -> str:
+    level = (thinking_level or DEFAULT_THINKING_LEVEL).strip().upper()
+    if level not in _ALLOWED_THINKING:
+        raise ValueError(f"unsupported thinking_level: {thinking_level!r}")
+    return level
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    status = getattr(exc, "status_code", None)
+    if status is None:
+        status = getattr(exc, "code", None)
+    try:
+        if int(status) in {429, 500, 502, 503, 504}:
+            return True
+    except (TypeError, ValueError):
+        pass
+    name = type(exc).__name__.lower()
+    blob = f"{name} {exc}".lower()
+    return any(
+        token in blob
+        for token in (
+            "unavailable",
+            "timeout",
+            "servererror",
+            "too many requests",
+            "resourceexhausted",
+            "503",
+            "429",
+        )
+    )
+
+
 def generate_vertex(
     messages: list[dict[str, str]],
     *,
     max_new_tokens: int,
-    temperature: float,
+    temperature: float = 0.2,
+    thinking_level: str | None = None,
+    response_mime_type: str | None = None,
+    response_schema: dict[str, Any] | None = None,
 ) -> str:
-    _ensure_vertex()
-    try:
-        from vertexai.generative_models import GenerationConfig, GenerativeModel
-    except ImportError as exc:
-        raise RuntimeError(
-            "google-cloud-aiplatform not installed; pip install -e '.[generator-api]'"
-        ) from exc
+    """Generate via google-genai on Vertex.
 
+    ``temperature`` is accepted for call-site compatibility with the local
+    backend but is not sent: Gemini 3.x ignores custom temperature/top_p.
+    """
+    del temperature  # unused on Gemini 3; kept in the signature for callers
+    types = _genai_types()
+    client = _ensure_vertex_client()
     system_instruction, chat_messages = _split_system_messages(messages)
-    history, last_message = _vertex_history(chat_messages)
-    if not last_message and chat_messages:
-        last_message = chat_messages[-1].get("content", "")
-    model_kwargs: dict[str, Any] = {}
+    contents = _to_contents(chat_messages, types)
+    if not contents:
+        raise GenerationEmptyError("generation_empty: no user contents")
+
+    level = _normalize_thinking_level(thinking_level)
+    config_kwargs: dict[str, Any] = {
+        "max_output_tokens": max_new_tokens,
+        "thinking_config": types.ThinkingConfig(
+            thinking_level=level,
+            include_thoughts=False,
+        ),
+    }
     if system_instruction:
-        model_kwargs["system_instruction"] = system_instruction
-    model = GenerativeModel(settings.generator_model, **model_kwargs)
-    generation_config = GenerationConfig(
-        max_output_tokens=max_new_tokens,
-        temperature=temperature,
-        top_p=0.9,
-    )
-    if history:
-        chat = model.start_chat(history=history)
-        response = chat.send_message(
-            last_message,
-            generation_config=generation_config,
-        )
-    else:
-        response = model.generate_content(
-            last_message,
-            generation_config=generation_config,
-        )
-    return _extract_response_text(response)
+        config_kwargs["system_instruction"] = system_instruction
+    if response_mime_type:
+        config_kwargs["response_mime_type"] = response_mime_type
+    if response_schema:
+        config_kwargs["response_schema"] = response_schema
+    config = types.GenerateContentConfig(**config_kwargs)
+
+    last_exc: BaseException | None = None
+    for attempt in range(_RETRY_ATTEMPTS):
+        try:
+            response = client.models.generate_content(
+                model=settings.generator_model,
+                contents=contents,
+                config=config,
+            )
+            return _extract_response_text(response)
+        except GenerationEmptyError:
+            raise
+        except Exception as exc:
+            last_exc = exc
+            if attempt + 1 < _RETRY_ATTEMPTS and _is_retryable(exc):
+                _log.warning(
+                    "vertex generate retry after %s: %s",
+                    type(exc).__name__,
+                    exc,
+                )
+                time.sleep(_RETRY_SLEEP_SEC)
+                continue
+            raise
+    raise last_exc  # pragma: no cover
 
 
 class GenerationEmptyError(RuntimeError):
@@ -132,7 +206,7 @@ def _is_max_tokens_finish(finish: Any) -> bool:
     name = _finish_reason_name(finish).upper()
     if "MAX_TOKEN" in name:
         return True
-    # Vertex enum: FinishReason.MAX_TOKENS == 2
+    # google-genai uses a string enum; older Vertex numeric MAX_TOKENS == 2.
     try:
         return int(finish) == 2
     except (TypeError, ValueError):
@@ -142,11 +216,9 @@ def _is_max_tokens_finish(finish: Any) -> bool:
 def _extract_response_text(response: Any) -> str:
     """Concatenate all text parts of the first candidate.
 
-    Gemini 2.5 "thinking" models can return multiple content parts (e.g. a thought
-    summary plus the answer). The SDK's ``response.text`` convenience accessor
-    raises ``"Multiple content parts are not supported"`` in that case, so we walk
-    the parts manually and join their text. Parts explicitly flagged as thoughts
-    are skipped so they never leak into the visible / JSON output.
+    Thinking models can return multiple content parts (thought summary plus
+    answer). Walk parts and skip those flagged as thoughts so they never leak
+    into visible / JSON output.
 
     Empty candidates log ``finish_reason`` / safety metadata. Empty + MAX_TOKENS
     raises :class:`GenerationEmptyError` so callers treat it as generation failure
@@ -180,7 +252,6 @@ def _extract_response_text(response: Any) -> str:
             safety,
         )
 
-    # Single-part fallback (older responses); guarded because ``.text`` can raise.
     try:
         text = (response.text or "").strip()
     except (ValueError, AttributeError):

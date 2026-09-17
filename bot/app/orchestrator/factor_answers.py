@@ -18,6 +18,7 @@ from app.services.rag.factor_patterns import (
     _severity_implies_severe,
 )
 from app.services.rag.factor_polarity import (
+    ASKED_FACTOR_NOT_ANSWERED,
     FACTOR_STATE_AFFIRMED,
     FACTOR_STATE_DENIED,
     FACTOR_STATE_UNKNOWN,
@@ -27,7 +28,7 @@ from app.services.rag.factor_polarity import (
 
 _UNCERTAINTY = re.compile(
     r"^\s*(?:i\s+don'?t\s+know|idk|unsure|not\s+sure|n/?a|"
-    r"no\s+idea|not\s+certain|\?+)\s*$",
+    r"no\s+idea|not\s+certain|\?+)\s*[.!]*\s*$",
     re.I,
 )
 _BARE_YES = re.compile(
@@ -77,10 +78,6 @@ def polarity_for_factor_reply(
         return FACTOR_STATE_DENIED
     if _BARE_YES.match(text):
         return FACTOR_STATE_AFFIRMED
-    # Whole-message polarity only when the wording is a short hedge, not a
-    # volunteered finding about something else.
-    if len(text.split()) <= 6:
-        return polarity_for_span(text, 0, len(text))
     return FACTOR_STATE_UNKNOWN
 
 
@@ -107,4 +104,25 @@ def credit_asked_factor_answer(
         out.setdefault(asked_factor, FACTOR_STATE_UNKNOWN)
     else:
         out[asked_factor] = polarity
+    return out
+
+
+def apply_asked_factor_reply(
+    *,
+    asked_factor: str | None,
+    reply: str | None,
+    factor_states: dict[str, str] | None,
+) -> dict[str, str]:
+    """Apply the enricher's asked_factor_reply without a heuristic overwrite."""
+    out = dict(factor_states or {})
+    if not asked_factor:
+        return out
+    value = (reply or "").strip().casefold()
+    if not value or value == ASKED_FACTOR_NOT_ANSWERED:
+        return out
+    if value == FACTOR_STATE_UNKNOWN:
+        out.setdefault(asked_factor, FACTOR_STATE_UNKNOWN)
+        return out
+    if value in {FACTOR_STATE_AFFIRMED, FACTOR_STATE_DENIED}:
+        out[asked_factor] = value
     return out

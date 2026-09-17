@@ -1,4 +1,4 @@
-"""LLM-owned graph Factor matching via the intake enricher."""
+"""Per-turn dedicated matcher owns factor_states; enricher does not emit Factors."""
 
 from __future__ import annotations
 
@@ -13,23 +13,16 @@ from app.services.intake_enricher import (
     FactorStateUpdate,
     IntakeEnrichmentResult,
     apply_factor_state_updates,
-    parse_factor_matches,
     propose_checklist_enrichment,
 )
 from app.services.rag.factor_matcher import (
     affirmed_factor_names,
+    checklist_row_deltas,
     drop_denied_factor_matches,
+    match_checklist_to_factors,
 )
 from app.services.graphrag.schemas import FactorMatch
-
-
-_INVENTORY = (
-    "Neuro motor deficit",
-    "Neuro sensory deficit",
-    "Bilat neuro sensory deficit",
-    "Bilat neuro motor deficit",
-    "Saddle anaesthesia",
-)
+from app.schemas import ChecklistItem
 
 
 def _coverage_for_planner():
@@ -46,56 +39,6 @@ def _coverage_for_planner():
             {"symptom_id": "s1", "display_name": "back pain", "checklist_keys": []}
         ],
     }
-
-
-def test_parse_factor_matches_keeps_inventory_names_and_drops_unknown():
-    accepted, rejected = parse_factor_matches(
-        {
-            "factor_matches": [
-                {
-                    "factor": "Neuro motor deficit",
-                    "polarity": "affirmed",
-                    "reason": "legs weak",
-                },
-                {
-                    "factor": "Neuro sensory deficit",
-                    "polarity": "denied",
-                    "reason": "no tingling",
-                },
-                {
-                    "factor": "Bilat neuro sensory deficit",
-                    "polarity": "denied",
-                    "reason": "cannot be both legs",
-                },
-                {"factor": "Not A Real Factor", "polarity": "affirmed"},
-                {"factor": "Saddle anaesthesia", "polarity": "maybe"},
-            ]
-        },
-        inventory=_INVENTORY,
-    )
-    names = {item.factor: item.polarity for item in accepted}
-    assert names["Neuro motor deficit"] == "affirmed"
-    assert names["Neuro sensory deficit"] == "denied"
-    assert names["Bilat neuro sensory deficit"] == "denied"
-    assert "Not A Real Factor" not in names
-    assert "Saddle anaesthesia" not in names
-    assert rejected == 2
-
-
-def test_parse_factor_matches_later_row_wins():
-    accepted, rejected = parse_factor_matches(
-        {
-            "factor_matches": [
-                {"factor": "Neuro motor deficit", "polarity": "denied"},
-                {"factor": "neuro motor deficit", "polarity": "affirmed"},
-            ]
-        },
-        inventory=_INVENTORY,
-    )
-    assert rejected == 0
-    assert len(accepted) == 1
-    assert accepted[0].factor == "Neuro motor deficit"
-    assert accepted[0].polarity == "affirmed"
 
 
 def test_apply_unknown_does_not_clear_sticky_denied():
@@ -137,11 +80,115 @@ def test_denied_factor_not_in_matched_factors():
     assert "Neuro motor deficit" in names
 
 
-def test_enrich_node_applies_llm_factor_matches_without_regex():
+def test_checklist_row_deltas_by_id_and_signature():
+    prior = [
+        {"id": "cl_1", "text": "improved by", "kind": "palliative", "label": "palliative"},
+        {"id": "cl_2", "text": "70", "kind": "demographic", "label": "age"},
+    ]
+    current = [
+        {"id": "cl_1", "text": "Exercise helps", "kind": "palliative", "label": "palliative"},
+        {"id": "cl_2", "text": "70", "kind": "demographic", "label": "age"},
+        {"id": "cl_3", "text": "dull", "kind": "symptom_quality", "label": "symptom_quality"},
+    ]
+    deltas = checklist_row_deltas(prior, current)
+    texts = {row["text"] for row in deltas}
+    assert texts == {"Exercise helps", "dull"}
+
+
+def test_enrich_node_runs_matcher_when_enricher_json_parsed():
+    state = {
+        "session_id": "sess-matcher-always",
+        "message": "exercise",
+        "message_normalized": "exercise",
+        "turn_start_checklist": [],
+        "clinical_checklist": [
+            {
+                "id": "cl_ex",
+                "text": "exercise",
+                "kind": "palliative",
+                "source": "slot_answer",
+                "label": "palliative",
+            }
+        ],
+        "encoder_turn_items": [],
+        "extraction_history": [],
+        "messages": [],
+        "asked_factor": None,
+        "last_asked_slot": "palliative",
+        "factor_states": {},
+        "comorbidities_acknowledged": False,
+    }
+    with patch(
+        "app.orchestrator.nodes.propose_checklist_enrichment",
+        return_value=IntakeEnrichmentResult(
+            status="no_changes",
+            summary_reason="Palliative already on the checklist.",
+        ),
+    ):
+        out = enrich_checklist_node(state)
+    assert out["factor_states"].get("Improves with conservative care") == "affirmed"
+    log = out["extraction_history"][0].get("factor_matching") or []
+    assert any(row.get("factor_name") == "Improves with conservative care" for row in log)
+
+
+def test_enrich_node_bare_no_denies_asked_factor_when_matcher_empty():
+    asked = {
+        "session_id": "sess-bare-no",
+        "message": "no",
+        "message_normalized": "no",
+        "turn_start_checklist": [],
+        "clinical_checklist": [],
+        "encoder_turn_items": [],
+        "extraction_history": [],
+        "messages": [],
+        "asked_factor": "Saddle anaesthesia",
+        "last_asked_slot": None,
+        "factor_states": {},
+        "comorbidities_acknowledged": False,
+    }
+    with patch(
+        "app.orchestrator.nodes.propose_checklist_enrichment",
+        return_value=IntakeEnrichmentResult(
+            status="no_changes",
+            summary_reason="Nothing to add.",
+        ),
+    ):
+        out = enrich_checklist_node(asked)
+    assert out["factor_states"]["Saddle anaesthesia"] == "denied"
+    assert not any(row.get("kind") == "palliative" for row in out["clinical_checklist"])
+
+
+def test_enrich_node_falls_back_to_credit_when_enricher_unavailable():
+    asked = {
+        "session_id": "sess-fallback",
+        "message": "no",
+        "message_normalized": "no",
+        "turn_start_checklist": [],
+        "clinical_checklist": [],
+        "encoder_turn_items": [],
+        "extraction_history": [],
+        "messages": [],
+        "asked_factor": "Saddle anaesthesia",
+        "last_asked_slot": None,
+        "factor_states": {},
+        "comorbidities_acknowledged": False,
+    }
+    with patch(
+        "app.orchestrator.nodes.propose_checklist_enrichment",
+        return_value=IntakeEnrichmentResult(
+            status="unavailable",
+            summary_reason="skipped",
+        ),
+    ):
+        out = enrich_checklist_node(asked)
+    assert out["factor_states"]["Saddle anaesthesia"] == "denied"
+
+
+def test_denied_neighbours_skipped_after_matcher_and_credit():
     state = {
         "session_id": "sess-llm-factors",
-        "message": "my legs are weak but I don't have any tingling",
-        "message_normalized": "my legs are weak but I don't have any tingling",
+        "message": "no",
+        "message_normalized": "no",
         "turn_start_checklist": [],
         "clinical_checklist": [
             {
@@ -159,33 +206,38 @@ def test_enrich_node_applies_llm_factor_matches_without_regex():
         "factor_states": {},
         "comorbidities_acknowledged": True,
     }
-    enrichment = IntakeEnrichmentResult(
-        status="applied",
-        summary_reason="Mixed motor affirm and sensory deny.",
-        factor_matches=[
-            FactorStateUpdate(factor="Neuro motor deficit", polarity="affirmed"),
-            FactorStateUpdate(factor="Neuro sensory deficit", polarity="denied"),
-            FactorStateUpdate(
-                factor="Bilat neuro sensory deficit", polarity="denied"
-            ),
-        ],
+    motor = FactorMatch(
+        checklist_item={
+            "text": "weak",
+            "kind": "ner_entity",
+            "source": "gliner",
+            "label": "symptom",
+        },
+        factor_name="Neuro motor deficit",
+        match_method="regex",
+        match_score=0.9,
+        polarity="affirmed",
     )
+    state["message"] = "no but my legs are weak"
+    state["message_normalized"] = "no but my legs are weak"
     with patch(
         "app.orchestrator.nodes.propose_checklist_enrichment",
-        return_value=enrichment,
+        return_value=IntakeEnrichmentResult(
+            status="applied",
+            summary_reason="Kept weakness row.",
+        ),
+    ), patch(
+        "app.services.rag.factor_matcher.match_turn_to_factors",
+        return_value=[motor],
     ):
         out = enrich_checklist_node(state)
 
     states = out["factor_states"]
     assert states["Neuro motor deficit"] == "affirmed"
     assert states["Neuro sensory deficit"] == "denied"
-    assert states["Bilat neuro sensory deficit"] == "denied"
-    log = out["extraction_history"][0]["llm_enrichment"]
-    assert len(log["factor_matches"]) == 3
 
     neighbours = eligible_neighbour_factors(states, ontology=load_ontology())
     assert "Neuro sensory deficit" not in neighbours
-    assert "Bilat neuro sensory deficit" not in neighbours
 
     planned = plan_next_question(
         _coverage_for_planner(),
@@ -196,7 +248,6 @@ def test_enrich_node_applies_llm_factor_matches_without_regex():
         matched_factors=["Neuro motor deficit"],
     )
     assert planned.asked_factor != "Neuro sensory deficit"
-    assert planned.asked_factor != "Bilat neuro sensory deficit"
 
 
 def test_enrich_node_fills_provocative_na_from_llm_ops():
@@ -251,82 +302,14 @@ def test_enrich_node_fills_provocative_na_from_llm_ops():
     assert ("provocative", "N/A") in rows
 
 
-def test_enrich_node_skips_regex_matcher_when_llm_ran():
-    state = {
-        "session_id": "sess-skip-regex",
-        "message": "aching",
-        "message_normalized": "aching",
-        "turn_start_checklist": [],
-        "clinical_checklist": [
-            {
-                "text": "aching",
-                "kind": "symptom_quality",
-                "source": "pattern",
-                "label": "symptom_quality",
-            }
-        ],
-        "encoder_turn_items": [],
-        "extraction_history": [],
-        "messages": [],
-        "asked_factor": None,
-        "last_asked_slot": "symptom_quality",
-        "factor_states": {},
-        "comorbidities_acknowledged": False,
-    }
-    with patch(
-        "app.orchestrator.nodes.propose_checklist_enrichment",
-        return_value=IntakeEnrichmentResult(
-            status="no_changes",
-            summary_reason="Quality already on the checklist.",
-        ),
-    ), patch(
-        "app.services.rag.factor_matcher.update_factor_states_from_checklist"
-    ) as matcher:
-        out = enrich_checklist_node(state)
-    matcher.assert_not_called()
-    assert out["factor_states"] == {}
-
-
-def test_enrich_node_falls_back_to_credit_when_enricher_unavailable():
-    asked = {
-        "session_id": "sess-fallback",
-        "message": "no",
-        "message_normalized": "no",
-        "turn_start_checklist": [],
-        "clinical_checklist": [],
-        "encoder_turn_items": [],
-        "extraction_history": [],
-        "messages": [],
-        "asked_factor": "Saddle anaesthesia",
-        "last_asked_slot": None,
-        "factor_states": {},
-        "comorbidities_acknowledged": False,
-    }
-    with patch(
-        "app.orchestrator.nodes.propose_checklist_enrichment",
-        return_value=IntakeEnrichmentResult(
-            status="unavailable",
-            summary_reason="skipped",
-        ),
-    ):
-        out = enrich_checklist_node(asked)
-    assert out["factor_states"]["Saddle anaesthesia"] == "denied"
-
-
 @patch("app.services.intake_enricher.generate_from_messages")
 @patch("app.services.intake_enricher.generator_model_configured", return_value=True)
-def test_enrichment_parses_factor_matches_from_json(mock_cfg, mock_gen):
+def test_enrichment_prompt_omits_factor_inventory(mock_cfg, mock_gen):
     mock_gen.return_value = json.dumps(
         {
-            "summary_reason": "Motor yes, sensory no.",
+            "summary_reason": "No checklist changes.",
             "comorbidities_acknowledged": False,
             "checklist_operations": [],
-            "factor_matches": [
-                {"factor": "Neuro motor deficit", "polarity": "affirmed"},
-                {"factor": "Neuro sensory deficit", "polarity": "denied"},
-                {"factor": "Bilat neuro sensory deficit", "polarity": "denied"},
-                {"factor": "Invented Factor", "polarity": "affirmed"},
-            ],
             "next_intake": None,
         }
     )
@@ -341,15 +324,38 @@ def test_enrichment_parses_factor_matches_from_json(mock_cfg, mock_gen):
         ],
         latest_user_message="my legs are weak but I don't have any tingling",
         last_asked_factor="Neuro sensory deficit",
-        inventory=_INVENTORY,
     )
     assert result.llm_ran is True
-    names = {item.factor: item.polarity for item in result.factor_matches}
-    assert names["Neuro motor deficit"] == "affirmed"
-    assert names["Neuro sensory deficit"] == "denied"
-    assert names["Bilat neuro sensory deficit"] == "denied"
-    assert "Invented Factor" not in names
     prompt = mock_gen.call_args[0][0][0]["content"]
-    assert "factor_matches" in prompt
-    assert "Inventory Factors" in prompt
+    assert "factor_matches" not in prompt
+    assert "Inventory Factors" not in prompt
+    assert "matching is not your job" in prompt.casefold() or "not your job" in prompt.casefold()
+    assert "Last graph factor asked" in prompt
     assert "N/A" in prompt
+    assert "Denials are not checklist rows" in prompt
+
+
+def test_palliative_exercise_maps_to_conservative_care():
+    items = [
+        ChecklistItem(
+            text="exercise",
+            kind="palliative",
+            source="slot_answer",
+            label="palliative",
+        )
+    ]
+    matches = match_checklist_to_factors(items, skip_llm=True)
+    assert matches[0].factor_name == "Improves with conservative care"
+
+
+def test_provocative_exercise_does_not_map_to_conservative_care():
+    items = [
+        ChecklistItem(
+            text="exercise",
+            kind="provocative",
+            source="slot_answer",
+            label="provocative",
+        )
+    ]
+    matches = match_checklist_to_factors(items, skip_llm=True)
+    assert matches[0].factor_name != "Improves with conservative care"

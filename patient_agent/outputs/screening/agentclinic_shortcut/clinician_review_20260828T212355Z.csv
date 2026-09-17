@@ -1,2 +1,0 @@
-source_id,stem_hash,split,auto_red_flag_family,lexicon_terms,token_count,has_agentclinic_osce,question,answer,clinician_include,clinician_grid,clinician_notes
-agentclinic_medqa:19,e73fe2f4738caf82,agentclinic,mechanical,low_back|disc_herniation|back_pain,39,True,26-year-old woman. The patient reports exercising in the gym several hours ago when she suddenly felt a sharp pain in her lower back. She describes the pain as radiating down the side of her leg and into her foot.,Disc herniation,,,

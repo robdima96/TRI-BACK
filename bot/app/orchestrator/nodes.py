@@ -5,7 +5,7 @@ import logging
 from app.orchestrator.checklist import ensure_checklist_ids, merge_checklist_items
 from app.session_enrichment import append_turn_extraction, build_turn_extraction_record
 from app.services.intake_enricher import (
-    apply_factor_state_updates,
+    IntakeEnrichmentResult,
     propose_checklist_enrichment,
 )
 
@@ -29,9 +29,24 @@ from app.orchestrator.dormant import (
     is_dormant_phase,
 )
 
-from app.orchestrator.slot_answers import credit_volunteered_slots
+from app.orchestrator.slot_answers import (
+    close_provocative_if_severity_severe,
+    credit_volunteered_slots,
+)
 
-from app.orchestrator.factor_answers import credit_asked_factor_answer
+from app.orchestrator.factor_answers import (
+    apply_asked_factor_reply,
+    credit_asked_factor_answer,
+)
+from app.services.question_brief import (
+    CANNED_QUESTION_BRIEF,
+    answer_patient_question,
+    build_question_graph_packet,
+)
+from app.services.utterance_spans import (
+    UtteranceAnalysis,
+    classify_utterance,
+)
 
 from app.orchestrator.state import ChatState
 from app.triage_profiles import graph_client_for_profile, profile_from_state
@@ -129,10 +144,19 @@ def encode_input_node(state: ChatState) -> ChatState:
     if changed and is_dormant_phase(state):
         state["session_phase"] = INTAKE_PHASE
 
+    analysis = classify_utterance(state.get("message") or state.get("message_normalized") or "")
+    state["utterance_analysis"] = analysis.to_dict()
+
     return state
 
 
 
+
+
+def _utterance_analysis(state: ChatState) -> UtteranceAnalysis:
+    analysis = classify_utterance(state.get("message") or state.get("message_normalized") or "")
+    state["utterance_analysis"] = analysis.to_dict()
+    return analysis
 
 
 def enrich_checklist_node(state: ChatState) -> ChatState:
@@ -143,13 +167,17 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
     history = conversation_history_before_last_user(msgs)
     extraction_history = state.get("extraction_history") or []
     turn_index = len(extraction_history) + 1
-    latest_message = state.get("message_normalized", "")
+    latest_message = state.get("message_normalized", "") or state.get("message", "")
     last_asked = state.get("last_asked_slot")
     asked_factor = state.get("asked_factor")
+    analysis = _utterance_analysis(state)
+    topic_slot = last_asked
 
     # Deterministic credit for the prior question. Factor answers must not
     # fall through to slot credit (a bare "no" would otherwise fill palliative).
-    if asked_factor:
+    # Question-only turns also skip slot credit so "should I press on it?"
+    # does not fill the parked HPI slot.
+    if asked_factor or analysis.question_only:
         last_asked = None
     else:
         slot_credit = credit_volunteered_slots(
@@ -161,18 +189,61 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
             encoder_merged = merge_checklist_items(encoder_merged, slot_credit)
             state["clinical_checklist"] = encoder_merged
 
-    enrichment = propose_checklist_enrichment(
-        checklist=encoder_merged,
-        conversation_history=history,
-        latest_user_message=latest_message,
-        last_asked_slot=last_asked,
-        last_asked_factor=asked_factor,
-        comorbidities_acknowledged=bool(state.get("comorbidities_acknowledged")),
-        session_id=state.get("session_id", ""),
-        turn_index=turn_index,
-        factor_states=state.get("factor_states"),
-        profile=profile_from_state(state),
+    packet = None
+    if analysis.has_question:
+        packet = build_question_graph_packet(
+            analysis.question_spans,
+            asked_factor=asked_factor,
+            last_asked_slot=None if asked_factor else topic_slot,
+            query_embedding=state.get("encoder_pooled_embedding"),
+        )
+
+    run_enricher = analysis.has_statement or (
+        analysis.has_polarity and not asked_factor and not analysis.has_question
     )
+    if run_enricher:
+        statement_text = " ".join(analysis.statement_spans).strip() or latest_message
+        enrichment = propose_checklist_enrichment(
+            checklist=encoder_merged,
+            conversation_history=history,
+            latest_user_message=statement_text,
+            last_asked_slot=last_asked,
+            last_asked_factor=asked_factor,
+            comorbidities_acknowledged=bool(state.get("comorbidities_acknowledged")),
+            session_id=state.get("session_id", ""),
+            turn_index=turn_index,
+            factor_states=state.get("factor_states"),
+            profile=profile_from_state(state),
+            question_spans=analysis.question_spans if analysis.has_question else None,
+            graph_packet=packet,
+        )
+    else:
+        reason = (
+            "question_only"
+            if analysis.question_only
+            else "fast_path_polarity"
+            if analysis.has_polarity
+            else "no_statement"
+        )
+        enrichment = IntakeEnrichmentResult(
+            status="skipped",
+            summary_reason=reason,
+        )
+
+    if analysis.has_question and run_enricher:
+        state["patient_question_brief"] = (
+            (enrichment.patient_answer or "").strip() or CANNED_QUESTION_BRIEF
+        )
+    elif analysis.has_question:
+        state["patient_question_brief"] = answer_patient_question(
+            analysis.question_spans,
+            asked_factor=asked_factor,
+            last_asked_slot=None if asked_factor else topic_slot,
+            query_embedding=state.get("encoder_pooled_embedding"),
+            packet=packet,
+        )
+    else:
+        state["patient_question_brief"] = None
 
     final_checklist = ensure_checklist_ids([dict(x) for x in encoder_merged])
     if enrichment.resulting_checklist is not None:
@@ -188,26 +259,46 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
     else:
         state["clinical_checklist"] = final_checklist
 
+    final_checklist = close_provocative_if_severity_severe(final_checklist)
+    state["clinical_checklist"] = final_checklist
+
     if enrichment.comorbidities_acknowledged:
         state["comorbidities_acknowledged"] = True
 
-    if enrichment.llm_ran:
-        # Enricher owns Factor polarity when it returned parseable JSON.
-        state["factor_states"] = apply_factor_state_updates(
-            state.get("factor_states"),
-            enrichment.factor_matches,
-        )
-    else:
-        from app.services.rag.factor_matcher import update_factor_states_from_checklist
+    from app.services.rag.factor_matcher import (
+        apply_factor_states,
+        compact_factor_matching_log,
+        match_turn_to_factors,
+    )
 
-        update_factor_states_from_checklist(state, skip_llm=True)
-        if asked_factor:
-            # Fallback yes/no/unknown for the asked factor when the enricher is down.
-            state["factor_states"] = credit_asked_factor_answer(
-                message=latest_message,
-                asked_factor=asked_factor,
-                factor_states=state.get("factor_states"),
-            )
+    turn_matches = []
+    if run_enricher:
+        capture_text = " ".join(
+            analysis.polarity_spans + analysis.statement_spans
+        ).strip() or latest_message
+        turn_matches = match_turn_to_factors(
+            prior_checklist=prior_turn,
+            current_checklist=final_checklist,
+            source_message=capture_text or None,
+            skip_llm=True,
+        )
+        apply_factor_states(state, turn_matches)
+
+    if analysis.question_only:
+        pass
+    elif asked_factor and enrichment.asked_factor_reply:
+        state["factor_states"] = apply_asked_factor_reply(
+            asked_factor=asked_factor,
+            reply=enrichment.asked_factor_reply,
+            factor_states=state.get("factor_states"),
+        )
+    elif asked_factor and analysis.has_polarity:
+        polarity_text = " ".join(analysis.polarity_spans).strip() or latest_message
+        state["factor_states"] = credit_asked_factor_answer(
+            message=polarity_text,
+            asked_factor=asked_factor,
+            factor_states=state.get("factor_states"),
+        )
 
     # Stash the co-generated next question for the planner (one LLM call per turn).
     state["pending_intake_question"] = enrichment.next_question
@@ -223,6 +314,7 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
             prior_checklist=prior_turn,
             merged_checklist=final_checklist,
             llm_enrichment=enrichment.to_log_dict(),
+            factor_matching=compact_factor_matching_log(turn_matches),
         ),
     )
 
@@ -385,6 +477,10 @@ def generate_question_node(state: ChatState) -> ChatState:
         "Could you tell me a bit more about your symptoms?"
 
     )
+    brief = (state.get("patient_question_brief") or "").strip()
+    if brief:
+        text = f"{brief} {text}".strip()
+        state["next_question"] = text
 
     state["final_response"] = text
 
@@ -479,7 +575,7 @@ def graph_traversal_node(state: ChatState) -> ChatState:
     from app.schemas import ChunkMatch
     from app.services.graphrag import traverse_from_turn
     from app.services.rag.evidence_builder import build_generator_evidence
-    from app.services.rag.fusion import build_traversal_seeds
+    from app.services.rag.fusion import build_disposition_seeds
 
     if not settings.graphrag_load:
         return state
@@ -491,24 +587,21 @@ def graph_traversal_node(state: ChatState) -> ChatState:
         else []
     )
 
-    seeds = build_traversal_seeds(
+    seeds, filled_states, leftover = build_disposition_seeds(
+        factor_states=state.get("factor_states"),
         checklist=state.get("clinical_checklist") or [],
         chunk_matches=chunk_matches,
-        source_message=state.get("message") or state.get("message_normalized"),
     )
+    state["factor_states"] = filled_states
 
     from app.services.rag.factor_matcher import (
         build_factor_matching_audit,
         drop_denied_factor_matches,
-        gap_fill_factor_states,
     )
 
-    factor_audit = build_factor_matching_audit(seeds.factor_matches)
-    state["factor_states"] = gap_fill_factor_states(
-        state.get("factor_states"), seeds.factor_matches
-    )
+    factor_audit = build_factor_matching_audit(leftover)
     traversal_matches = drop_denied_factor_matches(
-        seeds.factor_matches, state.get("factor_states")
+        list(seeds.factor_matches), state.get("factor_states")
     )
     _log.info(
         "factor_matching_audit: matched=%s gaps=%s methods=%s",
@@ -523,7 +616,7 @@ def graph_traversal_node(state: ChatState) -> ChatState:
 
         chunk_matches=chunk_matches,
 
-        factor_matches=traversal_matches,
+        factor_matches=list(traversal_matches),
 
         title=f"Chat turn: {state.get('session_id', '')}",
 

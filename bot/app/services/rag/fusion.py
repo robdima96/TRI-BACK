@@ -6,7 +6,12 @@ from dataclasses import dataclass, field
 
 from app.schemas import ChecklistItem, ChecklistItemDump, ChunkMatch
 from app.services.graphrag.schemas import FactorMatch, GraphTraversalTrace
-from app.services.rag.factor_matcher import affirmed_factor_names, match_checklist_to_factors
+from app.services.rag.factor_matcher import (
+    affirmed_factor_names,
+    factor_matches_from_states,
+    gap_fill_factor_states,
+    match_checklist_to_factors,
+)
 
 
 @dataclass
@@ -41,24 +46,55 @@ class TraversalSeeds:
         return ids
 
 
-def build_traversal_seeds(
+def _parse_checklist(
     checklist: list[ChecklistItem] | list[ChecklistItemDump],
-    *,
-    chunk_matches: list[ChunkMatch] | None = None,
-    source_message: str | None = None,
-) -> TraversalSeeds:
-    """Graph path: factor matches + optional RAG chunk seeds (from retrieve_evidence_node)."""
+) -> list[ChecklistItem]:
     parsed: list[ChecklistItem] = []
     for row in checklist:
         if isinstance(row, ChecklistItem):
             parsed.append(row)
         else:
             parsed.append(ChecklistItem.model_validate(row))
+    return parsed
 
+
+def build_traversal_seeds(
+    checklist: list[ChecklistItem] | list[ChecklistItemDump],
+    *,
+    chunk_matches: list[ChunkMatch] | None = None,
+    source_message: str | None = None,
+) -> TraversalSeeds:
+    """Offline / smoke path: checklist rematch. Session disposition uses
+    :func:`build_disposition_seeds` instead."""
     factor_matches = match_checklist_to_factors(
-        parsed, source_message=source_message
+        _parse_checklist(checklist), source_message=source_message
     )
     return TraversalSeeds(
         factor_matches=factor_matches,
         chunk_matches=list(chunk_matches or []),
     )
+
+
+def build_disposition_seeds(
+    *,
+    factor_states: dict[str, str] | None,
+    checklist: list[ChecklistItem] | list[ChecklistItemDump] | None = None,
+    chunk_matches: list[ChunkMatch] | None = None,
+) -> tuple[TraversalSeeds, dict[str, str], list[FactorMatch]]:
+    """Session disposition: synth FactorMatch from interview polarities + chunks.
+
+    Optional regex-only leftover rematch (no current-turn ``source_message``, no
+    ``llm_semantic``) gap-fills names never written during intake.
+    """
+    leftover = match_checklist_to_factors(
+        _parse_checklist(checklist or []),
+        source_message=None,
+        skip_llm=True,
+    )
+    filled = gap_fill_factor_states(factor_states, leftover)
+    synth = factor_matches_from_states(filled)
+    seeds = TraversalSeeds(
+        factor_matches=synth,
+        chunk_matches=list(chunk_matches or []),
+    )
+    return seeds, filled, leftover

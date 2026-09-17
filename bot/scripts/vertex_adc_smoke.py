@@ -5,6 +5,11 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
+
+_BOT_ROOT = Path(__file__).resolve().parents[1]
+if str(_BOT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BOT_ROOT))
 
 
 def main() -> int:
@@ -31,6 +36,7 @@ def main() -> int:
     args = parser.parse_args()
 
     from app.config import settings
+    from app.services.generator_backends import _extract_response_text
     from app.services.vertex_auth import vertex_adc_status
 
     project = args.project or settings.vertex_project_id
@@ -65,15 +71,29 @@ def main() -> int:
     print(f"Model: {model}")
 
     try:
-        import vertexai
-        from vertexai.generative_models import GenerativeModel
+        from google import genai
+        from google.genai import types
     except ImportError:
         print("pip install -e '.[generator-api]'", file=sys.stderr)
         return 1
 
-    vertexai.init(project=project, location=location)
-    response = GenerativeModel(model).generate_content(args.prompt)
-    text = (getattr(response, "text", None) or "").strip()
+    client = genai.Client(vertexai=True, project=project, location=location)
+    response = client.models.generate_content(
+        model=model,
+        contents=args.prompt,
+        config=types.GenerateContentConfig(
+            max_output_tokens=64,
+            thinking_config=types.ThinkingConfig(
+                thinking_level="MINIMAL",
+                include_thoughts=False,
+            ),
+        ),
+    )
+    try:
+        text = _extract_response_text(response)
+    except Exception as exc:
+        print(f"Empty or unusable response from Vertex: {exc}", file=sys.stderr)
+        return 1
     print(f"Response: {text!r}")
     if not text:
         print("Empty response from Vertex", file=sys.stderr)

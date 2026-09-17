@@ -1,7 +1,8 @@
 """Map encoder checklist items to red-flag graph Factor names (regex-first).
 
-When ``TRI_BACK_LLM_FACTOR_MATCH=1``, unmatched (non-gated) rows get one batched
-LLM cross-check against the inventory Factor list before GraphRAG traversal.
+When ``TRI_BACK_LLM_FACTOR_MATCH=1``, unmatched this-turn checklist deltas get
+one batched LLM cross-check against the inventory Factor list. Disposition
+seeds GraphRAG from sticky ``factor_states`` rather than rematching old rows.
 """
 
 from __future__ import annotations
@@ -74,11 +75,16 @@ def merge_factor_states(
     existing: dict[str, str] | None,
     matches: list[FactorMatch],
 ) -> dict[str, str]:
-    """Sticky per-session polarity: later affirms override denials and vice versa."""
+    """Sticky per-session polarity: later affirms override denials and vice versa.
+
+    Explicit ``unknown`` (patient said they do not know) is kept across idle
+    merges so a later regex fallback cannot reopen the ask. A later
+    affirmed/denied match for the same factor still overrides.
+    """
     out = {
         key: value
         for key, value in (existing or {}).items()
-        if value in {FACTOR_STATE_AFFIRMED, FACTOR_STATE_DENIED}
+        if value in {FACTOR_STATE_AFFIRMED, FACTOR_STATE_DENIED, FACTOR_STATE_UNKNOWN}
     }
     turn: dict[str, set[str]] = {}
 
@@ -145,6 +151,142 @@ def apply_factor_states(state: dict, matches: list[FactorMatch]) -> dict[str, st
     merged = merge_factor_states(state.get("factor_states"), matches)
     state["factor_states"] = merged
     return merged
+
+
+def _row_id(row: Any) -> str:
+    if isinstance(row, dict):
+        return str(row.get("id") or "").strip()
+    return str(getattr(row, "id", None) or "").strip()
+
+
+def _row_signature(row: Any) -> tuple[str, str, str]:
+    if isinstance(row, dict):
+        return (
+            str(row.get("text") or "").strip(),
+            str(row.get("kind") or "").strip(),
+            str(row.get("label") or "").strip(),
+        )
+    return (
+        str(getattr(row, "text", None) or "").strip(),
+        str(getattr(row, "kind", None) or "").strip(),
+        str(getattr(row, "label", None) or "").strip(),
+    )
+
+
+def checklist_row_deltas(
+    prior: list[Any] | None,
+    current: list[Any] | None,
+) -> list[Any]:
+    """Rows whose id is new or whose (text, kind, label) changed this turn."""
+    prior_rows = list(prior or [])
+    current_rows = list(current or [])
+    prior_by_id: dict[str, Any] = {}
+    for row in prior_rows:
+        rid = _row_id(row)
+        if rid:
+            prior_by_id[rid] = row
+    out: list[Any] = []
+    for row in current_rows:
+        rid = _row_id(row)
+        if not rid or rid not in prior_by_id:
+            out.append(row)
+            continue
+        if _row_signature(row) != _row_signature(prior_by_id[rid]):
+            out.append(row)
+    return out
+
+
+def compact_factor_matching_log(matches: list[FactorMatch]) -> list[dict[str, Any]]:
+    """Per-turn matcher slice for extraction_history."""
+    rows: list[dict[str, Any]] = []
+    for match in matches:
+        item = match.checklist_item or {}
+        entry: dict[str, Any] = {
+            "text": str(item.get("text") or ""),
+            "kind": str(item.get("kind") or ""),
+            "factor_name": match.factor_name,
+            "polarity": match.polarity,
+            "match_method": match.match_method,
+        }
+        if match.mentions:
+            entry["mentions"] = [
+                {
+                    "factor_name": m.factor_name,
+                    "polarity": m.polarity,
+                    "match_method": m.match_method,
+                }
+                for m in match.mentions
+            ]
+        rows.append(entry)
+    return rows
+
+
+def factor_matches_from_states(
+    factor_states: dict[str, str] | None,
+) -> list[FactorMatch]:
+    """Synthetic matches from sticky interview polarities (disposition seeds)."""
+    out: list[FactorMatch] = []
+    for name, polarity in (factor_states or {}).items():
+        if polarity not in {FACTOR_STATE_AFFIRMED, FACTOR_STATE_DENIED}:
+            continue
+        if not name:
+            continue
+        out.append(
+            FactorMatch(
+                checklist_item={
+                    "text": name,
+                    "kind": "other",
+                    "source": "factor_states",
+                    "label": "",
+                },
+                factor_name=name,
+                match_method="factor_states",
+                match_score=1.0,
+                polarity=polarity,  # type: ignore[arg-type]
+            )
+        )
+    return out
+
+
+def match_turn_to_factors(
+    *,
+    prior_checklist: list[Any] | None,
+    current_checklist: list[Any] | None,
+    source_message: str | None = None,
+    skip_llm: bool = False,
+) -> list[FactorMatch]:
+    """Match this turn's checklist deltas. Utterance is polarity context only.
+
+    A message-only regex pass (``kind=other``, ``skip_llm=True``) still records
+    volunteered denials. Kind-scoped aliases do not apply to that pass.
+    """
+    deltas = checklist_row_deltas(prior_checklist, current_checklist)
+    matches: list[FactorMatch] = []
+    if deltas:
+        matches.extend(
+            match_checklist_to_factors(
+                deltas,
+                source_message=source_message,
+                skip_llm=skip_llm,
+            )
+        )
+    message = (source_message or "").strip()
+    if message:
+        matches.extend(
+            match_checklist_to_factors(
+                [
+                    ChecklistItem(
+                        text=message,
+                        kind="other",
+                        source="user_message",
+                        label="",
+                    )
+                ],
+                source_message=message,
+                skip_llm=True,
+            )
+        )
+    return matches
 
 
 def update_factor_states_from_checklist(
@@ -577,10 +719,10 @@ def match_checklist_to_factors(
     :func:`affirmed_factor_names` (denied matches keep ``factor_name`` so the
     LLM path cannot re-affirm them).
 
-    When LLM factor matching is enabled, unmatched non-gated rows may be filled
-    with ``match_method="llm_semantic"`` after the deterministic pass.
-    ``skip_llm`` is for question-turn ``factor_states`` updates so intake does
-    not pay an extra generator call.
+    When LLM factor matching is enabled, unmatched non-gated **delta** rows may
+    be filled with ``match_method="llm_semantic"`` after the deterministic pass.
+    ``skip_llm`` skips that call (disposition leftover rematch, message-only
+    regex). Intake uses ``skip_llm=False`` on this-turn deltas only.
     """
     inv = str(inventory_path or DEFAULT_INVENTORY_PATH)
     factors = load_factor_names(inv)

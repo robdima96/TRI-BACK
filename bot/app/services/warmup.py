@@ -24,6 +24,8 @@ def warmup_runtime() -> None:
     """
     t0 = time.perf_counter()
     _warmup_gliner()
+    _warmup_sat_splitter()
+    _warmup_query_classifier()
     _warmup_rag_embedding()
     _warmup_lexical_index()
     _warmup_generator()
@@ -54,6 +56,45 @@ def _warmup_gliner() -> None:
         _log.info("warmup: GliNER ready")
     except Exception as exc:  # noqa: BLE001
         _log.warning("warmup: GliNER error: %s", exc)
+
+
+def _warmup_sat_splitter() -> None:
+    if not settings.sat_splitter_load:
+        _log.info("warmup: SaT splitter skipped (TRI_BACK_LOAD_SAT_SPLITTER=0)")
+        return
+    try:
+        from app.services.utterance_spans import (
+            sat_splitter_configured,
+            split_idea_spans,
+        )
+
+        if not sat_splitter_configured():
+            _log.warning("warmup: SaT splitter not configured; skipping")
+            return
+        split_idea_spans("warmup yes I do have osteoarthritis but what about my back")
+        _log.info("warmup: SaT splitter ready")
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("warmup: SaT splitter error: %s", exc)
+
+
+def _warmup_query_classifier() -> None:
+    if not settings.query_classifier_load:
+        _log.info("warmup: query classifier skipped (TRI_BACK_LOAD_QUERY_CLASSIFIER=0)")
+        return
+    try:
+        from app.services.utterance_spans import (
+            classify_span_kind,
+            query_classifier_configured,
+        )
+
+        if not query_classifier_configured():
+            _log.warning("warmup: query classifier not configured; skipping")
+            return
+        classify_span_kind("should I press on it?")
+        classify_span_kind("if I stay still")
+        _log.info("warmup: query classifier ready")
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("warmup: query classifier error: %s", exc)
 
 
 def _warmup_rag_embedding() -> None:
@@ -101,7 +142,7 @@ def _warmup_generator() -> None:
         # Tiny completion forces Vertex ADC + TLS + model handshake.
         generate_from_messages(
             [{"role": "user", "content": "Reply with exactly: ok"}],
-            max_new_tokens=16,
+            max_new_tokens=64,
             temperature=0.0,
         )
         _log.info("warmup: generator ready")

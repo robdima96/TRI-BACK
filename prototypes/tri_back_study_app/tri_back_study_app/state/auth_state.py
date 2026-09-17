@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import reflex as rx
 
 from tri_back_study_app.adapters.http_client import ping_bot_ready
 from tri_back_study_app.auth.hydrate import auth_fields_from_session
+from tri_back_study_app.auth.logout import (
+    LOGOUT_CONFIRM_TIMEOUT_SEC,
+    should_complete_logout,
+    should_disarm_logout,
+    stamp_session_json,
+)
 from tri_back_study_app.auth.session import login_admin, login_participant
 from tri_back_study_app.config import (
     LOGIN_RATE_LIMIT,
@@ -13,7 +21,7 @@ from tri_back_study_app.config import (
     PUBLIC_ACCESS,
     SESSION_COOKIE_MAX_AGE,
 )
-from tri_back_study_app.session_store import init_session, load_session, save_session
+from tri_back_study_app.session_store import init_session
 
 
 class AuthState(rx.State):
@@ -32,6 +40,8 @@ class AuthState(rx.State):
     login_count: int = 0
     login_at: str = ""
     login_error: str = ""
+    logout_confirming: bool = False
+    _logout_arm_id: int = 0
     _failed_attempts: list[float] = []
 
     def _hydrate_from_session_store(self) -> bool:
@@ -92,8 +102,10 @@ class AuthState(rx.State):
             self.login_error = result.error or "Invalid credentials"
             return
         self._apply_login(result)
-        # Warmup starts immediately; chat mount shows the delayed intro in parallel.
-        return [AuthState.ping_bot_warmup, rx.redirect("/chat")]
+        # Warmup + intro start here so chat on_load is not the only trigger.
+        from tri_back_study_app.state.chat_state import ChatState
+
+        return [AuthState.ping_bot_warmup, ChatState.mount_chat, rx.redirect("/chat")]
 
     @rx.event
     async def login_admin_submit(self, form_data: dict):
@@ -116,7 +128,9 @@ class AuthState(rx.State):
             return
         self.admin_selected_arm = selected_arm
         self._apply_login(result)
-        return [AuthState.ping_bot_warmup, rx.redirect("/chat")]
+        from tri_back_study_app.state.chat_state import ChatState
+
+        return [AuthState.ping_bot_warmup, ChatState.mount_chat, rx.redirect("/chat")]
 
     def _apply_login(self, result) -> None:
         self.is_authenticated = True
@@ -127,6 +141,8 @@ class AuthState(rx.State):
         self.login_count = int(result.login_count or 1)
         self.login_at = result.login_at or ""
         self.login_error = ""
+        self.logout_confirming = False
+        self._logout_arm_id = 0
         init_session(
             self.session_id,
             study_id=self.study_id,
@@ -143,15 +159,9 @@ class AuthState(rx.State):
         except ValueError:
             pass
 
-    @rx.event
-    def logout(self):
-        # Touch last_active_at on the study overlay, then clear auth cookie/state
-        # so admin (or participant) can start a fresh login without a full reload.
-        sid = (self.session_id or "").strip()
-        if sid:
-            session = load_session(sid)
-            if session:
-                save_session(sid, **session)
+    def _end_session(self) -> None:
+        """Stamp the existing session JSON and clear auth + cookie."""
+        stamp_session_json(self.session_id)
         self.is_authenticated = False
         self.study_id = ""
         self.role = ""
@@ -159,4 +169,33 @@ class AuthState(rx.State):
         self.session_id = ""
         self.login_count = 0
         self.login_at = ""
+        self.logout_confirming = False
+        self._logout_arm_id = 0
+
+    def _arm_logout_confirm(self) -> int:
+        self.logout_confirming = True
+        self._logout_arm_id += 1
+        return self._logout_arm_id
+
+    @rx.event(background=True)
+    async def disarm_logout_confirm(self, arm_id: int):
+        """Restore the idle Logout button if the confirm click never comes."""
+        await asyncio.sleep(float(LOGOUT_CONFIRM_TIMEOUT_SEC))
+        async with self:
+            if should_disarm_logout(self.logout_confirming, self._logout_arm_id, arm_id):
+                self.logout_confirming = False
+
+    @rx.event
+    def request_logout(self):
+        """First click arms; second click ends the session with no delay."""
+        if not should_complete_logout(self.logout_confirming):
+            arm_id = self._arm_logout_confirm()
+            return AuthState.disarm_logout_confirm(arm_id)
+        self._end_session()
+        return rx.redirect("/")
+
+    @rx.event
+    def logout(self):
+        """Immediate teardown (same as the confirmed second click)."""
+        self._end_session()
         return rx.redirect("/")

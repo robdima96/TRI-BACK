@@ -56,11 +56,42 @@ _GLINER_LABELS: dict[SlotName, frozenset[str]] = {
 # Empty / none-style replies. On an asked floor slot these close coverage as N/A.
 # A bare "no" is a real answer to a factor question (see factor_answers) and must
 # not reach this helper while a graph factor is being asked.
+# Trailing . / ! is allowed so "I don't know !" still counts as empty.
 _EMPTY_ANSWER = re.compile(
     r"^\s*(?:i\s+don'?t\s+know|idk|unsure|not\s+sure|n/?a|nothing|none|"
-    r"no\s+idea|\?+|no|nope|nah)\s*$",
+    r"no\s+idea|\?+|no|nope|nah)\s*[.!]*\s*$",
     re.I,
 )
+
+NA_SLOT_TEXT = "N/A"
+
+# Kinds whose empty-answer text should stay canonical N/A (floor HPI slots).
+_FLOOR_SLOT_KINDS: frozenset[str] = frozenset(
+    {
+        "palliative",
+        "provocative",
+        "symptom_quality",
+        "severity",
+        "duration",
+        "demographic",
+    }
+)
+
+
+def is_empty_slot_answer(text: str) -> bool:
+    """True when ``text`` is a whole-message empty / unsure slot reply."""
+    return bool(_EMPTY_ANSWER.match(text or ""))
+
+
+def is_na_slot_text(text: str) -> bool:
+    return str(text or "").strip() == NA_SLOT_TEXT
+
+
+def canonicalize_floor_slot_text(kind: str, text: str) -> str:
+    """Map empty-answer utterances on floor-slot kinds to ``N/A``."""
+    if kind in _FLOOR_SLOT_KINDS and is_empty_slot_answer(text):
+        return NA_SLOT_TEXT
+    return text
 
 # Compact clinical token: digits plus an optional leftover used with _SEX_CANONICAL.
 _COMPACT_AGE = re.compile(r"^(\d{1,3})(.*)$", re.I)
@@ -92,6 +123,36 @@ def _slot_already_filled(checklist: list[dict[str, str]], slot: SlotName) -> boo
     if slot == "symptom_anchor":
         return any(r.get("kind") == "symptom" for r in checklist)
     return False
+
+
+def _severity_row_texts(checklist: list[dict[str, str]]) -> list[str]:
+    texts: list[str] = []
+    for row in checklist:
+        kind = str(row.get("kind") or "")
+        label = str(row.get("label") or "").casefold()
+        if kind == "severity" and label == "symptom_severity":
+            texts.append(str(row.get("text") or ""))
+        elif kind == "ner_entity" and label == "symptom severity":
+            texts.append(str(row.get("text") or ""))
+    return texts
+
+
+def close_provocative_if_severity_severe(
+    checklist: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """If pain is already severe (7+ or severe wording), close provocative as N/A."""
+    from app.orchestrator.checklist import merge_checklist_items
+    from app.services.rag.factor_patterns import _severity_implies_severe
+
+    working = [dict(row) for row in checklist]
+    if _slot_already_filled(working, "provocative"):
+        return working
+    if not any(_severity_implies_severe(text) for text in _severity_row_texts(working)):
+        return working
+    row = _row_for_slot("provocative", NA_SLOT_TEXT, source="rule")
+    if row is None:
+        return working
+    return merge_checklist_items(working, [row])
 
 
 def _snippet(text: str) -> str:
@@ -215,10 +276,10 @@ def credit_asked_slot_answer(
     text = (message or "").strip()
     if not text:
         return []
-    if _EMPTY_ANSWER.match(text):
+    if is_empty_slot_answer(text):
         if _slot_already_filled(checklist, last_asked_slot):
             return []
-        row = _row_for_slot(last_asked_slot, "N/A")
+        row = _row_for_slot(last_asked_slot, NA_SLOT_TEXT)
         return [row] if row else []
     if _slot_already_filled(checklist, last_asked_slot):
         return []
@@ -254,7 +315,7 @@ def credit_volunteered_slots(
         out.append(item)
         working.append(item.model_dump())
 
-    if _EMPTY_ANSWER.match(text):
+    if is_empty_slot_answer(text):
         return out
 
     for slot in (

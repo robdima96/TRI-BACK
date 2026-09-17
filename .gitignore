@@ -44,3 +44,18 @@ slurm-*.err
 bot/app/services/public_host/.env.public
 bot/app/services/public_host/.run/
 bot/app/services/public_host/cloud_run/.env.cloud
+
+# Local research / non-chatbot trees (keep on disk, not on Git)
+/Reports/
+/Project/
+/plan_2026.9.1/
+/patient_agent/
+/Graphs/
+/Uncanny Valley/
+
+# Checkpoints, Neo4j notes, WAL/SHM
+**/langgraph_checkpoints.sqlite
+**/langgraph_checkpoints.sqlite-*
+**/*.sqlite-shm
+**/*.sqlite-wal
+Neo4j-*.txt

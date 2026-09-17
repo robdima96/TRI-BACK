@@ -31,6 +31,15 @@ def test_force_hook_returns_saddle_fallback():
     assert question.endswith("?")
 
 
+def test_credit_press_on_it_is_not_a_false_affirm():
+    from app.orchestrator.factor_answers import polarity_for_factor_reply
+    from app.services.agentic_graph_rag.ontology import get_factor_question_spec
+
+    spec = get_factor_question_spec("Point tenderness")
+    assert spec is not None
+    assert polarity_for_factor_reply("should I press on it?", spec) == "unknown"
+
+
 def test_credit_factor_yes_no_unknown():
     yes = credit_asked_factor_answer(
         message="yes",
@@ -52,6 +61,15 @@ def test_credit_factor_yes_no_unknown():
         factor_states={},
     )
     assert unsure["Saddle anaesthesia"] == "unknown"
+
+
+def test_credit_factor_i_dont_know_with_punctuation_is_unknown():
+    states = credit_asked_factor_answer(
+        message="I don't know !",
+        asked_factor="Saddle anaesthesia",
+        factor_states={},
+    )
+    assert states["Saddle anaesthesia"] == "unknown"
 
 
 def test_credit_severe_pain_numeric_six_is_denied():
@@ -149,9 +167,7 @@ def test_forced_factor_ask_round_trip_no_does_not_fill_slot():
         return_value=enrichment,
     ) as mocked:
         out = enrich_checklist_node(asked)
-        kwargs = mocked.call_args.kwargs
-        assert kwargs["last_asked_slot"] is None
-        assert kwargs["last_asked_factor"] == "Saddle anaesthesia"
+        assert mocked.call_count == 0
 
     assert (out.get("factor_states") or {}).get("Saddle anaesthesia") == "denied"
     assert not any(row.get("kind") == "palliative" for row in out["clinical_checklist"])
@@ -198,3 +214,46 @@ def test_forced_factor_ask_round_trip_yes_and_not_sure():
     ):
         unsure_out = enrich_checklist_node(unsure_state)
     assert unsure_out["factor_states"]["Saddle anaesthesia"] == "unknown"
+
+
+def test_parse_error_fallback_keeps_prior_unknown():
+    enrichment = IntakeEnrichmentResult(
+        status="parse_error",
+        summary_reason="Could not parse LLM enrichment JSON.",
+    )
+    first = {
+        "session_id": "sess-unknown-sticky",
+        "message": "i dont know",
+        "message_normalized": "i dont know",
+        "turn_start_checklist": [],
+        "clinical_checklist": [],
+        "encoder_turn_items": [],
+        "extraction_history": [],
+        "messages": [],
+        "asked_factor": "Saddle anaesthesia",
+        "last_asked_slot": None,
+        "factor_states": {},
+    }
+    with patch(
+        "app.orchestrator.nodes.propose_checklist_enrichment",
+        return_value=enrichment,
+    ):
+        first_out = enrich_checklist_node(first)
+    assert first_out["factor_states"]["Saddle anaesthesia"] == "unknown"
+
+    second = {
+        **first,
+        "message": "yes",
+        "message_normalized": "yes",
+        "asked_factor": "Bladder dysfunction",
+        "factor_states": dict(first_out["factor_states"]),
+        "clinical_checklist": list(first_out.get("clinical_checklist") or []),
+        "extraction_history": [],
+    }
+    with patch(
+        "app.orchestrator.nodes.propose_checklist_enrichment",
+        return_value=enrichment,
+    ):
+        second_out = enrich_checklist_node(second)
+    assert second_out["factor_states"]["Saddle anaesthesia"] == "unknown"
+    assert second_out["factor_states"]["Bladder dysfunction"] == "affirmed"

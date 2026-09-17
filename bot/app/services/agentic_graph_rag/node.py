@@ -29,7 +29,7 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
         build_generator_evidence,
         evidence_from_chunk_ids,
     )
-    from app.services.rag.fusion import build_traversal_seeds
+    from app.services.rag.fusion import build_disposition_seeds
     from app.triage_profiles import load_ontology_for_profile, profile_from_state
 
     query = state["message_normalized"]
@@ -47,23 +47,20 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
         chunk_matches = list(raw)
     state["chunk_matches"] = [m.model_dump() for m in chunk_matches]
 
-    seeds = build_traversal_seeds(
+    seeds, filled_states, leftover = build_disposition_seeds(
+        factor_states=state.get("factor_states"),
         checklist=checklist,
         chunk_matches=chunk_matches,
-        source_message=state.get("message") or state.get("message_normalized"),
     )
     from app.services.rag.factor_matcher import (
         build_factor_matching_audit,
         drop_denied_factor_matches,
-        gap_fill_factor_states,
     )
 
-    factor_audit = build_factor_matching_audit(seeds.factor_matches)
-    state["factor_states"] = gap_fill_factor_states(
-        state.get("factor_states"), seeds.factor_matches
-    )
+    factor_audit = build_factor_matching_audit(leftover)
+    state["factor_states"] = filled_states
     traversal_matches = drop_denied_factor_matches(
-        seeds.factor_matches, state.get("factor_states")
+        list(seeds.factor_matches), state.get("factor_states")
     )
     matched_factors = [
         name

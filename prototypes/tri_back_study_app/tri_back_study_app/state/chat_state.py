@@ -15,6 +15,7 @@ from tri_back_study_app.config import (
     INTRO_MESSAGE,
     INTRO_MESSAGE_ID,
 )
+from tri_back_study_app.auth.logout import should_complete_logout
 from tri_back_study_app.models.chat_types import (
     ChatMessageItem,
     CitationItem,
@@ -85,6 +86,23 @@ def should_play_intro(messages: list[ChatMessageItem] | list[dict]) -> bool:
     return len(messages) == 0
 
 
+AUTH_HYDRATE_RETRY_SEC = 0.2
+
+
+def intro_mount_action(
+    *,
+    authenticated: bool,
+    messages: list[ChatMessageItem] | list[dict],
+    after_retry: bool = False,
+) -> str:
+    """How ``mount_chat`` should proceed: retry, redirect, play, or skip."""
+    if not authenticated:
+        return "redirect" if after_retry else "retry"
+    if should_play_intro(messages):
+        return "play"
+    return "skip"
+
+
 def build_intro_message(*, timestamp: str | None = None) -> ChatMessageItem:
     """Study-local welcome bubble (never posted to ``POST /api/v1/chat``)."""
     return empty_message(
@@ -93,6 +111,23 @@ def build_intro_message(*, timestamp: str | None = None) -> ChatMessageItem:
         content=INTRO_MESSAGE,
         timestamp=timestamp or _now_iso(),
     )
+
+
+def chat_view_from_session(session: dict | None) -> dict:
+    """Transcript fields for the chat UI. Missing session wipes leftovers."""
+    if not session:
+        return {
+            "messages": [],
+            "turn_count": 0,
+            "escalated": False,
+            "safety_reason": "",
+        }
+    return {
+        "messages": _session_messages_to_chat(session.get("messages")),
+        "turn_count": int(session.get("turn_count") or 0),
+        "escalated": bool(session.get("escalated")),
+        "safety_reason": str(session.get("safety_reason") or ""),
+    }
 
 
 class ChatState(AuthState):
@@ -119,13 +154,35 @@ class ChatState(AuthState):
         return merged
 
     def _load_chat_from_session(self) -> None:
-        session = load_session(self.session_id)
-        if not session:
-            return
-        self.messages = _session_messages_to_chat(session.get("messages"))
-        self.turn_count = int(session.get("turn_count") or 0)
-        self.escalated = bool(session.get("escalated"))
-        self.safety_reason = str(session.get("safety_reason") or "")
+        fields = chat_view_from_session(load_session(self.session_id))
+        self.messages = fields["messages"]
+        self.turn_count = fields["turn_count"]
+        self.escalated = fields["escalated"]
+        self.safety_reason = fields["safety_reason"]
+
+    def _clear_chat_ui(self) -> None:
+        self.messages = []
+        self.draft = ""
+        self.loading = False
+        self.error = ""
+        self.escalated = False
+        self.safety_reason = ""
+        self.turn_count = 0
+
+    @rx.event
+    def request_logout(self):
+        if not should_complete_logout(self.logout_confirming):
+            arm_id = self._arm_logout_confirm()
+            return ChatState.disarm_logout_confirm(arm_id)
+        self._clear_chat_ui()
+        self._end_session()
+        return rx.redirect("/")
+
+    @rx.event
+    def logout(self):
+        self._clear_chat_ui()
+        self._end_session()
+        return rx.redirect("/")
 
     def _persist_messages(self) -> None:
         session = load_session(self.session_id) or {}
@@ -150,12 +207,33 @@ class ChatState(AuthState):
     @rx.event(background=True)
     async def mount_chat(self):
         async with self:
-            if not self._ensure_authenticated():
+            ready = self._ensure_authenticated()
+            if ready:
+                self._load_chat_from_session()
+            action = intro_mount_action(
+                authenticated=ready,
+                messages=self.messages if ready else [],
+            )
+
+        if action == "retry":
+            await asyncio.sleep(AUTH_HYDRATE_RETRY_SEC)
+            async with self:
+                ready = self._ensure_authenticated()
+                if ready:
+                    self._load_chat_from_session()
+                action = intro_mount_action(
+                    authenticated=ready,
+                    messages=self.messages if ready else [],
+                    after_retry=True,
+                )
+            if action == "redirect":
                 yield rx.redirect("/")
                 return
-            self._load_chat_from_session()
-            if not should_play_intro(self.messages):
-                return
+
+        if action != "play":
+            return
+
+        async with self:
             # Typing bubble while the intentional delay runs (warmup started at login).
             self.loading = True
             self.error = ""
@@ -302,7 +380,10 @@ class ChatState(AuthState):
                 msg["feedback"] = {"rating": rating, "rated_at": _now_iso()}
         engagement = (load_session(self.session_id) or {}).get("engagement") or {}
         up, down = feedback_tallies(messages)
-        engagement = recompute_engagement(engagement)
+        engagement = recompute_engagement(
+            engagement,
+            time_on_task_sec=float(engagement.get("session_duration_sec") or 0.0),
+        )
         engagement["feedback_up_count"] = up
         engagement["feedback_down_count"] = down
         try:

@@ -79,10 +79,20 @@ def _condition_tier_map(profile: TriageProfile) -> dict[str, int]:
 
 
 def _state_of(factor_states: dict[str, str] | None, factor: str) -> str:
-    raw = (factor_states or {}).get(factor) or FACTOR_STATE_UNKNOWN
+    raw = _recorded_polarity(factor_states, factor)
+    return raw if raw is not None else FACTOR_STATE_UNKNOWN
+
+
+def _recorded_polarity(factor_states: dict[str, str] | None, factor: str) -> str | None:
+    """Return affirmed|denied|unknown only when ``factor`` is already recorded.
+
+    Missing keys stay None so the ranker can still ask them. Explicit
+    ``unknown`` (patient said they do not know) is a recorded answer.
+    """
+    raw = (factor_states or {}).get(factor)
     if raw in {FACTOR_STATE_AFFIRMED, FACTOR_STATE_DENIED, FACTOR_STATE_UNKNOWN}:
         return raw
-    return FACTOR_STATE_UNKNOWN
+    return None
 
 
 def _canonical_factor(name: str, ontology: RedFlagOntology) -> str | None:
@@ -191,10 +201,12 @@ def eligible_neighbour_factors(
     matched_factors: Iterable[str] | None = None,
     ontology: RedFlagOntology | None = None,
 ) -> tuple[str, ...]:
-    """Askable, still-unknown factors one hop from a clinical-finding seed.
+    """Askable, still-unasked factors one hop from a clinical-finding seed.
 
-    Non-askable mediators are dropped; their askable sources already sit on
-    the same condition via mediated edge rows, so they remain candidates.
+    Recorded polarities (affirmed, denied, or explicit unknown) are skipped;
+    absent keys remain candidates. Non-askable mediators are dropped; their
+    askable sources already sit on the same condition via mediated edge rows,
+    so they remain candidates.
     """
     ont = ontology or load_ontology_for_profile()
     seeds = clinical_finding_seeds(
@@ -213,10 +225,7 @@ def eligible_neighbour_factors(
             if factor in seen or factor in seed_set:
                 continue
             seen.add(factor)
-            if _state_of(factor_states, factor) in {
-                FACTOR_STATE_AFFIRMED,
-                FACTOR_STATE_DENIED,
-            }:
+            if _recorded_polarity(factor_states, factor) is not None:
                 continue
             spec = ont.get_factor_question_spec(factor)
             if spec is None or not spec.askable:

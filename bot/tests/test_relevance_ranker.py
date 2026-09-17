@@ -81,6 +81,19 @@ def test_denied_factor_is_not_a_candidate():
     assert "Bladder dysfunction" in neighbours
 
 
+def test_explicit_unknown_factor_is_not_a_candidate():
+    ont = load_ontology()
+    neighbours = eligible_neighbour_factors(
+        {
+            "Neuro sensory deficit": "affirmed",
+            "Saddle anaesthesia": "unknown",
+        },
+        ontology=ont,
+    )
+    assert "Saddle anaesthesia" not in neighbours
+    assert "Bladder dysfunction" in neighbours
+
+
 def test_ces_after_tingling_outranks_symptom_slots():
     cov = _coverage(missing_slots=_symptom_gaps())
     planned = plan_next_question(

@@ -9,8 +9,10 @@
 param(
   [string]$ProjectId = $(if ($env:TRI_BACK_GCP_PROJECT) { $env:TRI_BACK_GCP_PROJECT } else { "YOUR_GCP_PROJECT" }),
   [string]$Bucket = $(if ($env:TRI_BACK_GCS_BUCKET) { $env:TRI_BACK_GCS_BUCKET } else { "digimsk-cloudrun-$ProjectId" }),
-  [string]$Region = $(if ($env:TRI_BACK_VERTEX_LOCATION) { $env:TRI_BACK_VERTEX_LOCATION } else { "us-central1" }),
+  [string]$Region = $(if ($env:TRI_BACK_GCS_LOCATION) { $env:TRI_BACK_GCS_LOCATION } elseif ($env:TRI_BACK_CLOUD_RUN_REGION) { $env:TRI_BACK_CLOUD_RUN_REGION } else { "us-central1" }),
   [string]$GliNERDir = $(if ($env:TRI_BACK_GLINER_MODEL_DIR) { $env:TRI_BACK_GLINER_MODEL_DIR } elseif (Test-Path "E:\TRI-BACK\GliNER-BioMed") { "E:\TRI-BACK\GliNER-BioMed" } else { "E:\TRI-BACK\GliNER-BioMed" }),
+  [string]$QueryClassifierDir = $(if ($env:TRI_BACK_QUERY_CLASSIFIER_DIR) { $env:TRI_BACK_QUERY_CLASSIFIER_DIR } elseif (Test-Path "E:\TRI-BACK\miniBERT_query_classifier") { "E:\TRI-BACK\miniBERT_query_classifier" } else { "E:\TRI-BACK\miniBERT_query_classifier" }),
+  [string]$SatSplitterDir = $(if ($env:TRI_BACK_SAT_SPLITTER_DIR) { $env:TRI_BACK_SAT_SPLITTER_DIR } elseif (Test-Path "E:\TRI-BACK\sat-3l-sm") { "E:\TRI-BACK\sat-3l-sm" } else { "E:\TRI-BACK\sat-3l-sm" }),
   [string]$RepoRoot = ""
 )
 
@@ -30,10 +32,20 @@ if (-not (Test-Path $GraphInv)) { throw "Missing inventory: $GraphInv" }
 if (-not (Test-Path $GliNERDir)) {
   throw "GliNER directory not found: $GliNERDir - set -GliNERDir or TRI_BACK_GLINER_MODEL_DIR"
 }
+if (-not (Test-Path $QueryClassifierDir)) {
+  Write-Host "Query classifier directory not found: $QueryClassifierDir - skipping models/query_classifier"
+  $QueryClassifierDir = ""
+}
+if (-not (Test-Path $SatSplitterDir)) {
+  Write-Host "SaT splitter directory not found: $SatSplitterDir - skipping models/sat_splitter"
+  $SatSplitterDir = ""
+}
 
 Write-Host "Project:  $ProjectId"
 Write-Host "Bucket:   gs://$Bucket"
 Write-Host "GliNER:   $GliNERDir"
+Write-Host "QueryClf: $QueryClassifierDir"
+Write-Host "SaT:      $SatSplitterDir"
 Write-Host "Graph:    $GraphCsv"
 
 gcloud config set project $ProjectId | Out-Null
@@ -58,6 +70,16 @@ gcloud storage cp "$GraphInv" "$bucketUri/graph/v4/red_flags_inventory_v4_2026.9
 Write-Host "Uploading GliNER model tree (may take a while) ..."
 gcloud storage rsync --recursive "$GliNERDir" "$bucketUri/models/gliner"
 
+if ($QueryClassifierDir) {
+  Write-Host "Uploading query classifier (miniBERT) ..."
+  gcloud storage rsync --recursive "$QueryClassifierDir" "$bucketUri/models/query_classifier"
+}
+
+if ($SatSplitterDir) {
+  Write-Host "Uploading SaT splitter ..."
+  gcloud storage rsync --recursive "$SatSplitterDir" "$bucketUri/models/sat_splitter"
+}
+
 Write-Host "Ensuring sessions/ prefix ..."
 $tmp = New-TemporaryFile
 Set-Content -Path $tmp.FullName -Value "TRI-BACK session store root`n" -NoNewline
@@ -67,6 +89,8 @@ Remove-Item $tmp.FullName -Force
 Write-Host ""
 Write-Host "Done. Mount gs://$Bucket at /mnt/tri-back on tri-back."
 Write-Host "  TRI_BACK_GLINER_MODEL_DIR=/mnt/tri-back/models/gliner"
+Write-Host "  TRI_BACK_QUERY_CLASSIFIER_DIR=/mnt/tri-back/models/query_classifier"
+Write-Host "  TRI_BACK_SAT_SPLITTER_DIR=/mnt/tri-back/models/sat_splitter"
 Write-Host "  TRI_BACK_GRAPH_CSV=/mnt/tri-back/graph/v4/red_flags_edges_v4_2026.9.10.csv"
 Write-Host "  TRI_BACK_GRAPH_FACTORS=/mnt/tri-back/graph/v4/red_flags_factors_v4_2026.9.10.csv"
 Write-Host "  TRI_BACK_GRAPH_INVENTORY=/mnt/tri-back/graph/v4/red_flags_inventory_v4_2026.9.10.json"

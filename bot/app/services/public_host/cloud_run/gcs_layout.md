@@ -24,6 +24,8 @@ Services mount the **entire bucket** at:
 gs://<bucket>/
   models/
     gliner/                 # full GliNER-BioMed tree (config, weights, …)
+    query_classifier/       # miniBERT question-vs-statement (Haystack)
+    sat_splitter/           # Segment Any Text sat-3l-sm (safetensors, not ONNX)
   graph/
     v4/
       red_flags_edges_v4_2026.9.10.csv
@@ -41,6 +43,8 @@ gs://<bucket>/
 | Env var | Container path |
 |---------|----------------|
 | `TRI_BACK_GLINER_MODEL_DIR` | `/mnt/tri-back/models/gliner` |
+| `TRI_BACK_QUERY_CLASSIFIER_DIR` | `/mnt/tri-back/models/query_classifier` |
+| `TRI_BACK_SAT_SPLITTER_DIR` | `/mnt/tri-back/models/sat_splitter` |
 | `TRI_BACK_GRAPH_CSV` | `/mnt/tri-back/graph/v4/red_flags_edges_v4_2026.9.10.csv` |
 | `TRI_BACK_GRAPH_FACTORS` | `/mnt/tri-back/graph/v4/red_flags_factors_v4_2026.9.10.csv` |
 | `TRI_BACK_GRAPH_INVENTORY` | `/mnt/tri-back/graph/v4/red_flags_inventory_v4_2026.9.10.json` |

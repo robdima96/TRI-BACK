@@ -17,6 +17,7 @@ FactorPolarity = Literal["affirmed", "denied", "unknown"]
 FACTOR_STATE_UNKNOWN = "unknown"
 FACTOR_STATE_AFFIRMED = "affirmed"
 FACTOR_STATE_DENIED = "denied"
+ASKED_FACTOR_NOT_ANSWERED = "not_answered"
 
 # Contrastive / sentence boundaries — not coordinating "and"/"or", so
 # "no bladder or bowel problems" still sees the leading "no".

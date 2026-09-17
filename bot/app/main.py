@@ -106,6 +106,8 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
         "factor_states": dict(state.get("factor_states") or {}),
         "session_phase": state.get("session_phase") or "intake",
         "triage_profile_id": state.get("triage_profile_id") or "low_back",
+        "generator_backend": settings.generator_backend,
+        "generator_model": settings.generator_model,
     }
     if disposition is not None:
         save_kwargs["disposition"] = disposition

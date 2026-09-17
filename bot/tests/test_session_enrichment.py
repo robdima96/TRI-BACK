@@ -8,6 +8,7 @@ from app.session_enrichment import (
     build_turn_extraction_record,
     compact_graph_for_session,
     default_engagement,
+    default_session_fields,
     engagement_from_messages,
     exposed_chat_graph_fields,
     slim_factor_matching_audit,
@@ -432,3 +433,13 @@ def test_engagement_from_messages_counts_feedback_ratings():
     engagement = engagement_from_messages(messages, existing=default_engagement())
     assert engagement["feedback_up_count"] == 1
     assert engagement["feedback_down_count"] == 1
+
+
+def test_default_session_fields_include_generator_provenance():
+    from app.config import settings
+
+    fields = default_session_fields("425_1")
+    assert fields["generator_backend"] == settings.generator_backend
+    assert fields["generator_model"] == settings.generator_model
+    assert "generator_model" in fields
+    assert "generator_backend" in fields

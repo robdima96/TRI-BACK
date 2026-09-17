@@ -19,6 +19,21 @@ def test_logout_does_not_set_undeclared_legacy_sid():
     """Reflex raises SetUndefinedStateVarError if logout assigns _legacy_sid."""
     src = inspect.getsource(AuthState)
     assert "_legacy_sid" not in src
+    assert "logout_confirming" in src
+    assert "request_logout" in src
+
+
+def test_chat_and_admin_share_logout_button():
+    from tri_back_study_app.pages import admin as admin_page
+    from tri_back_study_app.pages import chat as chat_page
+
+    assert "logout_button" in inspect.getsource(chat_page)
+    assert "logout_button" in inspect.getsource(admin_page)
+    from tri_back_study_app.components.logout_button import logout_button as btn
+
+    src = inspect.getsource(btn)
+    assert "request_logout" in src
+    assert "btn-logout-confirm" in src
 
 
 def test_local_admin_accepts_triback(monkeypatch: pytest.MonkeyPatch):

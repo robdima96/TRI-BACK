@@ -14,8 +14,9 @@ from app.services.vertex_auth import vertex_adc_status
 
 _log = logging.getLogger(__name__)
 
-# Sized to cover Gemini 2.5 thinking tokens + visible output (see agent.py note).
+# Sized to cover Gemini thinking tokens + visible output (see agent.py note).
 DISPOSITION_MAX_NEW_TOKENS = 4096
+DISPOSITION_THINKING_LEVEL = "MEDIUM"
 
 # Non-clinical copy when the generator backend is down. Must never look like a
 # triage recommendation. Policy gate marks escalated + system_failure reason.
@@ -30,7 +31,8 @@ _tok_gen: Any = None  # tokenizer
 _mdl_gen: Any = None  # model
 
 # Role constraints for the wording model (Vertex system_instruction / local system turn).
-# Gemini 2.5 already has native thinking parts; do not ask for <thinking>/<answer> tags.
+# Native thinking parts are stripped in generator_backends; do not ask for
+# <thinking>/<answer> tags.
 _SYSTEM_INSTRUCTION = (
     "You are a helpful, respectful, musculoskeletal health information assistant. "
     "If the evidence does not cover the question, say you don't have enough information. "
@@ -172,8 +174,15 @@ def generate_from_messages(
     *,
     max_new_tokens: int = 500,
     temperature: float = 0.2,
+    thinking_level: str | None = None,
+    response_mime_type: str | None = None,
+    response_schema: dict[str, Any] | None = None,
 ) -> str:
-    """Run the configured generator backend on a pre-built chat message list."""
+    """Run the configured generator backend on a pre-built chat message list.
+
+    ``thinking_level`` defaults to MINIMAL on the Vertex path. Local Mistral
+    ignores thinking and structured-output kwargs.
+    """
     backend = generator_backend()
     if backend == "local":
         return _generate_local_messages(
@@ -186,6 +195,9 @@ def generate_from_messages(
             messages,
             max_new_tokens=max_new_tokens,
             temperature=temperature,
+            thinking_level=thinking_level,
+            response_mime_type=response_mime_type,
+            response_schema=response_schema,
         )
     raise RuntimeError(
         f"unsupported TRI_BACK_GENERATOR_BACKEND: {backend!r} "
@@ -289,6 +301,7 @@ def generate_response(
             messages,
             max_new_tokens=DISPOSITION_MAX_NEW_TOKENS,
             temperature=0.2,
+            thinking_level=DISPOSITION_THINKING_LEVEL,
         )
         text = extract_answer_text(raw)
         if not text.strip():

@@ -257,7 +257,7 @@ def traverse_from_turn(
             )
         )
 
-    matches = factor_matches or match_checklist_to_factors(rows)
+    matches = match_checklist_to_factors(rows) if factor_matches is None else factor_matches
     matched_factors: list[str] = affirmed_factor_names(matches)
     unmatched_items: list[ChecklistItemDump] = []
 

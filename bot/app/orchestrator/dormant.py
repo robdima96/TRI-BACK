@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from app.orchestrator.slot_answers import _EMPTY_ANSWER
+from app.orchestrator.slot_answers import is_empty_slot_answer
 
 INTAKE_PHASE = "intake"
 DORMANT_PHASE = "dormant"
@@ -74,7 +74,7 @@ def detect_symptom_change(
     text = (message or "").strip()
     if _CHANGE_AFFIRM.search(text):
         return True
-    if _EMPTY_ANSWER.match(text or ""):
+    if is_empty_slot_answer(text):
         return False
     prior_keys = {_row_key(r) for r in prior_checklist if _is_symptom_row(r)}
     for row in merged_checklist:

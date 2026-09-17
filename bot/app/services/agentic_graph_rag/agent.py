@@ -29,13 +29,14 @@ from app.services.agentic_graph_rag.tools import ToolContext, invoke_tool, tool_
 
 _log = logging.getLogger(__name__)
 
-# NOTE: Gemini 2.5 "thinking" tokens count against max_output_tokens, so these
+# NOTE: Gemini thinking tokens count against max_output_tokens, so these
 # caps must cover the model's internal reasoning budget plus the visible output.
-# Under-sized caps surface as Vertex "Finish reason: 2" (MAX_TOKENS) errors that
-# return empty text. Raised from 512/1024 after observing agent-step failures.
-_TOOL_STEP_MAX_TOKENS = 2048
+# Under-sized caps surface as Vertex MAX_TOKENS errors that return empty text.
+# Tool-step cap raised again for MEDIUM thinking on Gemini 3.5 Flash-Lite.
+_TOOL_STEP_MAX_TOKENS = 4096
 _FINAL_MAX_TOKENS = 4096
 _TEMPERATURE = 0.2
+_THINKING_LEVEL = "MEDIUM"
 
 _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```", re.IGNORECASE)
 
@@ -160,6 +161,8 @@ def run_disposition_agent(
                 messages,
                 max_new_tokens=_TOOL_STEP_MAX_TOKENS,
                 temperature=_TEMPERATURE,
+                thinking_level=_THINKING_LEVEL,
+                response_mime_type="application/json",
             )
         except Exception as exc:  # pragma: no cover - backend failure
             _log.exception("agent generation failed: %s", exc)
@@ -255,7 +258,11 @@ def run_disposition_agent(
     )
     try:
         raw = generate_from_messages(
-            messages, max_new_tokens=_FINAL_MAX_TOKENS, temperature=_TEMPERATURE
+            messages,
+            max_new_tokens=_FINAL_MAX_TOKENS,
+            temperature=_TEMPERATURE,
+            thinking_level=_THINKING_LEVEL,
+            response_mime_type="application/json",
         )
     except Exception as exc:  # pragma: no cover - backend failure
         _log.exception("agent final generation failed: %s", exc)

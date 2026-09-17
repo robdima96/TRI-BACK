@@ -18,6 +18,7 @@ dependencies = [
   "chromadb>=0.5.0",
   "python-dotenv>=1.0.0",
   "sentence-transformers>=3.0.0",
+  "wtpsplit>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -37,11 +38,14 @@ ner = [
 gliner = [
   "gliner>=0.2.0",
 ]
+sat = [
+  "wtpsplit>=2.0.0",
+]
 graphrag = [
   "neo4j>=5.0.0",
 ]
 generator-api = [
-  "google-cloud-aiplatform>=1.60.0",
+  "google-genai>=1.40.0",
 ]
 # Comprehensive local/dev install: test tooling + every optional feature stack above.
 dev = [
@@ -51,12 +55,13 @@ dev = [
   "mypy>=1.13.0",
   "huggingface_hub>=0.20.0",
   "gliner>=0.2.0",
-  "google-cloud-aiplatform>=1.60.0",
+  "google-genai>=1.40.0",
   "reportlab>=4.0.0",
   "pypdf>=5.0.0",
   "fonttools>=4.0.0",
   "pymupdf>=1.24.0",
   "neo4j>=5.0.0",
+  "wtpsplit>=2.0.0",
 ]
 
 [build-system]

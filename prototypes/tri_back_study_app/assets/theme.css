@@ -83,6 +83,19 @@ body {
   cursor: pointer;
 }
 
+.btn-logout-confirm {
+  background: var(--red-600);
+  color: var(--white);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+}
+
+.btn-logout-confirm:hover {
+  background: #b91c1c;
+}
+
 .login-page {
   min-height: 100vh;
   display: flex;

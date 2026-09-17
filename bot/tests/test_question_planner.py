@@ -148,6 +148,32 @@ def test_planner_asks_graph_factor_after_floor_is_complete():
     assert planned.question_reason and planned.question_reason.startswith("rank:t1:CES:")
 
 
+def test_planner_does_not_reask_explicit_unknown_factor():
+    cov = _coverage(
+        session_complete=True,
+        symptoms_complete=True,
+        ready_for_disposition=True,
+        missing_slots=[],
+        symptom_instances=[
+            {"symptom_id": "s1", "display_name": "low back pain", "checklist_keys": []}
+        ],
+        active_symptom_id="s1",
+    )
+    planned = plan_next_question(
+        cov,
+        risk_hits=[],
+        questions_asked=9,
+        comorbidities_acknowledged=True,
+        factor_states={
+            "Neuro sensory deficit": "affirmed",
+            "Saddle anaesthesia": "unknown",
+        },
+    )
+    assert planned.question_mode is True
+    assert planned.asked_factor != "Saddle anaesthesia"
+    assert planned.asked_factor
+
+
 def test_planner_coverage_complete_when_floor_met_and_no_factors():
     cov = _coverage(
         session_complete=True,

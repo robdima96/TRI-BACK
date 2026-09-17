@@ -172,6 +172,20 @@ def test_denials_are_sticky_until_affirm():
     assert states["Bladder dysfunction"] == "affirmed"
 
 
+def test_unknown_is_sticky_until_affirm():
+    states = merge_factor_states(
+        {"Saddle anaesthesia": "unknown"},
+        match_checklist_to_factors([_item("the pain is still there")]),
+    )
+    assert states["Saddle anaesthesia"] == "unknown"
+    affirmed = match_checklist_to_factors(
+        [_item("I have saddle numbness")],
+        source_message="I have saddle numbness",
+    )
+    states = merge_factor_states(states, affirmed)
+    assert states["Saddle anaesthesia"] == "affirmed"
+
+
 def test_factor_states_round_trip_checkpointer():
     graph = build_chat_graph()
     cfg = {"configurable": {"thread_id": "factor-states-rt"}}

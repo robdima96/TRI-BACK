@@ -3,6 +3,7 @@
 from app.orchestrator.coverage import evaluate_checklist_coverage
 from app.orchestrator.question_planner import plan_next_question
 from app.orchestrator.slot_answers import (
+    close_provocative_if_severity_severe,
     credit_asked_slot_answer,
     credit_volunteered_slots,
 )
@@ -45,6 +46,23 @@ def test_empty_non_answers_fill_asked_slot_as_na():
     assert len(items) == 1
     assert items[0].kind == "palliative"
     assert items[0].text == "N/A"
+
+
+def test_empty_non_answer_with_trailing_punctuation_fills_na():
+    items = credit_asked_slot_answer(
+        message="I don't know !",
+        last_asked_slot="palliative",
+        checklist=[],
+    )
+    assert len(items) == 1
+    assert items[0].kind == "palliative"
+    assert items[0].text == "N/A"
+    dotted = credit_asked_slot_answer(
+        message="I don't know.",
+        last_asked_slot="palliative",
+        checklist=[],
+    )
+    assert dotted[0].text == "N/A"
 
 
 def test_bare_no_on_slot_questions_fills_na():
@@ -194,3 +212,73 @@ def test_volunteered_60m_does_not_reask_sex():
         report, risk_hits=[], questions_asked=1, comorbidities_acknowledged=False
     )
     assert planned.slot != "sex"
+
+
+def _symptom_with_severity(text: str) -> list[dict[str, str]]:
+    return [
+        {
+            "text": "low back pain",
+            "kind": "ner_entity",
+            "source": "gliner",
+            "label": "symptom",
+        },
+        {
+            "text": text,
+            "kind": "severity",
+            "source": "pattern",
+            "label": "symptom_severity",
+        },
+    ]
+
+
+def test_severe_numeric_closes_provocative_as_na():
+    for rating in ("7/10", "10/10"):
+        closed = close_provocative_if_severity_severe(_symptom_with_severity(rating))
+        provoc = [r for r in closed if r.get("label") == "provocative"]
+        assert len(provoc) == 1
+        assert provoc[0]["text"] == "N/A"
+        assert provoc[0]["source"] == "rule"
+        report, _, _ = evaluate_checklist_coverage(
+            checklist=closed,
+            comorbidities_acknowledged=True,
+        )
+        missing = {m["slot"] for m in report["missing_slots"]}
+        assert "provocative" not in missing
+        planned = plan_next_question(
+            report, risk_hits=[], questions_asked=1, comorbidities_acknowledged=True
+        )
+        assert planned.slot != "provocative"
+
+
+def test_severe_word_closes_provocative_as_na():
+    closed = close_provocative_if_severity_severe(_symptom_with_severity("severe"))
+    provoc = [r for r in closed if r.get("label") == "provocative"]
+    assert len(provoc) == 1
+    assert provoc[0]["text"] == "N/A"
+    report, _, _ = evaluate_checklist_coverage(
+        checklist=closed,
+        comorbidities_acknowledged=True,
+    )
+    missing = {m["slot"] for m in report["missing_slots"]}
+    assert "provocative" not in missing
+
+
+def test_mild_or_six_does_not_close_provocative():
+    for rating in ("6/10", "mild"):
+        closed = close_provocative_if_severity_severe(_symptom_with_severity(rating))
+        assert not any(r.get("label") == "provocative" for r in closed)
+
+
+def test_existing_provocative_kept_when_severity_severe():
+    checklist = _symptom_with_severity("8/10") + [
+        {
+            "text": "worse when sitting",
+            "kind": "provocative",
+            "source": "pattern",
+            "label": "provocative",
+        },
+    ]
+    closed = close_provocative_if_severity_severe(checklist)
+    provoc = [r for r in closed if r.get("label") == "provocative"]
+    assert len(provoc) == 1
+    assert provoc[0]["text"] == "worse when sitting"
