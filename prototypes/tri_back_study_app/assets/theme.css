@@ -457,6 +457,16 @@ body {
   border-color: var(--red-600);
 }
 
+.feedback-btn.rephrase-btn {
+  font-size: 0.8rem;
+}
+
+.feedback-btn.rephrase-btn.used,
+.feedback-btn.rephrase-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .composer {
   display: flex;
   gap: 0.5rem;

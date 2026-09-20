@@ -22,6 +22,8 @@ class ChatMessageItem(TypedDict):
     citations: list[CitationItem]
     timestamp: str
     feedback_rating: str
+    question_mode: bool
+    rephrased: bool
 
 
 def normalize_citation(raw: dict) -> CitationItem:
@@ -69,6 +71,8 @@ def empty_message(
     graph_json: str = "",
     has_graph: bool = False,
     feedback_rating: str = "",
+    question_mode: bool = False,
+    rephrased: bool = False,
 ) -> ChatMessageItem:
     return ChatMessageItem(
         message_id=message_id,
@@ -80,4 +84,6 @@ def empty_message(
         citations=citations or [],
         timestamp=timestamp,
         feedback_rating=feedback_rating,
+        question_mode=question_mode,
+        rephrased=rephrased,
     )

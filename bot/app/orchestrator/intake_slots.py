@@ -27,11 +27,11 @@ def question_template(
     display_name: str = "your symptom",
 ) -> str:
     if slot == "age":
-        return "How old are you?"
+        return "How old are you in years?"
     if slot == "sex":
         return (
-            "What sex were you assigned at birth or how do you identify "
-            "(for example male, female, or other)?"
+            "What biologicalsex were you assigned at birth "
+            "(male or female)?"
         )
     if slot == "comorbidities":
         return (

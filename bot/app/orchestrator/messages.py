@@ -4,6 +4,17 @@ from __future__ import annotations
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
+def user_message_count(messages: list | None) -> int:
+    """Count user turns in a LangChain or dict transcript."""
+    n = 0
+    for m in messages or []:
+        if isinstance(m, HumanMessage):
+            n += 1
+        elif isinstance(m, dict) and m.get("role") == "user":
+            n += 1
+    return n
+
+
 # convert LangChain message objects into a list of user/assistant dicts for session JSON output
 def transcript_from_messages(messages: list[BaseMessage]) -> list[dict[str, str]]:
     """Flatten chat history to user/assistant dicts for session JSON."""

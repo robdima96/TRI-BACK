@@ -11,6 +11,8 @@ from app.session_enrichment import (
     default_session_fields,
     engagement_from_messages,
     exposed_chat_graph_fields,
+    hide_participant_graphs,
+    skip_disposition_record,
     slim_factor_matching_audit,
     split_checklist_by_source,
 )
@@ -155,6 +157,7 @@ def test_orchestrator_snapshot_includes_safety_fields():
             "questions_asked": 2,
             "coverage": {"ready_for_disposition": True, "missing_slots": []},
             "generator_failed": False,
+            "generator_failure_kind": None,
         },
         turn_index=3,
     )
@@ -163,6 +166,38 @@ def test_orchestrator_snapshot_includes_safety_fields():
     assert snap["safety_reason"] == "risk_policy"
     assert snap["coverage_ready"] is True
     assert snap["factor_states"] == {}
+    assert snap["generator_failed"] is False
+    assert snap["generator_failure_kind"] is None
+
+
+def test_orchestrator_snapshot_includes_slot_reply_and_ack():
+    snap = build_orchestrator_snapshot(
+        {
+            "question_mode": True,
+            "slot_reply": "unusable",
+            "intake_ack": None,
+            "slot_being_asked": "age",
+        },
+        turn_index=2,
+    )
+    assert snap["slot_reply"] == "unusable"
+    assert snap["intake_ack"] is None
+    assert snap["slot_being_asked"] == "age"
+
+
+def test_orchestrator_snapshot_includes_generator_failure_kind():
+    snap = build_orchestrator_snapshot(
+        {
+            "escalated": False,
+            "safety_reason": "system_failure:generator_unavailable",
+            "generator_failed": True,
+            "generator_failure_kind": "empty",
+        },
+        turn_index=8,
+    )
+    assert snap["escalated"] is False
+    assert snap["generator_failed"] is True
+    assert snap["generator_failure_kind"] == "empty"
 
 
 def test_orchestrator_snapshot_includes_factor_states():
@@ -184,6 +219,38 @@ def test_disposition_skipped_on_question_mode():
         )
         is None
     )
+
+
+def test_disposition_skipped_on_canned_dormant_kept_on_generator_failure():
+    assert skip_disposition_record({"canned_dormant": True, "question_mode": False})
+    assert not skip_disposition_record(
+        {"generator_failed": True, "question_mode": False, "canned_dormant": False}
+    )
+    assert (
+        build_disposition_record(
+            {
+                "canned_dormant": True,
+                "question_mode": False,
+                "final_response": "Have your symptoms changed?",
+                "graph_traversal": {"trace_id": "old"},
+            },
+            turn_index=4,
+        )
+        is None
+    )
+    rec = build_disposition_record(
+        {
+            "generator_failed": True,
+            "question_mode": False,
+            "canned_dormant": False,
+            "final_response": "I'm temporarily unable to generate a recommendation",
+            "escalated": False,
+            "safety_reason": "system_failure:generator_unavailable",
+        },
+        turn_index=3,
+    )
+    assert rec is not None
+    assert rec["safety_reason"] == "system_failure:generator_unavailable"
 
 
 def test_merge_preserves_disposition_after_question_turn():
@@ -341,6 +408,18 @@ def test_exposed_chat_graph_fields_on_disposition():
     )
     assert graph == {"trace_id": "g1"}
     assert intake == {"trace_id": "in1"}
+
+
+def test_exposed_chat_graph_fields_hidden_on_canned_and_generator_failure():
+    payload = {
+        "question_mode": False,
+        "graph_traversal": {"trace_id": "g1"},
+        "intake_traversal": {"trace_id": "in1"},
+    }
+    assert hide_participant_graphs({**payload, "canned_dormant": True})
+    assert exposed_chat_graph_fields({**payload, "canned_dormant": True}) == (None, None)
+    assert hide_participant_graphs({**payload, "generator_failed": True})
+    assert exposed_chat_graph_fields({**payload, "generator_failed": True}) == (None, None)
 
 
 def test_merge_messages_preserves_feedback_and_message_id():

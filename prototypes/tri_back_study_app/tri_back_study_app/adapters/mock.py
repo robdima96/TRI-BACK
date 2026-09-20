@@ -24,3 +24,11 @@ class MockAdapter:
             question_mode=True,
             round_trip_ms=120.0,
         )
+
+    async def rephrase_message(self, session_id: str, message_id: str) -> ChatTurnResult:
+        return ChatTurnResult(
+            session_id=session_id,
+            response="Could you tell me your age in years?",
+            question_mode=True,
+            round_trip_ms=40.0,
+        )

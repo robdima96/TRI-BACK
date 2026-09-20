@@ -15,6 +15,25 @@ _log = logging.getLogger(__name__)
 _INTRO_MESSAGE_ID = "msg_intro"
 
 
+def _latest_disposition_is_generator_failure(
+    stored: dict[str, Any], orch: dict[str, Any]
+) -> bool:
+    """True when the latest saved disposition is a wording-backend stub, not triage."""
+    if orch.get("generator_failed"):
+        return True
+    if str(orch.get("safety_reason") or "").startswith("system_failure"):
+        return True
+    history = stored.get("disposition_history") or []
+    if not isinstance(history, list) or not history:
+        return False
+    last = history[-1]
+    if not isinstance(last, dict):
+        return False
+    if last.get("generator_failed"):
+        return True
+    return str(last.get("safety_reason") or "").startswith("system_failure")
+
+
 def _lc_messages_from_session(raw: list[Any] | None) -> list[HumanMessage | AIMessage]:
     out: list[HumanMessage | AIMessage] = []
     for row in raw or []:
@@ -46,10 +65,24 @@ def resume_values_from_session(stored: dict[str, Any]) -> dict[str, Any]:
 
     phase = stored.get("session_phase") or orch.get("session_phase")
     if not phase:
-        if stored.get("disposition_history") or orch.get("coverage_ready"):
+        if _latest_disposition_is_generator_failure(stored, orch):
+            phase = INTAKE_PHASE
+        elif stored.get("disposition_history") or orch.get("coverage_ready"):
             phase = DORMANT_PHASE
         else:
             phase = INTAKE_PHASE
+
+    asked_factor = orch.get("asked_factor")
+    if not asked_factor:
+        intake_hist = stored.get("intake_history") or []
+        if isinstance(intake_hist, list) and intake_hist:
+            last_intake = intake_hist[-1]
+            if isinstance(last_intake, dict):
+                asked_factor = last_intake.get("asked_factor")
+    asked_factor = (asked_factor or "").strip() or None
+    last_asked_slot = None if asked_factor else (
+        orch.get("slot_being_asked") or orch.get("last_asked_slot")
+    )
 
     values: dict[str, Any] = {
         "session_id": stored.get("session_id") or "",
@@ -65,7 +98,8 @@ def resume_values_from_session(stored: dict[str, Any]) -> dict[str, Any]:
             else orch.get("comorbidities_acknowledged")
         ),
         "questions_asked": int(orch.get("questions_asked") or 0),
-        "last_asked_slot": orch.get("slot_being_asked") or orch.get("last_asked_slot"),
+        "last_asked_slot": last_asked_slot,
+        "asked_factor": asked_factor,
         "last_rank_topic": orch.get("last_rank_topic"),
         "last_rank_tier": orch.get("last_rank_tier"),
         "session_phase": phase,

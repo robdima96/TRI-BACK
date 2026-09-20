@@ -132,3 +132,25 @@ async def call_chat_api(session_id: str, message: str) -> ChatTurnResult:
         turn_extraction=data.get("turn_extraction"),
         round_trip_ms=elapsed_ms,
     )
+
+
+async def call_rephrase_api(session_id: str, message_id: str) -> ChatTurnResult:
+    url = f"{CHATBOT_BASE_URL}/api/v1/rephrase"
+    headers = _bot_headers()
+    started = time.perf_counter()
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        resp = await client.post(
+            url,
+            json={"session_id": session_id, "message_id": message_id},
+            headers=headers,
+        )
+        resp.raise_for_status()
+        data: dict[str, Any] = resp.json()
+    elapsed_ms = (time.perf_counter() - started) * 1000.0
+    return ChatTurnResult(
+        session_id=data.get("session_id", session_id),
+        response=data.get("response", ""),
+        question_mode=bool(data.get("question_mode", True)),
+        questions_asked=int(data.get("questions_asked") or 0),
+        round_trip_ms=elapsed_ms,
+    )

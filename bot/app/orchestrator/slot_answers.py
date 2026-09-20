@@ -140,6 +140,62 @@ def _severity_row_texts(checklist: list[dict[str, str]]) -> list[str]:
     return texts
 
 
+def _row_fills_slot(row: dict[str, str], slot: SlotName) -> bool:
+    kind_label = _SLOT_KIND_LABEL.get(slot)
+    if not kind_label:
+        return False
+    kind, label = kind_label
+    row_kind = str(row.get("kind") or "")
+    row_label = str(row.get("label") or "").casefold()
+    if row_kind == kind and row_label == label.casefold():
+        return True
+    for gliner_label in _GLINER_LABELS.get(slot, frozenset()):
+        if row_kind == "ner_entity" and row_label == gliner_label.casefold():
+            return True
+    if slot == "symptom_anchor" and row_kind == "symptom":
+        return True
+    return False
+
+
+def drop_this_turn_rows_for_slot(
+    checklist: list[dict[str, str]],
+    *,
+    prior_checklist: list[dict[str, str]],
+    slot: SlotName | None,
+) -> list[dict[str, str]]:
+    """Remove this-turn candidate rows that fill ``slot`` (unusable answers)."""
+    if not slot or slot not in _SLOT_KIND_LABEL:
+        return [dict(row) for row in checklist]
+    prior_ids = {str(row.get("id")) for row in prior_checklist if row.get("id")}
+    prior_keys = {
+        (
+            str(row.get("text") or ""),
+            str(row.get("kind") or ""),
+            str(row.get("source") or ""),
+            str(row.get("label") or ""),
+        )
+        for row in prior_checklist
+    }
+    kept: list[dict[str, str]] = []
+    for row in checklist:
+        item = dict(row)
+        if not _row_fills_slot(item, slot):
+            kept.append(item)
+            continue
+        row_id = str(item.get("id") or "")
+        key = (
+            str(item.get("text") or ""),
+            str(item.get("kind") or ""),
+            str(item.get("source") or ""),
+            str(item.get("label") or ""),
+        )
+        if row_id and row_id in prior_ids:
+            kept.append(item)
+        elif not row_id and key in prior_keys:
+            kept.append(item)
+    return kept
+
+
 def close_provocative_if_severity_severe(
     checklist: list[dict[str, str]],
 ) -> list[dict[str, str]]:

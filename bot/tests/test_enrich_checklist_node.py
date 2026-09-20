@@ -190,3 +190,59 @@ def test_enrich_credits_i_dont_know_on_comorbidities_without_llm_ack():
     assert covered["comorbidities_acknowledged"] is True
     planned = plan_question_node(covered)
     assert planned.get("slot_being_asked") != "comorbidities"
+
+
+def test_enrich_drops_unusable_age_this_turn():
+    state = {
+        "session_id": "sess-unusable-age",
+        "message": "148",
+        "message_normalized": "148",
+        "turn_start_checklist": [
+            {
+                "id": "cl_sx",
+                "text": "low back pain",
+                "kind": "ner_entity",
+                "source": "profile",
+                "label": "symptom",
+            }
+        ],
+        "clinical_checklist": [
+            {
+                "id": "cl_sx",
+                "text": "low back pain",
+                "kind": "ner_entity",
+                "source": "profile",
+                "label": "symptom",
+            },
+            {
+                "id": "cl_age",
+                "text": "148",
+                "kind": "demographic",
+                "source": "slot_answer",
+                "label": "age",
+            },
+        ],
+        "encoder_turn_items": [],
+        "extraction_history": [],
+        "messages": [],
+        "last_asked_slot": "age",
+        "comorbidities_acknowledged": False,
+    }
+    enrichment = IntakeEnrichmentResult(
+        status="no_changes",
+        summary_reason="Age 148 is not usable.",
+        slot_reply="unusable",
+        next_slot="age",
+        next_question="How old are you?",
+    )
+    with patch(
+        "app.orchestrator.nodes.propose_checklist_enrichment",
+        return_value=enrichment,
+    ):
+        out = enrich_checklist_node(state)
+
+    assert not any(r.get("label") == "age" for r in out["clinical_checklist"])
+    assert out["slot_reply"] == "unusable"
+    covered = evaluate_coverage_node(out)
+    missing = [m["slot"] for m in (covered["coverage"] or {}).get("missing_slots") or []]
+    assert "age" in missing

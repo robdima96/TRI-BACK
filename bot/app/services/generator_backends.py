@@ -24,6 +24,34 @@ _ALLOWED_THINKING = frozenset({"MINIMAL", "LOW", "MEDIUM", "HIGH"})
 _RETRY_ATTEMPTS = 2
 _RETRY_SLEEP_SEC = 0.5
 
+# Gemini 3.x publisher models are served at Vertex multi-regions (us, eu, global),
+# not Cloud Run regions such as us-central1 (admin_16 404).
+_VERTEX_MULTIREGION_LOCATIONS = frozenset({"us", "eu", "global", "asia"})
+
+
+def vertex_location_is_regional(location: str | None) -> bool:
+    """True when ``location`` looks like a Cloud Run / compute region."""
+    loc = (location or "").strip().lower()
+    if not loc:
+        return False
+    if loc in _VERTEX_MULTIREGION_LOCATIONS:
+        return False
+    return "-" in loc
+
+
+def vertex_location_problem(location: str | None) -> str | None:
+    """Human-readable location error, or None when the value is usable."""
+    loc = (location or "").strip()
+    if not loc:
+        return "TRI_BACK_VERTEX_LOCATION not set"
+    if vertex_location_is_regional(loc):
+        return (
+            f"TRI_BACK_VERTEX_LOCATION={loc!r} is a Cloud Run regional location; "
+            "Gemini 3.5 Flash-Lite requires a Vertex multi-region "
+            f"({', '.join(sorted(_VERTEX_MULTIREGION_LOCATIONS))})"
+        )
+    return None
+
 
 def _genai_types() -> Any:
     try:
@@ -78,10 +106,19 @@ def _ensure_vertex_client() -> Any:
         raise RuntimeError(
             "TRI_BACK_VERTEX_PROJECT_ID and TRI_BACK_VERTEX_LOCATION must be set"
         )
+    problem = vertex_location_problem(settings.vertex_location)
+    if problem:
+        raise RuntimeError(problem)
     try:
         from google import genai
     except ImportError as exc:
         raise RuntimeError(_MISSING_GENAI) from exc
+    _log.info(
+        "vertex client project=%s location=%s model=%s",
+        settings.vertex_project_id,
+        settings.vertex_location,
+        settings.generator_model,
+    )
     _vertex_client = genai.Client(
         vertexai=True,
         project=settings.vertex_project_id,
@@ -145,44 +182,59 @@ def generate_vertex(
         raise GenerationEmptyError("generation_empty: no user contents")
 
     level = _normalize_thinking_level(thinking_level)
-    config_kwargs: dict[str, Any] = {
-        "max_output_tokens": max_new_tokens,
-        "thinking_config": types.ThinkingConfig(
-            thinking_level=level,
-            include_thoughts=False,
-        ),
-    }
-    if system_instruction:
-        config_kwargs["system_instruction"] = system_instruction
-    if response_mime_type:
-        config_kwargs["response_mime_type"] = response_mime_type
-    if response_schema:
-        config_kwargs["response_schema"] = response_schema
-    config = types.GenerateContentConfig(**config_kwargs)
 
-    last_exc: BaseException | None = None
-    for attempt in range(_RETRY_ATTEMPTS):
-        try:
-            response = client.models.generate_content(
-                model=settings.generator_model,
-                contents=contents,
-                config=config,
-            )
-            return _extract_response_text(response)
-        except GenerationEmptyError:
-            raise
-        except Exception as exc:
-            last_exc = exc
-            if attempt + 1 < _RETRY_ATTEMPTS and _is_retryable(exc):
-                _log.warning(
-                    "vertex generate retry after %s: %s",
-                    type(exc).__name__,
-                    exc,
+    def _call(thinking: str) -> str:
+        config_kwargs: dict[str, Any] = {
+            "max_output_tokens": max_new_tokens,
+            "thinking_config": types.ThinkingConfig(
+                thinking_level=thinking,
+                include_thoughts=False,
+            ),
+        }
+        if system_instruction:
+            config_kwargs["system_instruction"] = system_instruction
+        if response_mime_type:
+            config_kwargs["response_mime_type"] = response_mime_type
+        if response_schema:
+            config_kwargs["response_schema"] = response_schema
+        config = types.GenerateContentConfig(**config_kwargs)
+
+        last_exc: BaseException | None = None
+        for attempt in range(_RETRY_ATTEMPTS):
+            try:
+                response = client.models.generate_content(
+                    model=settings.generator_model,
+                    contents=contents,
+                    config=config,
                 )
-                time.sleep(_RETRY_SLEEP_SEC)
-                continue
-            raise
-    raise last_exc  # pragma: no cover
+                return _extract_response_text(response)
+            except GenerationEmptyError:
+                raise
+            except Exception as exc:
+                last_exc = exc
+                if attempt + 1 < _RETRY_ATTEMPTS and _is_retryable(exc):
+                    _log.warning(
+                        "vertex generate retry after %s: %s",
+                        type(exc).__name__,
+                        exc,
+                    )
+                    time.sleep(_RETRY_SLEEP_SEC)
+                    continue
+                raise
+        raise last_exc  # pragma: no cover
+
+    try:
+        return _call(level)
+    except GenerationEmptyError:
+        if level != DEFAULT_THINKING_LEVEL:
+            _log.warning(
+                "vertex generate empty at thinking=%s; retrying at %s",
+                level,
+                DEFAULT_THINKING_LEVEL,
+            )
+            time.sleep(_RETRY_SLEEP_SEC)
+            return _call(DEFAULT_THINKING_LEVEL)
+        raise
 
 
 class GenerationEmptyError(RuntimeError):
@@ -235,6 +287,7 @@ def _extract_response_text(response: Any) -> str:
         safety = getattr(candidate, "safety_ratings", None)
         content = getattr(candidate, "content", None)
         parts = getattr(content, "parts", None) or []
+        n_parts, n_thought, n_text = _part_counts(parts)
         texts: list[str] = []
         for part in parts:
             if getattr(part, "thought", False):
@@ -247,19 +300,28 @@ def _extract_response_text(response: Any) -> str:
             if joined:
                 return joined
         _log.warning(
-            "vertex candidate empty text finish_reason=%s safety=%s",
+            "vertex candidate empty text finish_reason=%s safety=%s "
+            "n_parts=%s n_thought_parts=%s n_text_parts=%s prompt_feedback=%s",
             finish_name,
             safety,
+            n_parts,
+            n_thought,
+            n_text,
+            getattr(response, "prompt_feedback", None),
         )
 
-    try:
-        text = (response.text or "").strip()
-    except (ValueError, AttributeError):
-        text = ""
-    if text:
-        return text
+    # Do not fall back to ``response.text`` after walking candidates: it can
+    # include thought parts that we just stripped.
+    if not saw_candidate:
+        try:
+            text = (response.text or "").strip()
+        except (ValueError, AttributeError):
+            text = ""
+        if text:
+            return text
 
     finish_name = _finish_reason_name(last_finish)
+    prompt_feedback = getattr(response, "prompt_feedback", None)
     if saw_candidate and _is_max_tokens_finish(last_finish):
         raise GenerationEmptyError(
             f"generation_empty: finish_reason={finish_name} (MAX_TOKENS)",
@@ -270,5 +332,20 @@ def _extract_response_text(response: Any) -> str:
             f"generation_empty: finish_reason={finish_name}",
             finish_reason=last_finish,
         )
-    _log.warning("vertex response had no candidates and no .text")
+    _log.warning(
+        "vertex response had no candidates and no .text prompt_feedback=%s",
+        prompt_feedback,
+    )
     raise GenerationEmptyError("generation_empty: no candidates")
+
+
+def _part_counts(parts: list[Any]) -> tuple[int, int, int]:
+    n_parts = len(parts)
+    n_thought = 0
+    n_text = 0
+    for part in parts:
+        if getattr(part, "thought", False):
+            n_thought += 1
+        elif (getattr(part, "text", "") or "").strip():
+            n_text += 1
+    return n_parts, n_thought, n_text

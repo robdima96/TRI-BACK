@@ -167,7 +167,7 @@ def test_forced_factor_ask_round_trip_no_does_not_fill_slot():
         return_value=enrichment,
     ) as mocked:
         out = enrich_checklist_node(asked)
-        assert mocked.call_count == 0
+        assert mocked.call_count == 1
 
     assert (out.get("factor_states") or {}).get("Saddle anaesthesia") == "denied"
     assert not any(row.get("kind") == "palliative" for row in out["clinical_checklist"])

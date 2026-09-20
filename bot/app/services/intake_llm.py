@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 
@@ -212,3 +213,53 @@ def generate_intake_question(
     except Exception as exc:
         _log.exception("intake LLM failed: %s", exc)
         return fallback, f"template_fallback:{reason}"
+
+
+REPHRASE_MAX_NEW_TOKENS = 512
+_REPHRASE_SCHEMA: dict = {
+    "type": "OBJECT",
+    "properties": {"text": {"type": "STRING"}},
+    "required": ["text"],
+}
+
+
+def rephrase_assistant_text(text: str) -> str | None:
+    """Rewrite an intake assistant bubble; keep the same clinical ask. None on failure."""
+    original = (text or "").strip()
+    if not original:
+        return None
+    if not generator_model_configured():
+        return None
+    prompt = (
+        "Rewrite the following musculoskeletal screening message in concise, "
+        "plain English.\n"
+        "Keep the same clinical meaning and the same question topic. "
+        "Do not add a new question, a diagnosis, triage advice, or extra facts.\n"
+        "If the message has a short preamble then a question, keep that shape.\n"
+        "Output only the rewritten message.\n\n"
+        f"Original:\n{original}\n"
+    )
+    try:
+        raw = generate_from_messages(
+            [{"role": "user", "content": prompt}],
+            max_new_tokens=REPHRASE_MAX_NEW_TOKENS,
+            temperature=0.3,
+            response_mime_type="application/json",
+            response_schema=_REPHRASE_SCHEMA,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("rephrase LLM failed: %s", exc)
+        return None
+    payload = None
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        cleaned = raw.strip()
+        if cleaned:
+            return cleaned
+        return None
+    if isinstance(payload, dict):
+        rewritten = str(payload.get("text") or "").strip()
+        return rewritten or None
+    return None
+

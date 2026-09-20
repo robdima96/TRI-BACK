@@ -139,6 +139,8 @@ def agentic_disposition_node(state: ChatState) -> ChatState:
 
     state["draft_response"] = final_text
     state["generator_failed"] = False
+    state["generator_failure_kind"] = None
+    state["canned_dormant"] = False
 
     used_ids = list(agent_trace.used_chunk_ids)
     if used_ids:
@@ -268,6 +270,7 @@ def _insufficient_info_disposition(
     state["disposition_brief"] = brief
     state["draft_response"] = INSUFFICIENT_INFO_TEXT
     state["generator_failed"] = False
+    state["generator_failure_kind"] = None
     state["agent_trace"] = {
         "status": "skipped",
         "stop_reason": "insufficient_info_time_critical",
@@ -292,7 +295,7 @@ def _deterministic_fallback(
     """Run deterministic disposition only after the independent agent fails."""
     from app.config import settings
     from app.services.disposition_brief import build_disposition_brief_from_state
-    from app.services.generator import generate_response, is_generator_system_failure
+    from app.services.generator import generate_response_result, is_generator_system_failure
     from app.services.rag.evidence_builder import build_generator_evidence
 
     fallback_log = dict(agent_trace or {})
@@ -340,7 +343,7 @@ def _deterministic_fallback(
     brief = build_disposition_brief_from_state(state)
     state["disposition_brief"] = brief
 
-    draft = generate_response(
+    draft, kind = generate_response_result(
         query,
         evidence,
         conversation_history=history,
@@ -349,6 +352,7 @@ def _deterministic_fallback(
     )
     state["draft_response"] = draft
     state["generator_failed"] = is_generator_system_failure(draft)
+    state["generator_failure_kind"] = kind
     state["agent_trace"] = fallback_log
     _log.warning("agentic disposition used deterministic fallback: %s", stop_reason)
     return state

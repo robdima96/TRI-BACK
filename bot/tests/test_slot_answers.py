@@ -306,3 +306,28 @@ def test_existing_provocative_kept_when_severity_severe():
     provoc = [r for r in closed if r.get("label") == "provocative"]
     assert len(provoc) == 1
     assert provoc[0]["text"] == "worse when sitting"
+
+
+def test_drop_this_turn_age_row_leaves_prior_rows():
+    from app.orchestrator.slot_answers import drop_this_turn_rows_for_slot
+
+    prior = [
+        {"id": "cl_sx", "text": "low back pain", "kind": "ner_entity", "source": "profile", "label": "symptom"},
+    ]
+    current = prior + [
+        {"id": "cl_age", "text": "148", "kind": "demographic", "source": "slot_answer", "label": "age"},
+    ]
+    dropped = drop_this_turn_rows_for_slot(current, prior_checklist=prior, slot="age")
+    assert not any(r.get("label") == "age" for r in dropped)
+    assert dropped[0]["id"] == "cl_sx"
+
+
+def test_drop_this_turn_keeps_prior_age():
+    from app.orchestrator.slot_answers import drop_this_turn_rows_for_slot
+
+    prior = [
+        {"id": "cl_age", "text": "47", "kind": "demographic", "source": "pattern", "label": "age"},
+    ]
+    current = list(prior)
+    dropped = drop_this_turn_rows_for_slot(current, prior_checklist=prior, slot="age")
+    assert dropped[0]["text"] == "47"

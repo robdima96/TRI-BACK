@@ -11,8 +11,8 @@ INTAKE_PHASE = "intake"
 DORMANT_PHASE = "dormant"
 
 DORMANT_REPLY = (
-    "I was built to help you navigate the healthcare system. "
-    "Have your symptoms changed?"
+    "I was built to help you navigate the healthcare system - I cannot provide a medical diagnosis."
+    "If your symptoms have changed, please let me know in the chat."
 )
 
 _SYMPTOM_KINDS = frozenset(

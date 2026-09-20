@@ -79,3 +79,17 @@ class ChatResponse(BaseModel):
     clinical_checklist: list[dict] = Field(default_factory=list)
     extraction_history: list[dict] = Field(default_factory=list)
     turn_extraction: dict | None = None
+
+
+class RephraseRequest(BaseModel):
+    session_id: str
+    message_id: str
+
+
+class RephraseResponse(BaseModel):
+    session_id: str
+    message_id: str
+    response: str
+    questions_asked: int = 0
+    question_mode: bool = True
+    rephrased: bool = True

@@ -10,13 +10,17 @@ from typing import Any
 from app.config import settings
 from app.schemas import Evidence
 from app.services import generator_backends
+from app.services.generator_backends import (
+    GenerationEmptyError,
+    vertex_location_problem,
+)
 from app.services.vertex_auth import vertex_adc_status
 
 _log = logging.getLogger(__name__)
 
 # Sized to cover Gemini thinking tokens + visible output (see agent.py note).
 DISPOSITION_MAX_NEW_TOKENS = 4096
-DISPOSITION_THINKING_LEVEL = "MEDIUM"
+DISPOSITION_THINKING_LEVEL = "MINIMAL"
 
 # Non-clinical copy when the generator backend is down. Must never look like a
 # triage recommendation. Policy gate marks escalated + system_failure reason.
@@ -85,6 +89,8 @@ def generator_model_configured() -> bool:
     if backend == "vertex":
         if not (settings.vertex_project_id and settings.vertex_location):
             return False
+        if vertex_location_problem(settings.vertex_location):
+            return False
         adc_ok, _ = vertex_adc_status()
         return adc_ok
     return False
@@ -100,6 +106,9 @@ def generator_status_detail() -> str:
     if backend == "vertex":
         if not (settings.vertex_project_id and settings.vertex_location):
             return "TRI_BACK_VERTEX_PROJECT_ID or TRI_BACK_VERTEX_LOCATION not set"
+        location_problem = vertex_location_problem(settings.vertex_location)
+        if location_problem:
+            return location_problem
         adc_ok, adc_detail = vertex_adc_status()
         base = (
             f"vertex: {settings.generator_model} @ "
@@ -279,14 +288,42 @@ def generate_response(
     disposition_brief: dict[str, Any] | None = None,
 ) -> str:
     """Generate a draft with the configured backend, or a system-failure stub."""
+    text, _kind = generate_response_result(
+        query,
+        evidence,
+        conversation_history=conversation_history,
+        intake_summary=intake_summary,
+        disposition_brief=disposition_brief,
+    )
+    return text
+
+
+def generate_response_result(
+    query: str,
+    evidence: list[Evidence],
+    *,
+    conversation_history: list[dict[str, str]] | None = None,
+    intake_summary: str | None = None,
+    disposition_brief: dict[str, Any] | None = None,
+) -> tuple[str, str | None]:
+    """Like :func:`generate_response`, plus ``generator_failure_kind``.
+
+    Kind is ``None`` on success. Failures are ``empty``, ``echo``, ``error``,
+    or ``not_configured``. Patient-facing copy is always the same stub.
+    """
     from app.services.disposition_brief import decline_to_advise_text
 
     canned = decline_to_advise_text(disposition_brief)
     if canned:
-        return canned
+        return canned, None
 
     if not generator_model_configured():
-        return _generator_unavailable_stub(query, evidence, conversation_history)
+        return (
+            _generator_unavailable_stub(
+                query, evidence, conversation_history, kind="not_configured"
+            ),
+            "not_configured",
+        )
 
     try:
         ev: list[dict[str, Any]] = [e.model_dump() for e in evidence]
@@ -306,26 +343,52 @@ def generate_response(
         text = extract_answer_text(raw)
         if not text.strip():
             _log.warning("generator returned empty text; treating as system failure")
-            return _generator_unavailable_stub(query, evidence, conversation_history)
+            return (
+                _generator_unavailable_stub(
+                    query, evidence, conversation_history, kind="empty"
+                ),
+                "empty",
+            )
         if looks_like_instruction_echo(text):
             _log.warning("generator echoed prompt scaffolding; treating as system failure")
-            return _generator_unavailable_stub(query, evidence, conversation_history)
-        return text
+            return (
+                _generator_unavailable_stub(
+                    query, evidence, conversation_history, kind="echo"
+                ),
+                "echo",
+            )
+        return text, None
+    except GenerationEmptyError as e:
+        _log.exception("%s generate empty: %s", generator_backend(), e)
+        return (
+            _generator_unavailable_stub(
+                query, evidence, conversation_history, kind="empty"
+            ),
+            "empty",
+        )
     except Exception as e:
         _log.exception("%s generate failed: %s", generator_backend(), e)
-        return _generator_unavailable_stub(query, evidence, conversation_history)
+        return (
+            _generator_unavailable_stub(
+                query, evidence, conversation_history, kind="error"
+            ),
+            "error",
+        )
 
 
 def _generator_unavailable_stub(
     query: str,
     evidence: list[Evidence],
     conversation_history: list[dict[str, str]] | None,
+    *,
+    kind: str = "error",
 ) -> str:
     source_label = evidence[0].source if evidence else "no-source"
     prior_turns = len(conversation_history) if conversation_history else 0
     _log.warning(
         "generator unavailable; emitting system-failure copy "
-        "(source=%r, query=%r, prior_turns=%s)",
+        "(kind=%s, source=%r, query=%r, prior_turns=%s)",
+        kind,
         source_label,
         query[:120],
         prior_turns,

@@ -222,8 +222,8 @@ def test_agentic_failure_runs_clearly_logged_deterministic_fallback(monkeypatch)
             return_value=deterministic,
         ) as traverse,
         patch(
-            "app.services.generator.generate_response",
-            return_value="Deterministic fallback response.",
+            "app.services.generator.generate_response_result",
+            return_value=("Deterministic fallback response.", None),
         ),
     ):
         result = agentic_disposition_node(state)

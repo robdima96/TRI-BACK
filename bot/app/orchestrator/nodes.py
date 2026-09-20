@@ -3,8 +3,14 @@ from langchain_core.messages import AIMessage, HumanMessage
 import logging
 
 from app.orchestrator.checklist import ensure_checklist_ids, merge_checklist_items
-from app.session_enrichment import append_turn_extraction, build_turn_extraction_record
+from app.session_enrichment import (
+    append_turn_extraction,
+    build_turn_extraction_record,
+    hide_participant_graphs,
+)
 from app.services.intake_enricher import (
+    SLOT_REPLY_UNUSABLE,
+    UNUSABLE_REPLY_PREFIX,
     IntakeEnrichmentResult,
     propose_checklist_enrichment,
 )
@@ -17,7 +23,7 @@ from app.orchestrator.coverage import (
 
 )
 
-from app.orchestrator.messages import conversation_history_before_last_user
+from app.orchestrator.messages import conversation_history_before_last_user, user_message_count
 
 from app.orchestrator.question_planner import plan_forced_factor_question, plan_next_question
 
@@ -32,6 +38,7 @@ from app.orchestrator.dormant import (
 from app.orchestrator.slot_answers import (
     close_provocative_if_severity_severe,
     credit_volunteered_slots,
+    drop_this_turn_rows_for_slot,
 )
 
 from app.orchestrator.factor_answers import (
@@ -146,6 +153,8 @@ def encode_input_node(state: ChatState) -> ChatState:
 
     analysis = classify_utterance(state.get("message") or state.get("message_normalized") or "")
     state["utterance_analysis"] = analysis.to_dict()
+    # Per-turn flag; must not stick in the checkpoint from a prior canned reply.
+    state["canned_dormant"] = False
 
     return state
 
@@ -166,7 +175,7 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
     msgs = state.get("messages") or []
     history = conversation_history_before_last_user(msgs)
     extraction_history = state.get("extraction_history") or []
-    turn_index = len(extraction_history) + 1
+    turn_index = user_message_count(msgs) or (len(extraction_history) + 1)
     latest_message = state.get("message_normalized", "") or state.get("message", "")
     last_asked = state.get("last_asked_slot")
     asked_factor = state.get("asked_factor")
@@ -198,11 +207,11 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
             query_embedding=state.get("encoder_pooled_embedding"),
         )
 
-    run_enricher = analysis.has_statement or (
-        analysis.has_polarity and not asked_factor and not analysis.has_question
-    )
+    run_enricher = analysis.has_statement or analysis.has_polarity
     if run_enricher:
-        statement_text = " ".join(analysis.statement_spans).strip() or latest_message
+        statement_text = " ".join(analysis.statement_spans).strip()
+        if not statement_text:
+            statement_text = " ".join(analysis.polarity_spans).strip() or latest_message
         enrichment = propose_checklist_enrichment(
             checklist=encoder_merged,
             conversation_history=history,
@@ -245,6 +254,9 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
     else:
         state["patient_question_brief"] = None
 
+    state["slot_reply"] = enrichment.slot_reply
+    state["intake_ack"] = None if state.get("patient_question_brief") else enrichment.intake_ack
+
     final_checklist = ensure_checklist_ids([dict(x) for x in encoder_merged])
     if enrichment.resulting_checklist is not None:
         # Trusted post-filter snapshot (adds / modifies / deletes already validated).
@@ -258,6 +270,20 @@ def enrich_checklist_node(state: ChatState) -> ChatState:
         state["clinical_checklist"] = final_checklist
     else:
         state["clinical_checklist"] = final_checklist
+
+    if (
+        enrichment.llm_ran
+        and enrichment.slot_reply == SLOT_REPLY_UNUSABLE
+        and topic_slot
+        and not asked_factor
+    ):
+        final_checklist = drop_this_turn_rows_for_slot(
+            final_checklist,
+            prior_checklist=prior_turn,
+            slot=topic_slot,
+        )
+        state["clinical_checklist"] = final_checklist
+        state["intake_ack"] = None
 
     final_checklist = close_provocative_if_severity_severe(final_checklist)
     state["clinical_checklist"] = final_checklist
@@ -478,8 +504,17 @@ def generate_question_node(state: ChatState) -> ChatState:
 
     )
     brief = (state.get("patient_question_brief") or "").strip()
+    ack = (state.get("intake_ack") or "").strip()
     if brief:
         text = f"{brief} {text}".strip()
+        state["next_question"] = text
+        state["intake_ack"] = None
+    elif state.get("slot_reply") == SLOT_REPLY_UNUSABLE:
+        text = f"{UNUSABLE_REPLY_PREFIX} {text}".strip()
+        state["next_question"] = text
+        state["intake_ack"] = None
+    elif ack:
+        text = f"{ack} {text}".strip()
         state["next_question"] = text
 
     state["final_response"] = text
@@ -507,6 +542,12 @@ def generate_question_node(state: ChatState) -> ChatState:
     state["escalated"] = False
 
     state["safety_reason"] = None
+
+    state["generator_failed"] = False
+
+    state["generator_failure_kind"] = None
+
+    state["canned_dormant"] = False
 
     # Clear in-memory LangGraph state for this question turn. Session JSON
     # merge preserves prior disposition_history / latest disposition snapshots.
@@ -658,7 +699,7 @@ def graph_traversal_node(state: ChatState) -> ChatState:
 def generate_draft_node(state: ChatState) -> ChatState:
 
     from app.services.disposition_brief import build_disposition_brief_from_state
-    from app.services.generator import generate_response, is_generator_system_failure
+    from app.services.generator import generate_response_result, is_generator_system_failure
 
     msgs = state.get("messages") or []
 
@@ -669,7 +710,7 @@ def generate_draft_node(state: ChatState) -> ChatState:
     brief = build_disposition_brief_from_state(state)
     state["disposition_brief"] = brief
 
-    draft = generate_response(
+    draft, kind = generate_response_result(
 
         state["message_normalized"],
 
@@ -686,6 +727,10 @@ def generate_draft_node(state: ChatState) -> ChatState:
     state["draft_response"] = draft
 
     state["generator_failed"] = is_generator_system_failure(draft)
+
+    state["generator_failure_kind"] = kind
+
+    state["canned_dormant"] = False
 
     return state
 
@@ -713,9 +758,13 @@ def policy_gate_node(state: ChatState) -> ChatState:
 
     state["final_response"] = final_response
 
-    if state.get("risk_hits") or not state.get("question_mode"):
+    if state.get("risk_hits") or (
+        not state.get("question_mode") and not state.get("generator_failed")
+    ):
         state["question_mode"] = False
         state["session_phase"] = DORMANT_PHASE
+    elif state.get("generator_failed"):
+        state["session_phase"] = INTAKE_PHASE
 
     return state
 
@@ -723,11 +772,14 @@ def policy_gate_node(state: ChatState) -> ChatState:
 def dormant_reply_node(state: ChatState) -> ChatState:
     """Canned post-disposition reply; skip enricher / planner / RAG / generator."""
     state["session_phase"] = DORMANT_PHASE
+    state["canned_dormant"] = True
     state["question_mode"] = False
     state["final_response"] = DORMANT_REPLY
     state["draft_response"] = DORMANT_REPLY
     state["escalated"] = False
     state["safety_reason"] = None
+    state["generator_failed"] = False
+    state["generator_failure_kind"] = None
     state["evidence"] = []
     state["next_question"] = None
     state["slot_being_asked"] = None
@@ -743,7 +795,7 @@ def dormant_reply_node(state: ChatState) -> ChatState:
 def finalize_response_node(state: ChatState) -> dict:
 
     out: dict = {"messages": [AIMessage(content=state["final_response"])]}
-    if not state.get("question_mode"):
+    if not hide_participant_graphs(state):
         from app.config import settings
 
         if settings.graphrag_load:

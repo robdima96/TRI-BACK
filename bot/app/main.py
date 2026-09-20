@@ -9,13 +9,14 @@ from app.config import validate_retrieval_paths
 from app.readiness import readiness_payload
 from app.orchestrator.checkpointing import close_checkpointer, get_checkpointer
 from app.orchestrator.graph import build_chat_graph
-from app.orchestrator.messages import transcript_from_messages
-from app.schemas import ChatRequest, ChatResponse
+from app.orchestrator.messages import transcript_from_messages, user_message_count
+from app.schemas import ChatRequest, ChatResponse, RephraseRequest, RephraseResponse
 from app.session_enrichment import (
     build_disposition_record,
     build_intake_record,
     build_orchestrator_snapshot,
     exposed_chat_graph_fields,
+    hide_participant_graphs,
 )
 from app.session_store import save_session
 from app.orchestrator.session_resume import maybe_resume_from_session
@@ -84,14 +85,11 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
     # JSON snapshot for logging / auditing (in addition to LangGraph checkpoints).
     extraction_history = list(state.get("extraction_history") or [])
     turn_extraction = extraction_history[-1] if extraction_history else None
-    turn_index = int(
-        (turn_extraction or {}).get("turn_index")
-        or len(extraction_history)
-        or 1
-    )
     transcript = transcript_from_messages(state["messages"])
+    turn_index = user_message_count(transcript) or 1
     graph_trace, intake_trace = exposed_chat_graph_fields(state)
-    factor_audit = state.get("factor_matching_audit")
+    hide_graphs = hide_participant_graphs(state)
+    factor_audit = None if hide_graphs else state.get("factor_matching_audit")
     orchestrator = build_orchestrator_snapshot(state, turn_index=turn_index)
     disposition = build_disposition_record(state, turn_index=turn_index)
     intake = build_intake_record(state, turn_index=turn_index)
@@ -127,11 +125,47 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
         coverage_ready=bool(coverage.get("ready_for_disposition")),
         graph_traversal=graph_trace,
         intake_traversal=intake_trace,
-        matched_factors=list(state.get("matched_factors") or []),
-        candidate_conditions=list(state.get("candidate_conditions") or []),
-        traversed_chunk_ids=list(state.get("traversed_chunk_ids") or []),
+        matched_factors=[] if hide_graphs else list(state.get("matched_factors") or []),
+        candidate_conditions=[] if hide_graphs else list(state.get("candidate_conditions") or []),
+        traversed_chunk_ids=[] if hide_graphs else list(state.get("traversed_chunk_ids") or []),
         factor_matching_audit=factor_audit,
         clinical_checklist=list(state.get("clinical_checklist") or []),
         extraction_history=extraction_history,
         turn_extraction=turn_extraction,
+    )
+
+
+@app.post(
+    "/api/v1/rephrase",
+    response_model=RephraseResponse,
+    dependencies=[Depends(require_bot_api_key)],
+)
+def rephrase(req: RephraseRequest, request: Request) -> RephraseResponse:
+    if not req.session_id.strip() or not req.message_id.strip():
+        raise HTTPException(status_code=400, detail="session_id and message_id are required")
+
+    sid = req.session_id.strip()
+    enforce_chat_rate_limit(request, sid)
+    from app.services.rephrase import rephrase_session_message
+
+    outcome = rephrase_session_message(
+        session_id=sid,
+        message_id=req.message_id.strip(),
+        graph=chat_graph,
+    )
+    if outcome.status == "not_found":
+        raise HTTPException(status_code=404, detail="message not found")
+    if outcome.status == "already":
+        raise HTTPException(status_code=409, detail="message already rephrased")
+    if outcome.status == "not_question":
+        raise HTTPException(status_code=400, detail="only intake questions can be rephrased")
+    if outcome.status != "ok":
+        raise HTTPException(status_code=503, detail="rephrase unavailable")
+    return RephraseResponse(
+        session_id=sid,
+        message_id=req.message_id.strip(),
+        response=outcome.response,
+        questions_asked=outcome.questions_asked,
+        question_mode=outcome.question_mode,
+        rephrased=True,
     )

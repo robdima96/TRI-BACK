@@ -72,9 +72,31 @@ ENRICHMENT_RESPONSE_SCHEMA: dict[str, Any] = {
             "type": "STRING",
             "nullable": True,
         },
+        "slot_reply": {
+            "type": "STRING",
+            "nullable": True,
+        },
+        "intake_ack": {
+            "type": "STRING",
+            "nullable": True,
+        },
     },
     "required": ["summary_reason", "checklist_operations"],
 }
+
+SLOT_REPLY_ACCEPTED = "accepted"
+SLOT_REPLY_UNUSABLE = "unusable"
+SLOT_REPLY_EMPTY = "empty"
+SLOT_REPLY_NOT_APPLICABLE = "not_applicable"
+_ALLOWED_SLOT_REPLIES: frozenset[str] = frozenset(
+    {
+        SLOT_REPLY_ACCEPTED,
+        SLOT_REPLY_UNUSABLE,
+        SLOT_REPLY_EMPTY,
+        SLOT_REPLY_NOT_APPLICABLE,
+    }
+)
+UNUSABLE_REPLY_PREFIX = "Sorry, I didn't understand that."
 
 _JSON_FENCE_RE = re.compile(
     r"```(?:json)?\s*([\s\S]*?)\s*```",
@@ -225,6 +247,8 @@ class IntakeEnrichmentResult:
     next_slot: SlotName | None = None
     asked_factor_reply: str | None = None
     patient_answer: str | None = None
+    slot_reply: str | None = None
+    intake_ack: str | None = None
     # Set when the model proposes next_intake that skips a still-missing higher
     # priority gap after ops (does not invent checklist rows).
     consistency_warning: dict[str, Any] | None = None
@@ -252,6 +276,8 @@ class IntakeEnrichmentResult:
             "next_slot": self.next_slot,
             "asked_factor_reply": self.asked_factor_reply,
             "patient_answer": self.patient_answer,
+            "slot_reply": self.slot_reply,
+            "intake_ack": self.intake_ack,
             "proposed": [op.to_log_dict() for op in self.proposed],
             "applied": [checklist_item_dict(item) for item in self.applied],
             "modified": list(self.modified),
@@ -821,6 +847,30 @@ def _parse_patient_answer(payload: dict[str, Any]) -> str | None:
     return value
 
 
+def _parse_slot_reply(payload: dict[str, Any]) -> str | None:
+    raw = payload.get("slot_reply")
+    if raw is None:
+        return None
+    value = str(raw).strip().casefold()
+    if value in {"", "null", "none"}:
+        return None
+    if value in _ALLOWED_SLOT_REPLIES:
+        return value
+    return None
+
+
+def _parse_intake_ack(payload: dict[str, Any], *, patient_answer: str | None) -> str | None:
+    if patient_answer:
+        return None
+    raw = payload.get("intake_ack")
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    if not value or value.casefold() in {"null", "none"}:
+        return None
+    return value
+
+
 def _format_last_exchange_block(
     *,
     last_assistant_message: str,
@@ -915,10 +965,12 @@ def _build_enrichment_messages(
     instruction = (
         "You are a careful overseer of a structured clinical intake checklist for a "
         "musculoskeletal triage chatbot.\n\n"
-        "In ONE response you must (1) maintain the checklist, (2) draft the next "
-        "intake question if coverage will still be incomplete after your updates, "
-        "and (3) if the patient asked a clarifying question, write patient_answer "
-        "from the knowledge-graph packet only. "
+        "In ONE response you must (1) maintain the checklist, (2) judge whether the "
+        "latest patient reply is a usable answer to the last asked floor slot, "
+        "(3) draft the next intake question if coverage will still be incomplete after "
+        "your updates, (4) if the patient asked a clarifying question, write "
+        "patient_answer from the knowledge-graph packet only, and (5) if they did not "
+        "ask a question and the slot answer is usable, write intake_ack. "
         "Do not map findings onto inventory graph Factors — matching is not your job.\n\n"
         "Read the last exchange, existing checklist, coverage gaps, prior factor "
         "states, and the latest patient message. Prior turns are already captured on "
@@ -939,7 +991,28 @@ def _build_enrichment_messages(
         "duration, age, sex, or comorbidities, and the patient answers nothing / none / "
         "n/a / I don't know / no, add a row for THAT slot with text N/A so coverage "
         "closes (comorbidities: kind=comorbidity, label=comorbidity). "
+        "Set slot_reply to empty. "
         "Do not modify or delete an existing N/A row; leave the text as N/A.\n"
+        "- Usable slot answers: only add or keep a floor-slot value a clinician would "
+        "use. Ordinary ages are about 18–120 years. Accept ordinary sex/identity, "
+        "comorbidities or a clear none, quality/severity/duration, and "
+        "provocative/palliative facts.\n"
+        "- Unusable slot answers (set slot_reply to unusable): impossible values "
+        "(age 205, age 148, severity 25 on a 0–10 scale), nonsense (fewofhowlvc), "
+        "digit salad (123456 when age or severity was asked), or off-topic replies "
+        "that do not answer the slot. Do NOT add those as checklist rows. DELETE any "
+        "encoder or free-text rows just created for that slot. Leave the slot "
+        "unanswered. Draft next_intake for THAT SAME slot (a re-ask). Do not close "
+        "coverage with N/A on gibberish.\n"
+        "- Set slot_reply to accepted when the last asked floor slot received a usable "
+        "answer; empty for I don't know / none / n/a; not_applicable or null when no "
+        "floor slot was being answered (for example a graph factor was asked).\n"
+        "- intake_ack: when slot_reply is accepted and the patient did not ask a "
+        "question, write ONE short sentence that shows the information was received "
+        "(paraphrase the fact; not a diagnosis; not a triage recommendation). "
+        "Set intake_ack to null when patient_answer is set, when slot_reply is "
+        "unusable (the app will say it did not understand), and when no floor-slot "
+        "answer was received.\n"
         "- Pattern extractors and GliNER often miss or mislabel facts. If the patient "
         "clearly stated something clinically relevant in the last exchange and it is "
         "not already on the checklist with the correct kind/label, you MUST add or "
@@ -1028,7 +1101,9 @@ def _build_enrichment_messages(
         "  ],\n"
         '  "next_intake": {"slot": "age", "question": "How old are you?"},\n'
         '  "asked_factor_reply": "not_answered",\n'
-        '  "patient_answer": null\n'
+        '  "patient_answer": null,\n'
+        '  "slot_reply": "accepted",\n'
+        '  "intake_ack": null\n'
         "}\n"
         "Use an empty checklist_operations list when no checklist changes are needed.\n"
         "Set comorbidities_acknowledged to true when the patient denies other health "
@@ -1038,7 +1113,10 @@ def _build_enrichment_messages(
         "Use not_answered or null when Last graph factor asked is (none) or the "
         "patient did not answer that factor.\n"
         "Set patient_answer to 1-3 graph-packet sentences when the patient asked a "
-        "clarifying question; otherwise null."
+        "clarifying question; otherwise null.\n"
+        "Set slot_reply to accepted | unusable | empty | not_applicable | null.\n"
+        "Set intake_ack to one short received-information sentence when the slot "
+        "answer is usable and the patient did not ask a question; otherwise null."
     )
     return [{"role": "user", "content": instruction}]
 
@@ -1125,6 +1203,8 @@ def propose_checklist_enrichment(
     next_question, next_slot = _parse_next_intake(payload)
     asked_factor_reply = _parse_asked_factor_reply(payload)
     patient_answer = _parse_patient_answer(payload)
+    slot_reply = _parse_slot_reply(payload)
+    intake_ack = _parse_intake_ack(payload, patient_answer=patient_answer)
     raw_ops = _collect_raw_operations(payload)
     proposed: list[ChecklistOperation] = []
     invalid_count = 0
@@ -1177,6 +1257,8 @@ def propose_checklist_enrichment(
         next_slot=next_slot,
         asked_factor_reply=asked_factor_reply,
         patient_answer=patient_answer,
+        slot_reply=slot_reply,
+        intake_ack=intake_ack,
         consistency_warning=consistency_warning,
         raw_response=raw[:2000],
     )

@@ -274,23 +274,7 @@ def run_disposition_agent(
     final = ""
     if isinstance(obj, dict) and "final_answer" in obj:
         final = str(obj.get("final_answer") or "").strip()
-    if not final:
-        # Oddly wrapped JSON / prose: still prefer any usable forced-final text
-        # over another full generate_response call in the node.
-        final = extract_answer_text(raw)
-    final = extract_answer_text(final)
-    if not final and isinstance(raw, str) and raw.strip():
-        # Last resort: keep non-empty forced-final output (strip fences/noise).
-        stripped = raw.strip()
-        if stripped.startswith("```"):
-            fence = _JSON_FENCE_RE.search(stripped)
-            stripped = (fence.group(1) if fence else stripped).strip()
-        if len(stripped) >= 20:
-            final = stripped
-            _log.info(
-                "agent forced-final: using raw usable text (%d chars) despite parse gaps",
-                len(final),
-            )
+        final = extract_answer_text(final)
     if not final:
         trace.status = "fallback"
         trace.stop_reason = "no_final_after_budget"

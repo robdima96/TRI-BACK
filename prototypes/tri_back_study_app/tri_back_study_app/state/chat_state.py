@@ -53,6 +53,8 @@ def _messages_to_session(messages: list[ChatMessageItem]) -> list[dict]:
                     "rating": m["feedback_rating"] or None,
                     "rated_at": None,
                 },
+                "question_mode": bool(m.get("question_mode")),
+                "rephrased": bool(m.get("rephrased")),
             }
         )
     return out
@@ -76,6 +78,8 @@ def _session_messages_to_chat(items: list[dict] | None) -> list[ChatMessageItem]
                 has_graph=bool(raw.get("has_graph")) or bool(graph_json),
                 citations=normalize_citations(raw.get("citations")),
                 feedback_rating=str(feedback.get("rating") or ""),
+                question_mode=bool(raw.get("question_mode")),
+                rephrased=bool(raw.get("rephrased")),
             )
         )
     return out
@@ -308,6 +312,7 @@ class ChatState(AuthState):
                 graph_json=result.graph_json or "",
                 has_graph=result.has_graph,
                 citations=normalize_citations(result.citations),
+                question_mode=bool(result.question_mode),
             )
             self.messages = [*self.messages, assistant]
             self.turn_count = turn_index + 1
@@ -398,3 +403,58 @@ class ChatState(AuthState):
                 exc_info=True,
             )
         self.error = ""
+
+    @rx.event(background=True)
+    async def rephrase_message(self, message_id: str):
+        async with self:
+            if not self._ensure_authenticated():
+                self.error = "Session expired. Please log in again."
+                return
+            if self.loading:
+                return
+            target = None
+            for msg in self.messages:
+                if msg["message_id"] == message_id:
+                    target = msg
+                    break
+            if target is None or target.get("rephrased") or not target.get("question_mode"):
+                return
+            self.loading = True
+            self.error = ""
+            session_id = self.session_id
+            group_id = self.group_id
+
+        try:
+            adapter = get_presentation_adapter(group_id)
+            result = await adapter.rephrase_message(session_id, message_id)
+        except Exception as exc:
+            async with self:
+                self.error = f"Could not rephrase that question: {exc}"
+                self.loading = False
+            return
+
+        async with self:
+            updated: list[ChatMessageItem] = []
+            for msg in self.messages:
+                if msg["message_id"] == message_id:
+                    updated.append(
+                        {
+                            **msg,
+                            "content": result.response or msg["content"],
+                            "rephrased": True,
+                        }
+                    )
+                else:
+                    updated.append(msg)
+            self.messages = updated
+            try:
+                save_session(session_id, messages=_messages_to_session(self.messages))
+            except OSError:
+                logging.getLogger(__name__).warning(
+                    "rephrase overlay save failed session=%s message_id=%s",
+                    session_id,
+                    message_id,
+                    exc_info=True,
+                )
+            self.loading = False
+            self.error = ""

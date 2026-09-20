@@ -119,6 +119,8 @@ def merge_messages_preserving_study(
         "has_graph",
         "timestamp",
         "citations",
+        "rephrased",
+        "question_mode",
     )
 
     def _feedback_has_rating(fb: Any) -> bool:
@@ -131,6 +133,8 @@ def merge_messages_preserving_study(
         if index < len(old):
             cand = old[index]
             if _same_turn(cand, msg):
+                return cand
+            if cand.get("role") == msg.get("role") and cand.get("rephrased"):
                 return cand
         for cand in old:
             if _same_turn(cand, msg):
@@ -153,6 +157,9 @@ def merge_messages_preserving_study(
         prev = _find_prior(msg, i)
         if not prev:
             continue
+        if prev.get("rephrased") and prev.get("content"):
+            msg["content"] = prev["content"]
+            msg["rephrased"] = True
         for key in preserve_keys:
             if key == "feedback":
                 if not _feedback_has_rating(msg.get("feedback")) and _feedback_has_rating(

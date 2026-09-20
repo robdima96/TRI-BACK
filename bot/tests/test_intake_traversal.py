@@ -231,6 +231,20 @@ def test_policy_catalog_excludes_lbp_red_flags():
     assert reason is None
 
 
+def test_apply_policy_generator_failure_is_not_clinical_escalation():
+    from app.services.generator import (
+        GENERATOR_SYSTEM_FAILURE_REASON,
+        GENERATOR_SYSTEM_FAILURE_TEXT,
+    )
+
+    escalated, reason, text = apply_policy(
+        GENERATOR_SYSTEM_FAILURE_TEXT, [], generator_failed=True
+    )
+    assert escalated is False
+    assert reason == GENERATOR_SYSTEM_FAILURE_REASON
+    assert text == GENERATOR_SYSTEM_FAILURE_TEXT
+
+
 def test_affirmed_saddle_does_not_policy_escalate():
     """LBP red flags stay with the disposition model, not RISK_CATALOG."""
     from langchain_core.messages import HumanMessage

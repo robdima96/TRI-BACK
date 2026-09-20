@@ -20,7 +20,12 @@ def chat_message(msg: ChatMessageItem) -> rx.Component:
             rx.text(msg["content"]),
             reasoning_block(msg["reasoning_text"]),
             graph_block(msg["graph_json"], msg["message_id"]),
-            feedback_row(msg["message_id"], msg["feedback_rating"]),
+            feedback_row(
+                msg["message_id"],
+                msg["feedback_rating"],
+                msg["question_mode"],
+                msg["rephrased"],
+            ),
             class_name="bubble-assistant",
         ),
     )

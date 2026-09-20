@@ -449,6 +449,64 @@ def test_patient_answer_is_parsed_from_packet(mock_cfg, mock_gen):
 
 @patch("app.services.intake_enricher.generate_from_messages")
 @patch("app.services.intake_enricher.generator_model_configured", return_value=True)
+def test_slot_reply_and_intake_ack_parsed(mock_cfg, mock_gen):
+    mock_gen.return_value = json.dumps(
+        {
+            "summary_reason": "Recorded age.",
+            "comorbidities_acknowledged": False,
+            "checklist_operations": [
+                {
+                    "op": "add",
+                    "text": "47",
+                    "kind": "demographic",
+                    "label": "age",
+                    "reason": "Stated age.",
+                }
+            ],
+            "slot_reply": "accepted",
+            "intake_ack": "Thanks — I've noted you're 47.",
+            "patient_answer": None,
+            "next_intake": {"slot": "sex", "question": "What sex were you assigned at birth?"},
+        }
+    )
+    result = propose_checklist_enrichment(
+        checklist=[],
+        latest_user_message="I'm 47",
+        last_asked_slot="age",
+    )
+    assert result.slot_reply == "accepted"
+    assert result.intake_ack == "Thanks — I've noted you're 47."
+    prompt = mock_gen.call_args[0][0][0]["content"]
+    assert "slot_reply" in prompt
+    assert "intake_ack" in prompt
+    assert "unusable" in prompt
+
+
+@patch("app.services.intake_enricher.generate_from_messages")
+@patch("app.services.intake_enricher.generator_model_configured", return_value=True)
+def test_intake_ack_cleared_when_patient_answer_present(mock_cfg, mock_gen):
+    mock_gen.return_value = json.dumps(
+        {
+            "summary_reason": "Answered clarifying question.",
+            "checklist_operations": [],
+            "slot_reply": "accepted",
+            "intake_ack": "Thanks, noted.",
+            "patient_answer": "Severe pain is on this graph.",
+        }
+    )
+    result = propose_checklist_enrichment(
+        checklist=[],
+        latest_user_message="it's a dull ache, should I ice it?",
+        last_asked_slot="symptom_quality",
+        question_spans=["should I ice it?"],
+        graph_packet="Current graph factor: Severe pain",
+    )
+    assert result.patient_answer
+    assert result.intake_ack is None
+
+
+@patch("app.services.intake_enricher.generate_from_messages")
+@patch("app.services.intake_enricher.generator_model_configured", return_value=True)
 def test_enrichment_dedupes_existing_rows(mock_cfg, mock_gen):
     mock_gen.return_value = json.dumps(
         {

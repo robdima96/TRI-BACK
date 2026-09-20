@@ -99,6 +99,55 @@ def test_press_on_it_is_question_only_and_reasks_point_tenderness():
     assert "tender" in text.casefold() or "press" in text.casefold() or "spot" in text.casefold()
 
 
+def test_generate_question_prefixes_canned_sorry_on_unusable():
+    from app.services.intake_enricher import UNUSABLE_REPLY_PREFIX
+
+    gen = generate_question_node(
+        {
+            "next_question": "How old are you?",
+            "slot_being_asked": "age",
+            "slot_reply": "unusable",
+            "intake_ack": "Thanks — I've noted you're 148.",
+            "patient_question_brief": None,
+            "questions_asked": 1,
+        }
+    )
+    assert gen["final_response"].startswith(UNUSABLE_REPLY_PREFIX)
+    assert "How old are you?" in gen["final_response"]
+    assert "148" not in gen["final_response"]
+    assert gen["questions_asked"] == 2
+
+
+def test_generate_question_prefixes_ack_when_no_patient_question():
+    gen = generate_question_node(
+        {
+            "next_question": "What sex were you assigned at birth?",
+            "slot_being_asked": "sex",
+            "slot_reply": "accepted",
+            "intake_ack": "Thanks — I've noted you're 47.",
+            "patient_question_brief": None,
+            "questions_asked": 1,
+        }
+    )
+    assert gen["final_response"].startswith("Thanks — I've noted you're 47.")
+    assert "What sex" in gen["final_response"]
+
+
+def test_generate_question_drops_ack_when_answering_patient_question():
+    gen = generate_question_node(
+        {
+            "next_question": "How would you describe your pain?",
+            "slot_being_asked": "symptom_quality",
+            "slot_reply": "accepted",
+            "intake_ack": "Thanks — I've noted a dull ache.",
+            "patient_question_brief": "I can only use the screening topics in this tool.",
+            "questions_asked": 2,
+        }
+    )
+    assert gen["final_response"].startswith("I can only use the screening topics")
+    assert "I've noted" not in gen["final_response"]
+
+
 def test_mixed_severity_and_danger_question_captures_and_prefixes():
     enrichment = IntakeEnrichmentResult(
         status="applied",
@@ -171,6 +220,8 @@ def test_mixed_severity_and_danger_question_captures_and_prefixes():
     assert text.startswith(brief)
     assert planned.get("slot_being_asked") != "symptom_severity"
     assert "how severe" not in text.casefold()
+    assert out.get("intake_ack") is None
+    assert gen.get("intake_ack") is None
 
 
 def test_unpunctuated_oa_mixed_runs_enricher_on_statement_span():
@@ -234,21 +285,23 @@ def test_unpunctuated_oa_mixed_runs_enricher_on_statement_span():
     assert out.get("patient_question_brief") == enrichment.patient_answer
 
 
-def test_bare_polarity_skips_enricher():
+def test_bare_polarity_runs_enricher_and_credits_factor():
     for token in ("no", "yes", "idk"):
         state = _asked_state(token, asked_factor="Saddle anaesthesia", factor_states={})
-        with patch("app.orchestrator.nodes.propose_checklist_enrichment") as mocked, patch(
+        enrichment = IntakeEnrichmentResult(
+            status="no_changes",
+            summary_reason="polarity",
+            slot_reply="not_applicable",
+        )
+        with patch(
+            "app.orchestrator.nodes.propose_checklist_enrichment",
+            return_value=enrichment,
+        ) as mocked, patch(
             "app.orchestrator.nodes.answer_patient_question",
-        ) as qa, patch(
-            "app.services.question_brief.generate_from_messages",
-        ) as gen, patch(
-            "app.services.intake_enricher.generate_from_messages",
-        ) as enrich_gen:
+        ) as qa:
             out = enrich_checklist_node(state)
-            assert mocked.call_count == 0, token
+            assert mocked.call_count == 1, token
             assert qa.call_count == 0, token
-            assert gen.call_count == 0, token
-            assert enrich_gen.call_count == 0, token
         polarity = (out.get("factor_states") or {}).get("Saddle anaesthesia")
         if token == "idk":
             assert polarity == "unknown"
@@ -333,16 +386,25 @@ def test_yes_plus_question_credits_and_prefixes():
         asked_factor="Point tenderness",
         factor_states={},
     )
-    with patch("app.orchestrator.nodes.propose_checklist_enrichment") as mocked, patch(
+    enrichment = IntakeEnrichmentResult(
+        status="no_changes",
+        summary_reason="affirmed factor",
+        asked_factor_reply="affirmed",
+        slot_reply="not_applicable",
+        patient_answer="That factor is a small spot on the spine that is sore to press.",
+    )
+    with patch(
+        "app.orchestrator.nodes.propose_checklist_enrichment",
+        return_value=enrichment,
+    ) as mocked, patch(
         "app.orchestrator.nodes.answer_patient_question",
-        return_value="That factor is a small spot on the spine that is sore to press.",
     ) as qa:
         out = enrich_checklist_node(state)
-        assert mocked.call_count == 0
-        assert qa.call_count == 1
+        assert mocked.call_count == 1
+        assert qa.call_count == 0
     assert out["factor_states"]["Point tenderness"] == "affirmed"
-    assert out.get("patient_question_brief")
-    assert not (out.get("patient_question_brief") or "").startswith(CANNED_QUESTION_BRIEF)
+    assert out.get("patient_question_brief") == enrichment.patient_answer
+    assert out.get("intake_ack") is None
 
 
 def test_like_what_after_comorbidities_calls_qa_not_enricher():

@@ -97,7 +97,8 @@ def apply_policy(
         return True, reason, response
 
     # Generator/backend failure must never look like a clinical ED disposition.
+    # escalated is reserved for RISK_CATALOG hits; the study banner keys off it.
     if generator_failed or is_generator_system_failure(draft_response):
-        return True, GENERATOR_SYSTEM_FAILURE_REASON, GENERATOR_SYSTEM_FAILURE_TEXT
+        return False, GENERATOR_SYSTEM_FAILURE_REASON, GENERATOR_SYSTEM_FAILURE_TEXT
 
     return False, None, draft_response

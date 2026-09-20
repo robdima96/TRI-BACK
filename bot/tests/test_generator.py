@@ -7,9 +7,11 @@ import pytest
 from app.config import settings
 from app.services.generator import (
     DISPOSITION_THINKING_LEVEL,
+    GENERATOR_SYSTEM_FAILURE_TEXT,
     _generator_unavailable_stub,
     generate_from_messages,
     generate_response,
+    generate_response_result,
     generator_model_configured,
     generator_status_detail,
 )
@@ -20,6 +22,8 @@ from app.services.generator_backends import (
     _split_system_messages,
     _to_contents,
     generate_vertex,
+    vertex_location_is_regional,
+    vertex_location_problem,
 )
 from app.schemas import Evidence
 
@@ -311,9 +315,256 @@ def test_generate_vertex_thinking_config_and_no_temperature(vertex_settings, mon
 
 
 @patch("app.services.generator.generate_from_messages")
-def test_generate_response_requests_medium_thinking(mock_gen, vertex_settings):
+def test_generate_response_requests_minimal_thinking(mock_gen, vertex_settings):
     mock_gen.return_value = "Please go to urgent care."
     text = generate_response("back pain", [])
     assert text == "Please go to urgent care."
     assert mock_gen.call_args.kwargs["thinking_level"] == DISPOSITION_THINKING_LEVEL
-    assert DISPOSITION_THINKING_LEVEL == "MEDIUM"
+    assert DISPOSITION_THINKING_LEVEL == "MINIMAL"
+
+
+def test_vertex_location_rejects_cloud_run_regions():
+    assert vertex_location_is_regional("us-central1") is True
+    assert vertex_location_is_regional("europe-west1") is True
+    assert vertex_location_is_regional("us") is False
+    assert vertex_location_is_regional("global") is False
+    assert vertex_location_problem("us-central1")
+    assert vertex_location_problem("us") is None
+
+
+def test_generator_not_configured_for_regional_vertex_location(
+    vertex_settings, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(settings, "vertex_location", "us-central1")
+    assert generator_model_configured() is False
+    detail = generator_status_detail()
+    assert "us-central1" in detail
+    assert "multi-region" in detail
+
+
+def test_ensure_vertex_client_refuses_regional_location(
+    vertex_settings, monkeypatch: pytest.MonkeyPatch
+):
+    import app.services.generator_backends as gb
+
+    monkeypatch.setattr(settings, "vertex_location", "us-central1")
+    monkeypatch.setattr(gb, "_vertex_client", None)
+    with pytest.raises(RuntimeError, match="us-central1"):
+        gb._ensure_vertex_client()
+
+
+def test_extract_response_text_raises_on_empty_unknown_finish():
+    part = MagicMock()
+    part.thought = False
+    part.text = ""
+    content = MagicMock()
+    content.parts = [part]
+    candidate = MagicMock()
+    candidate.content = content
+    candidate.finish_reason = None
+    candidate.safety_ratings = None
+    response = MagicMock()
+    response.candidates = [candidate]
+    response.prompt_feedback = None
+    with pytest.raises(GenerationEmptyError) as exc:
+        _extract_response_text(response)
+    assert "finish_reason=unknown" in str(exc.value)
+
+
+def test_extract_response_text_thought_only_does_not_leak():
+    thought = MagicMock()
+    thought.thought = True
+    thought.text = "internal reasoning that must not leak"
+    content = MagicMock()
+    content.parts = [thought]
+    candidate = MagicMock()
+    candidate.content = content
+    candidate.finish_reason = None
+    candidate.safety_ratings = None
+    response = MagicMock()
+    response.candidates = [candidate]
+    response.text = "internal reasoning that must not leak"
+    response.prompt_feedback = None
+    with pytest.raises(GenerationEmptyError) as exc:
+        _extract_response_text(response)
+    assert "internal reasoning" not in str(exc.value)
+
+
+def _fake_vertex_stack(monkeypatch, generate_content):
+    captured: dict = {"thinking_levels": []}
+
+    class FakePart:
+        @staticmethod
+        def from_text(text=""):
+            return text
+
+    class FakeContent:
+        def __init__(self, role, parts):
+            self.role = role
+            self.parts = parts
+
+    class FakeThinkingConfig:
+        def __init__(self, **kwargs):
+            captured["thinking_levels"].append(kwargs.get("thinking_level"))
+            self.thinking_level = kwargs.get("thinking_level")
+            self.include_thoughts = kwargs.get("include_thoughts")
+
+    class FakeGenConfig:
+        def __init__(self, **kwargs):
+            self.thinking_config = kwargs.get("thinking_config")
+            captured["config"] = kwargs
+
+    class FakeTypes:
+        Part = FakePart
+        Content = FakeContent
+        ThinkingConfig = FakeThinkingConfig
+        GenerateContentConfig = FakeGenConfig
+
+    class FakeModels:
+        def generate_content(self, *, model, contents, config):
+            return generate_content(model=model, contents=contents, config=config)
+
+    class FakeClient:
+        models = FakeModels()
+
+    import app.services.generator_backends as gb
+
+    monkeypatch.setattr(gb, "_vertex_client", FakeClient())
+    monkeypatch.setattr(gb, "_genai_types", lambda: FakeTypes)
+    monkeypatch.setattr(gb, "_RETRY_SLEEP_SEC", 0)
+    return captured
+
+
+def _empty_candidate_response(*, finish=None, thought_only=False):
+    part = MagicMock()
+    part.thought = thought_only
+    part.text = "secret" if thought_only else ""
+    content = MagicMock(parts=[part])
+    candidate = MagicMock(
+        content=content, finish_reason=finish, safety_ratings=None
+    )
+    response = MagicMock()
+    response.candidates = [candidate]
+    response.text = ""
+    response.prompt_feedback = None
+    return response
+
+
+def test_generate_vertex_retries_empty_medium_at_minimal(vertex_settings, monkeypatch):
+    calls = {"n": 0}
+
+    def generate_content(*, model, contents, config):
+        calls["n"] += 1
+        level = config.thinking_config.thinking_level
+        if level == "MEDIUM":
+            return _empty_candidate_response(finish=None, thought_only=True)
+        answer = MagicMock(thought=False, text="Go to urgent care.")
+        content = MagicMock(parts=[answer])
+        candidate = MagicMock(
+            content=content, finish_reason="STOP", safety_ratings=None
+        )
+        return MagicMock(candidates=[candidate], text="Go to urgent care.")
+
+    captured = _fake_vertex_stack(monkeypatch, generate_content)
+    out = generate_vertex(
+        [{"role": "user", "content": "hi"}],
+        max_new_tokens=64,
+        thinking_level="MEDIUM",
+    )
+    assert out == "Go to urgent care."
+    assert calls["n"] == 2
+    assert captured["thinking_levels"] == ["MEDIUM", "MINIMAL"]
+
+
+def test_generate_vertex_both_empty_raises(vertex_settings, monkeypatch):
+    calls = {"n": 0}
+
+    def generate_content(*, model, contents, config):
+        calls["n"] += 1
+        return _empty_candidate_response(finish=None)
+
+    captured = _fake_vertex_stack(monkeypatch, generate_content)
+    with pytest.raises(GenerationEmptyError, match="finish_reason=unknown"):
+        generate_vertex(
+            [{"role": "user", "content": "hi"}],
+            max_new_tokens=64,
+            thinking_level="MEDIUM",
+        )
+    assert calls["n"] == 2
+    assert captured["thinking_levels"] == ["MEDIUM", "MINIMAL"]
+
+
+def test_generate_vertex_minimal_empty_does_not_retry_identically(
+    vertex_settings, monkeypatch
+):
+    calls = {"n": 0}
+
+    def generate_content(*, model, contents, config):
+        calls["n"] += 1
+        return _empty_candidate_response(finish=None)
+
+    captured = _fake_vertex_stack(monkeypatch, generate_content)
+    with pytest.raises(GenerationEmptyError, match="finish_reason=unknown"):
+        generate_vertex(
+            [{"role": "user", "content": "hi"}],
+            max_new_tokens=64,
+            thinking_level="MINIMAL",
+        )
+    assert calls["n"] == 1
+    assert captured["thinking_levels"] == ["MINIMAL"]
+
+
+def test_generate_vertex_does_not_retry_404(vertex_settings, monkeypatch):
+    class NotFound(Exception):
+        status_code = 404
+
+    def generate_content(*, model, contents, config):
+        raise NotFound("Publisher model was not found")
+
+    _fake_vertex_stack(monkeypatch, generate_content)
+    with pytest.raises(NotFound):
+        generate_vertex(
+            [{"role": "user", "content": "hi"}],
+            max_new_tokens=64,
+            thinking_level="MINIMAL",
+        )
+
+
+@patch("app.services.generator.generate_from_messages")
+def test_generate_response_result_kinds(mock_gen, vertex_settings):
+    mock_gen.return_value = "Please go to urgent care."
+    text, kind = generate_response_result("back pain", [])
+    assert text == "Please go to urgent care."
+    assert kind is None
+
+    mock_gen.return_value = ""
+    text, kind = generate_response_result("back pain", [])
+    assert text == GENERATOR_SYSTEM_FAILURE_TEXT
+    assert kind == "empty"
+
+    mock_gen.return_value = (
+        "Strictly follow the graph disposition brief. **Accuracy** is required."
+    )
+    text, kind = generate_response_result("back pain", [])
+    assert text == GENERATOR_SYSTEM_FAILURE_TEXT
+    assert kind == "echo"
+
+    mock_gen.side_effect = GenerationEmptyError(
+        "generation_empty: finish_reason=unknown"
+    )
+    text, kind = generate_response_result("back pain", [])
+    assert text == GENERATOR_SYSTEM_FAILURE_TEXT
+    assert kind == "empty"
+
+    mock_gen.side_effect = RuntimeError("404 NOT_FOUND")
+    text, kind = generate_response_result("back pain", [])
+    assert text == GENERATOR_SYSTEM_FAILURE_TEXT
+    assert kind == "error"
+
+
+def test_generate_response_result_not_configured(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(settings, "generator_backend", "vertex")
+    monkeypatch.setattr(settings, "vertex_project_id", None)
+    text, kind = generate_response_result("back pain", [])
+    assert text == GENERATOR_SYSTEM_FAILURE_TEXT
+    assert kind == "not_configured"

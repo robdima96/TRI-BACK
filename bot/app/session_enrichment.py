@@ -29,11 +29,28 @@ PRESERVE_IF_EMPTY_KEYS: tuple[str, ...] = (
 )
 
 
+def hide_participant_graphs(state: dict[str, Any]) -> bool:
+    """True when this turn must not show graph / factor lists to the client."""
+    return bool(
+        state.get("question_mode")
+        or state.get("canned_dormant")
+        or state.get("generator_failed")
+    )
+
+
+def skip_disposition_record(state: dict[str, Any]) -> bool:
+    """True when this turn must not append disposition_history.
+
+    Failed generate still writes an audit row; canned dormant and questions do not.
+    """
+    return bool(state.get("question_mode") or state.get("canned_dormant"))
+
+
 def exposed_chat_graph_fields(
     state: dict[str, Any],
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-    """Participant-facing graph payloads. Hidden on question turns."""
-    if bool(state.get("question_mode")):
+    """Participant-facing graph payloads. Hidden on question, canned, or failed-generate turns."""
+    if hide_participant_graphs(state):
         return None, None
     graph = state.get("graph_traversal")
     intake = state.get("intake_traversal")
@@ -278,11 +295,14 @@ def build_orchestrator_snapshot(state: dict[str, Any], *, turn_index: int) -> di
         "question_reason": state.get("question_reason"),
         "slot_being_asked": state.get("slot_being_asked"),
         "asked_factor": state.get("asked_factor"),
+        "slot_reply": state.get("slot_reply"),
+        "intake_ack": state.get("intake_ack"),
         "last_rank_topic": state.get("last_rank_topic"),
         "last_rank_tier": state.get("last_rank_tier"),
         "coverage_ready": bool(coverage.get("ready_for_disposition")),
         "coverage": slim_coverage(coverage if isinstance(coverage, dict) else None),
         "generator_failed": bool(state.get("generator_failed")),
+        "generator_failure_kind": state.get("generator_failure_kind"),
         "comorbidities_acknowledged": bool(state.get("comorbidities_acknowledged")),
         "session_phase": state.get("session_phase") or "intake",
         "triage_profile_id": state.get("triage_profile_id") or "low_back",
@@ -342,7 +362,7 @@ def build_disposition_record(
     Factor / condition lists and audits are stored once here (not also nested
     under ``graph_traversal``).
     """
-    if bool(state.get("question_mode")):
+    if skip_disposition_record(state):
         return None
 
     graph = state.get("graph_traversal")

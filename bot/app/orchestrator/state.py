@@ -40,6 +40,10 @@ class ChatState(TypedDict):
     safety_reason: str | None
     # Set when draft_response is the non-clinical generator system-failure copy.
     generator_failed: NotRequired[bool]
+    generator_failure_kind: NotRequired[str | None]
+    # True only on the canned post-disposition reply this turn (not the
+    # disposition turn that first set session_phase=dormant).
+    canned_dormant: NotRequired[bool]
 
     # --- conversational intake (coverage + question loop) ---
     symptom_instances: NotRequired[list[SymptomInstance]]
@@ -82,6 +86,10 @@ class ChatState(TypedDict):
     utterance_analysis: NotRequired[dict]
     # Graph-grounded prefix prepended to the planner's next question.
     patient_question_brief: NotRequired[str | None]
+    # Per-turn intake enricher judgment of the last asked floor slot.
+    slot_reply: NotRequired[str | None]
+    # LLM acknowledgement after a usable slot answer (null when answering a Q).
+    intake_ack: NotRequired[str | None]
     candidate_conditions: NotRequired[list[str]]
     traversed_chunk_ids: NotRequired[list[str]]
     # Per-item factor matcher decisions + coverage gaps (also nested under graph_traversal).

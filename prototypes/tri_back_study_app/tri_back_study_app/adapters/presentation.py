@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from tri_back_study_app.adapters.base import ChatTurnResult
-from tri_back_study_app.adapters.http_client import call_chat_api
+from tri_back_study_app.adapters.http_client import call_chat_api, call_rephrase_api
 from tri_back_study_app.graph import BotTraversalClient, reasoning_text
 from tri_back_study_app.graph.cytoscape_builder import arm3_keyed_json
 from tri_back_study_app.models.chat_types import filter_display_citations
@@ -96,6 +96,9 @@ class PresentationAdapter:
             result.graph_json = None
             result.has_graph = False
         return result
+
+    async def rephrase_message(self, session_id: str, message_id: str) -> ChatTurnResult:
+        return await call_rephrase_api(session_id, message_id)
 
 
 def get_presentation_adapter(group_id: int) -> PresentationAdapter:
