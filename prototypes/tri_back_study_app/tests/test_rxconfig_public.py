@@ -13,8 +13,8 @@ def test_local_pins_ports_and_does_not_set_api_url():
 
 def test_public_is_same_origin():
     settings = public_reflex_settings(public=True)
-    assert settings["api_url"] == ""
-    assert settings["deploy_url"] == ""
+    assert "api_url" not in settings
+    assert "deploy_url" not in settings
     assert settings["backend_port"] == 8000
     assert "frontend_port" not in settings
     assert settings["cors_allowed_origins"] == ["*"]

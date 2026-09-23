@@ -33,10 +33,11 @@ def public_reflex_settings(*, public: bool) -> dict:
             "frontend_port": 3000,
             "backend_port": 8000,
         }
+    # Do not set api_url/deploy_url. An empty string makes `reflex export`
+    # fail (Invalid URL: "/_event"). Omitting them keeps the hostname out of
+    # the image; the browser uses this page origin and Caddy proxies /_event.
     return {
         "backend_port": 8000,
-        "api_url": "",
-        "deploy_url": "",
         "cors_allowed_origins": ["*"],
     }
 
