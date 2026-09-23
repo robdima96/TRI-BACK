@@ -91,6 +91,7 @@ INTRO_MESSAGE = _env_str(
 )
 
 PUBLIC_ACCESS = _env_bool("TRI_BACK_PUBLIC_ACCESS", False)
+# Optional metadata only. Hosted WebSockets use the page origin, not this value.
 PUBLIC_BASE_URL = _env_str("TRI_BACK_PUBLIC_BASE_URL", "").rstrip("/")
 # 7 days local; 12 hours when public HTTPS share link is active.
 SESSION_COOKIE_MAX_AGE = 12 * 60 * 60 if PUBLIC_ACCESS else 7 * 24 * 60 * 60

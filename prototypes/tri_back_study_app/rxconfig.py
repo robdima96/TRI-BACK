@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from urllib.parse import urlparse
 
 import reflex as rx
 from reflex_base.plugins.sitemap import SitemapPlugin
@@ -13,6 +12,7 @@ try:
 except ImportError:
     pass
 
+
 def _env_pref(*names: str) -> str:
     """First non-empty env among names; TRI_BACK_* callers should also pass TRI_BACK_*."""
     for name in names:
@@ -22,14 +22,30 @@ def _env_pref(*names: str) -> str:
     return ""
 
 
+def public_reflex_settings(*, public: bool) -> dict:
+    """Local ports, or same-origin API URL for the Cloud Run / Caddy export.
+
+    Public mode must not bake a hostname into ``api_url``. The browser already
+    opened the study host; Caddy proxies ``/_event`` on that same origin.
+    """
+    if not public:
+        return {
+            "frontend_port": 3000,
+            "backend_port": 8000,
+        }
+    return {
+        "backend_port": 8000,
+        "api_url": "",
+        "deploy_url": "",
+        "cors_allowed_origins": ["*"],
+    }
+
+
 _public = _env_pref("TRI_BACK_PUBLIC_ACCESS", "TRI_BACK_PUBLIC_ACCESS").lower() in (
     "1",
     "true",
     "yes",
     "on",
-)
-_base = _env_pref("TRI_BACK_PUBLIC_BASE_URL", "TRI_BACK_PUBLIC_BASE_URL", "API_URL").rstrip(
-    "/"
 )
 
 _config_kwargs: dict = {
@@ -41,27 +57,6 @@ _config_kwargs: dict = {
     ],
     "disable_plugins": [SitemapPlugin],
 }
-
-if not _public:
-    # Pin local ports so Reflex does not auto-increment onto the bot (:8001).
-    # Do not set frontend_port in public/Cloud Run: `reflex run --backend-only`
-    # rejects --frontend-port.
-    _config_kwargs["frontend_port"] = 3000
-    _config_kwargs["backend_port"] = 8000
-else:
-    _config_kwargs["backend_port"] = 8000
-
-if _public and _base:
-    # Same public origin for UI + WebSocket via reverse proxy (never point at :8001).
-    _config_kwargs["api_url"] = _base
-    _config_kwargs["deploy_url"] = _base
-    _config_kwargs["cors_allowed_origins"] = [
-        _base,
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ]
-    host = urlparse(_base).hostname
-    if host:
-        _config_kwargs["vite_allowed_hosts"] = [host, "localhost", "127.0.0.1"]
+_config_kwargs.update(public_reflex_settings(public=_public))
 
 config = rx.Config(**_config_kwargs)

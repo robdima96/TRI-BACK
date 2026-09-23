@@ -1,11 +1,9 @@
-# Build/push tri-back-study only (no Cloud Run update). First cutover image
-# uses the Dockerfile PUBLIC_BASE_URL placeholder; rebuild after the URL exists.
+# Build/push tri-back-study only (no Cloud Run update).
 #   gcloud builds submit --config bot/app/services/public_host/cloud_run/cloudbuild.study-push.yaml
 
 substitutions:
   _REGION: us-central1
   _REPO: tri-back
-  _PUBLIC_BASE_URL: https://tri-back-study-PLACEHOLDER.us-central1.run.app
   _TAG: latest
 
 options:
@@ -20,8 +18,6 @@ steps:
       - build
       - -f
       - bot/app/services/public_host/cloud_run/Dockerfile.study
-      - --build-arg
-      - PUBLIC_BASE_URL=${_PUBLIC_BASE_URL}
       - -t
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-study:${_TAG}
       - -t

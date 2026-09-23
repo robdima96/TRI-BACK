@@ -2,15 +2,13 @@
 # Manual: gcloud builds submit --config bot/app/services/public_host/cloud_run/cloudbuild.study.yaml .
 # Auto: Cloud Build trigger tri-back-study-deploy on push to main (study-related paths).
 #
-# After the first tri-back-study deploy, set _PUBLIC_BASE_URL (and _SERVICE) to the
-# new run.app hostname. The baked frontend URL must match or WebSockets break.
-# Keep the old tri-back-study service until smoke tests pass.
+# Frontend is same-origin (no baked run.app hostname). Keep the old
+# tri-back-study service until smoke tests pass.
 
 substitutions:
   _REGION: us-central1
   _REPO: tri-back
   _SERVICE: tri-back-study
-  _PUBLIC_BASE_URL: https://tri-back-study-PLACEHOLDER.us-central1.run.app
   _TAG: latest
 
 options:
@@ -25,8 +23,6 @@ steps:
       - build
       - -f
       - bot/app/services/public_host/cloud_run/Dockerfile.study
-      - --build-arg
-      - PUBLIC_BASE_URL=${_PUBLIC_BASE_URL}
       - -t
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/tri-back-study:${_TAG}
       - -t

@@ -43,5 +43,3 @@ RELATED
 -------
 - Study UI:     ../prototypes/tri_back_study_app/readme.txt
 - Session lab:  ../Testing/readme.txt
-- Cloud Run:    app/services/public_host/cloud_run/
-- Graph packs:  ../Graphs/backups/red flags/  (workspace; used via TRI_BACK_GRAPH_CSV)

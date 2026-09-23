@@ -9,8 +9,25 @@ import reflex as rx
 from tri_back_study_app.components.logout_button import logout_button
 from tri_back_study_app.db import login_events as login_db
 from tri_back_study_app.db import users as users_db
-from tri_back_study_app.session_store import list_session_files
+from tri_back_study_app.session_store import (
+    session_detail_for_current_admin,
+    sessions_for_current_admin,
+)
 from tri_back_study_app.state.auth_state import AuthState
+
+
+def _session_overview(session: dict) -> dict:
+    return {
+        "study_id": session.get("study_id"),
+        "session_id": session.get("session_id"),
+        "group_id": session.get("group_id"),
+        "turn_count": session.get("turn_count"),
+        "time_on_task_sec": session.get("time_on_task_sec"),
+        "feedback_up_count": (session.get("engagement") or {}).get("feedback_up_count"),
+        "feedback_down_count": (session.get("engagement") or {}).get("feedback_down_count"),
+        "escalated": session.get("escalated"),
+        "last_active_at": session.get("last_active_at"),
+    }
 
 
 class AdminState(rx.State):
@@ -20,40 +37,34 @@ class AdminState(rx.State):
     group_summary: str = ""
     selected_session_json: str = ""
 
+    async def _own_session_id(self) -> str:
+        auth = await self.get_state(AuthState)
+        return (auth.session_id or "").strip()
+
     @rx.event
-    def load_data(self):
+    async def load_data(self):
         users = users_db.list_users()
         logins = login_db.list_login_events()
-        sessions = list_session_files()
+        own_id = await self._own_session_id()
+        sessions = sessions_for_current_admin(own_id)
         counts = users_db.group_counts()
         self.users_json = json.dumps(users, indent=2)
         self.logins_json = json.dumps(logins, indent=2)
         self.sessions_json = json.dumps(
-            [
-                {
-                    "study_id": s.get("study_id"),
-                    "session_id": s.get("session_id"),
-                    "group_id": s.get("group_id"),
-                    "turn_count": s.get("turn_count"),
-                    "time_on_task_sec": s.get("time_on_task_sec"),
-                    "feedback_up_count": (s.get("engagement") or {}).get("feedback_up_count"),
-                    "feedback_down_count": (s.get("engagement") or {}).get("feedback_down_count"),
-                    "escalated": s.get("escalated"),
-                    "last_active_at": s.get("last_active_at"),
-                }
-                for s in sessions
-            ],
+            [_session_overview(s) for s in sessions],
             indent=2,
         )
         self.group_summary = ", ".join(f"Arm {k}: {v}" for k, v in sorted(counts.items()))
+        if sessions:
+            self.selected_session_json = json.dumps(sessions[0], indent=2)
+        else:
+            self.selected_session_json = ""
 
     @rx.event
-    def select_session(self, session_id: str):
-        for s in list_session_files():
-            if s.get("session_id") == session_id:
-                self.selected_session_json = json.dumps(s, indent=2)
-                return
-        self.selected_session_json = ""
+    async def select_session(self, session_id: str):
+        own_id = await self._own_session_id()
+        detail = session_detail_for_current_admin(own_id, session_id)
+        self.selected_session_json = json.dumps(detail, indent=2) if detail else ""
 
 
 def admin_page() -> rx.Component:

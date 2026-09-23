@@ -22,4 +22,6 @@ Each app has a **`readme.txt`** with local run details. Environment variables us
 
 The study app creates an empty local database on first start. Optional: **Session lab** on port **8765** (`Testing/readme.txt`).
 
-Cloud Run packaging lives under `bot/app/services/public_host/cloud_run/`.
+## License
+
+Copyright The University of British Columbia (DigiMSK Lab). Licensed under the Apache License, Version 2.0. See [`LICENSE`](LICENSE).

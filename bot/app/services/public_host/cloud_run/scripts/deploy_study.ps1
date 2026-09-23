@@ -23,7 +23,6 @@ param(
   [string]$BotApiKeySecret = $(if ($env:TRI_BACK_BOT_API_KEY_SECRET) { $env:TRI_BACK_BOT_API_KEY_SECRET } else { "TRI_BACK_BOT_API_KEY" }),
   [string]$AdminPasswordSecret = $(if ($env:TRI_BACK_ADMIN_PASSWORD_SECRET) { $env:TRI_BACK_ADMIN_PASSWORD_SECRET } else { "TRI_BACK_ADMIN_PASSWORD" }),
   [string]$ServiceAccount = $(if ($env:TRI_BACK_RUNTIME_SA) { $env:TRI_BACK_RUNTIME_SA } else { "" }),
-  [string]$PublicBaseUrl = "",
   [string]$ChatbotBaseUrl = ""
 )
 
@@ -79,20 +78,6 @@ $deployArgs = @(
 if ($LASTEXITCODE -ne 0) { throw "gcloud run deploy failed" }
 
 $studyUrl = (gcloud run services describe $Service --project=$ProjectId --region=$Region --format="value(status.url)").Trim()
-if ($PublicBaseUrl) {
-  $studyUrl = $PublicBaseUrl.TrimEnd("/")
-} else {
-  $preferred = (gcloud run services describe $Service --project=$ProjectId --region=$Region --format="yaml(status)" 2>$null) |
-    Select-String -Pattern "https://$Service-[0-9]+\.us-central1\.run\.app" |
-    ForEach-Object { $_.Matches.Value } |
-    Select-Object -First 1
-  if ($preferred) { $studyUrl = $preferred }
-}
-
-Write-Host "Setting public base URL env to $studyUrl"
-gcloud run services update $Service --project=$ProjectId --region=$Region `
-  --update-env-vars="TRI_BACK_PUBLIC_BASE_URL=$studyUrl,API_URL=$studyUrl,DEPLOY_URL=$studyUrl,REFLEX_API_URL=$studyUrl"
-if ($LASTEXITCODE -ne 0) { throw "gcloud run services update failed" }
 
 Write-Host "Granting roles/run.invoker on $BotService to $ServiceAccount"
 gcloud run services add-iam-policy-binding $BotService `
@@ -106,4 +91,4 @@ Write-Host ""
 Write-Host "Study UI: $studyUrl"
 Write-Host "Admin login: username admin / TRI_BACK_ADMIN_PASSWORD"
 Write-Host "Grant roles/secretmanager.secretAccessor on the API key and admin password secrets to $ServiceAccount."
-Write-Host "If the login page loads but WebSocket fails, rebuild with PUBLIC_BASE_URL=$studyUrl"
+Write-Host "WebSocket uses this same origin (Caddy /_event). No hostname rebuild required."

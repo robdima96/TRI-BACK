@@ -241,3 +241,28 @@ def list_session_files() -> list[dict[str, Any]]:
         except (OSError, json.JSONDecodeError):
             continue
     return out
+
+
+def sessions_for_current_admin(current_session_id: str) -> list[dict[str, Any]]:
+    """Only the session created by this admin login, never historical files."""
+    wanted = (current_session_id or "").strip()
+    if not wanted:
+        return []
+    return [
+        s
+        for s in list_session_files()
+        if (s.get("session_id") or "").strip() == wanted
+    ]
+
+
+def session_detail_for_current_admin(
+    current_session_id: str, requested_id: str
+) -> dict[str, Any] | None:
+    """Full session JSON only when the requested id is this admin's own session."""
+    wanted = (current_session_id or "").strip()
+    asked = (requested_id or "").strip()
+    if not wanted or wanted != asked:
+        return None
+    for session in sessions_for_current_admin(wanted):
+        return session
+    return None

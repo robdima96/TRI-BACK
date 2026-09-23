@@ -26,6 +26,7 @@ prototypes/tri_back_study_app/.web/
 prototypes/tri_back_study_app/.states/
 prototypes/tri_back_study_app/**/*.db
 prototypes/tri_back_study_app/data/participant_credentials.csv
+prototypes/tri_back_study_app/data/study_roster.csv
 prototypes/tri_back_study_app/.venv/
 
 # Scratch / binaries (ask before forcing PDFs into git)
@@ -40,10 +41,19 @@ prototypes/tri_back_study_app/.venv/
 slurm-*.out
 slurm-*.err
 
-# Cloud Run local secrets
+# Cloud Run local secrets and operator docs (keep on disk, not on Git)
 bot/app/services/public_host/.env.public
 bot/app/services/public_host/.run/
 bot/app/services/public_host/cloud_run/.env.cloud
+bot/app/services/public_host/cloud_run/.env.cloud.example
+bot/app/services/public_host/cloud_run/*.md
+
+# Unpublished knowledge graph pack and internal prompt files
+bot/Knowledge Base/
+prototypes/prompt.txt
+prototypes/prompt_2.txt
+prototypes/alignment_specifics.txt
+prototypes/temp_prompt_kgt.txt
 
 # Local research / non-chatbot trees (keep on disk, not on Git)
 /Reports/

@@ -1,27 +1,20 @@
 # TRI-BACK study (Reflex) for Cloud Run — single $PORT via Caddy + static export + backend.
 # Build from TRI-BACK monorepo root:
 #   docker build -f bot/app/services/public_host/cloud_run/Dockerfile.study \
-#     --build-arg PUBLIC_BASE_URL=https://tri-back-study-XXXX.us-central1.run.app \
 #     -t tri-back-study .
 #
-# After first deploy, rebuild with the printed study URL as PUBLIC_BASE_URL
-# or WebSockets will still point at the old tri-back-study host.
+# The exported frontend uses the page origin (Caddy proxies /_event). Do not
+# pass a Cloud Run hostname at build time.
 
 FROM python:3.11-slim-bookworm
 
 ARG PORT=8080
-# Baked into the static frontend at export time (same-origin via Caddy after deploy).
-ARG PUBLIC_BASE_URL=https://tri-back-study-PLACEHOLDER.us-central1.run.app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PORT=${PORT} \
     TRI_BACK_PUBLIC_ACCESS=1 \
-    TRI_BACK_PUBLIC_BASE_URL=${PUBLIC_BASE_URL} \
-    API_URL=${PUBLIC_BASE_URL} \
-    DEPLOY_URL=${PUBLIC_BASE_URL} \
-    REFLEX_API_URL=${PUBLIC_BASE_URL} \
     REFLEX_REDIS_URL=redis://127.0.0.1:6379 \
     TRI_BACK_STUDY_DB=/mnt/tri-back/study/tri_back.db \
     TRI_BACK_BOT_API_KEY=build-placeholder \

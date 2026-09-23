@@ -1,0 +1,8 @@
+**/.env
+**/.venv/
+**/__pycache__/
+**/.web/
+**/.states/
+**/node_modules/
+prototypes/tri_back_study_app/data/participant_credentials.csv
+prototypes/tri_back_study_app/data/study_roster.csv

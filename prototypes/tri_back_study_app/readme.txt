@@ -59,21 +59,18 @@ First-time only (venv), then run_local.py as above:
   pip install -r requirements.txt
 
 The study app creates an empty SQLite database on first start.
+Do not commit data/participant_credentials.csv or data/study_roster.csv.
 
 Optional: .env with CHATBOT_BASE_URL=http://127.0.0.1:8001
-
-Do not use this launcher for Cloud Run. Public hosting still uses
-bot/app/services/public_host/cloud_run/scripts/entrypoint_study.sh.
 
 
 LOGIN
 -----
 Admin: username admin, password TRI_BACK_ADMIN_PASSWORD
-       (required in .env for local and hosted runs)
+       (required in .env). A fresh clone has no participant accounts.
 
 
 RELATED
 -------
 - Bot backend:  ../../bot/readme.txt
 - Session lab:  ../../Testing/readme.txt
-- Cloud Run notes: ../../bot/app/services/public_host/cloud_run/STUDY_SERVICE.md
