@@ -95,6 +95,7 @@ PUBLIC_BASE_URL = _env_str("TRI_BACK_PUBLIC_BASE_URL", "").rstrip("/")
 # 7 days local; 12 hours when public HTTPS share link is active.
 SESSION_COOKIE_MAX_AGE = 12 * 60 * 60 if PUBLIC_ACCESS else 7 * 24 * 60 * 60
 
+# Hosted study UI must send the same Bearer key the bot requires.
 if PUBLIC_ACCESS and not BOT_API_KEY:
     raise RuntimeError(
         "TRI_BACK_PUBLIC_ACCESS=1 requires TRI_BACK_BOT_API_KEY "

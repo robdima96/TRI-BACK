@@ -43,15 +43,17 @@ _force_env("LLM_FACTOR_MATCH", "0")
 
 # Public-host API key must not break local chat route tests.
 _pop_env("BOT_API_KEY")
+_force_env("ALLOW_OPEN_API", "1")
 _pop_env("FORCE_FACTOR_ASK")
 
 
 @pytest.fixture(autouse=True)
 def clear_bot_api_key_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Default: no Bearer required. Auth tests override ``settings.bot_api_key``."""
+    """Default: open local API. Auth tests override ``settings.bot_api_key``."""
     from app.config import settings
 
     monkeypatch.setattr(settings, "bot_api_key", None)
+    monkeypatch.setattr(settings, "allow_open_api", True)
 
 
 @pytest.fixture(autouse=True)

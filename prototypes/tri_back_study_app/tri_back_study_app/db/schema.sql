@@ -33,3 +33,12 @@ CREATE TABLE IF NOT EXISTS admin_actions (
 );
 
 INSERT OR IGNORE INTO admin_meta (id, login_count) VALUES (1, 0);
+
+CREATE TABLE IF NOT EXISTS auth_tokens (
+  token           TEXT PRIMARY KEY,
+  study_id        TEXT NOT NULL,
+  role            TEXT NOT NULL,
+  session_file_id TEXT NOT NULL,
+  revoked         INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL
+);

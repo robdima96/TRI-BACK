@@ -36,8 +36,10 @@ def test_chat_and_admin_share_logout_button():
     assert "btn-logout-confirm" in src
 
 
-def test_local_admin_accepts_triback(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr("tri_back_study_app.config.PUBLIC_ACCESS", False)
-    monkeypatch.delenv("TRI_BACK_ADMIN_PASSWORD", raising=False)
-    assert verify_admin_password("triback") is True
+def test_admin_requires_env_password(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("TRI_BACK_ADMIN_PASSWORD", "test-admin-password")
+    assert verify_admin_password("test-admin-password") is True
     assert verify_admin_password("wrong") is False
+    monkeypatch.delenv("TRI_BACK_ADMIN_PASSWORD", raising=False)
+    assert verify_admin_password("triback") is False
+    assert verify_admin_password("test-admin-password") is False

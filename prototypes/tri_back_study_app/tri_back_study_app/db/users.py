@@ -24,7 +24,11 @@ def get_user_by_study_id(study_id: str) -> dict[str, Any] | None:
 def list_users() -> list[dict[str, Any]]:
     with db_connection() as conn:
         rows = conn.execute(
-            "SELECT * FROM users ORDER BY study_id"
+            """
+            SELECT id, study_id, group_id, login_count, first_login_at, last_login_at
+            FROM users
+            ORDER BY study_id
+            """
         ).fetchall()
         return [dict(r) for r in rows]
 

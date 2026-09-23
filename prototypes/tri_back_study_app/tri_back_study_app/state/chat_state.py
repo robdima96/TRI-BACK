@@ -158,7 +158,7 @@ class ChatState(AuthState):
         return merged
 
     def _load_chat_from_session(self) -> None:
-        fields = chat_view_from_session(load_session(self.session_id))
+        fields = chat_view_from_session(load_session(self._file_id()))
         self.messages = fields["messages"]
         self.turn_count = fields["turn_count"]
         self.escalated = fields["escalated"]
@@ -189,7 +189,7 @@ class ChatState(AuthState):
         return rx.redirect("/")
 
     def _persist_messages(self) -> None:
-        session = load_session(self.session_id) or {}
+        session = load_session(self._file_id()) or {}
         engagement = session.get("engagement") or {}
         msg_dicts = _messages_to_session(self.messages)
         up, down = feedback_tallies(msg_dicts)
@@ -197,7 +197,7 @@ class ChatState(AuthState):
         engagement["feedback_up_count"] = up
         engagement["feedback_down_count"] = down
         save_session(
-            self.session_id,
+            self._file_id(),
             study_id=self.study_id,
             role=self.role,
             group_id=self.group_id,
@@ -286,7 +286,7 @@ class ChatState(AuthState):
             self.messages = [*self.messages, user_msg]
             self.draft = ""
 
-            session_id = self.session_id
+            session_id = self._file_id()
             group_id = self.group_id
             study_id = self.study_id
             role = self.role
@@ -383,7 +383,7 @@ class ChatState(AuthState):
         for msg in messages:
             if msg.get("message_id") == message_id:
                 msg["feedback"] = {"rating": rating, "rated_at": _now_iso()}
-        engagement = (load_session(self.session_id) or {}).get("engagement") or {}
+        engagement = (load_session(self._file_id()) or {}).get("engagement") or {}
         up, down = feedback_tallies(messages)
         engagement = recompute_engagement(
             engagement,
@@ -392,13 +392,13 @@ class ChatState(AuthState):
         engagement["feedback_up_count"] = up
         engagement["feedback_down_count"] = down
         try:
-            save_session(self.session_id, messages=messages, engagement=engagement)
+            save_session(self._file_id(), messages=messages, engagement=engagement)
         except OSError:
             # Keep the in-memory rating. GCS FUSE can refuse overlay writes
             # without the clinical transcript being lost.
             logging.getLogger(__name__).warning(
                 "feedback save failed session=%s message_id=%s",
-                self.session_id,
+                self._file_id(),
                 message_id,
                 exc_info=True,
             )
@@ -421,7 +421,7 @@ class ChatState(AuthState):
                 return
             self.loading = True
             self.error = ""
-            session_id = self.session_id
+            session_id = self._file_id()
             group_id = self.group_id
 
         try:

@@ -1,24 +1,25 @@
 # TRI-BACK
 
-Three apps in one project for musculoskeletal triage chatbot research.
+TRI-BACK is software from the **DigiMSK Lab**, Department of Physical Therapy, Faculty of Medicine, University of British Columbia. It is a prototype for low-back virtual triage designed for research purposes. It is not a medical device and does not provide a diagnosis.
+
+Three apps in one project:
 
 | App | Folder | Role |
 |-----|--------|------|
-| **Bot backend** | [`bot/`](bot/) | FastAPI + LangGraph chatbot API (inference, GraphRAG, Vertex, session JSON) |
-| **Study prototype** | [`prototypes/tri_back_study_app/`](prototypes/tri_back_study_app/) | Reflex UI for the research study (login, arms, admin) |
-| **Session lab** | [`Testing/`](Testing/) | Local browser for developers to inspect `bot/data/sessions` |
+| **Bot backend** | [`bot/`](bot/) | FastAPI + LangGraph chatbot API |
+| **Study prototype** | [`prototypes/tri_back_study_app/`](prototypes/tri_back_study_app/) | Reflex UI (login, chat, admin) |
+| **Session lab** | [`Testing/`](Testing/) | Local browser for session JSON |
 
-Each app has a **`readme.txt`** with what it does and how to run it locally.
+Each app has a **`readme.txt`** with local run details. Environment variables use the `TRI_BACK_*` prefix.
 
-## Typical local order
+## Local use (admin)
 
-1. Start the **bot** (see `bot/readme.txt`) — port **8001**
-2. Start the **study prototype** (see `prototypes/tri_back_study_app/readme.txt`) — UI **3000**
-3. Optional: **Session lab** (see `Testing/readme.txt`) — port **8765**
+1. Copy [`prototypes/tri_back_study_app/.env.example`](prototypes/tri_back_study_app/.env.example) to `.env` in that folder. Set `TRI_BACK_ADMIN_PASSWORD` to a password you choose. Keep `CHATBOT_BASE_URL=http://127.0.0.1:8001`.
+2. In `bot/.env`, set `TRI_BACK_ALLOW_OPEN_API=1` so local chat works without an API key. Add your Vertex / graph / model settings as described in `bot/readme.txt`.
+3. Start the **bot** on port **8001** (see `bot/readme.txt`). Wait until `http://127.0.0.1:8001/ready` is up.
+4. Start the **study prototype** (see `prototypes/tri_back_study_app/readme.txt`) — UI **3000**.
+5. Open http://localhost:3000 and sign in on the **Admin** tab (username `admin`, password from your `.env`).
 
-## Hosting
+The study app creates an empty local database on first start. Optional: **Session lab** on port **8765** (`Testing/readme.txt`).
 
-Cloud Run + GCS packaging lives under `bot/app/services/public_host/cloud_run/`.
-Cutover from TRI-BACK service names: see [`STUDY_SERVICE.md`](bot/app/services/public_host/cloud_run/STUDY_SERVICE.md).
-
-Env vars are `TRI_BACK_*`.
+Cloud Run packaging lives under `bot/app/services/public_host/cloud_run/`.

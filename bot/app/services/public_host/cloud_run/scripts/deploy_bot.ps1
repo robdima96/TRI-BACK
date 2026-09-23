@@ -1,27 +1,36 @@
 # Deploy tri-back to Cloud Run with GCS volume at /mnt/tri-back.
 # Prerequisites: image in Artifact Registry; bucket populated via upload_gcs_assets.ps1
+# Required env: TRI_BACK_GCP_PROJECT, TRI_BACK_GCS_BUCKET, TRI_BACK_RUNTIME_SA,
+#               TRI_BACK_BOT_API_KEY (Secret Manager secret of the same name must exist).
 #
 # Usage:
 #   .\bot\app\services\public_host\cloud_run\scripts\deploy_bot.ps1
-#   .\bot\app\services\public_host\cloud_run\scripts\deploy_bot.ps1 -Image "us-central1-docker.pkg.dev/.../tri-back-bot:latest"
+#   .\bot\app\services\public_host\cloud_run\scripts\deploy_bot.ps1 -Image "REGION-docker.pkg.dev/PROJECT/tri-back/tri-back-bot:latest"
 
 param(
-  [string]$ProjectId = $(if ($env:TRI_BACK_GCP_PROJECT) { $env:TRI_BACK_GCP_PROJECT } else { "YOUR_GCP_PROJECT" }),
+  [string]$ProjectId = $(if ($env:TRI_BACK_GCP_PROJECT) { $env:TRI_BACK_GCP_PROJECT } else { "" }),
   [string]$Region = "us-central1",
   [string]$VertexLocation = $(if ($env:TRI_BACK_VERTEX_LOCATION) { $env:TRI_BACK_VERTEX_LOCATION } else { "us" }),
   [string]$GeneratorModel = $(if ($env:TRI_BACK_GENERATOR_MODEL) { $env:TRI_BACK_GENERATOR_MODEL } else { "gemini-3.5-flash-lite" }),
   [string]$Service = "tri-back",
-  [string]$Bucket = $(if ($env:TRI_BACK_GCS_BUCKET) { $env:TRI_BACK_GCS_BUCKET } else { "digimsk-cloudrun-$ProjectId" }),
+  [string]$Bucket = $(if ($env:TRI_BACK_GCS_BUCKET) { $env:TRI_BACK_GCS_BUCKET } else { "" }),
   [string]$Image = "",
   [string]$Memory = "8Gi",
   [string]$Cpu = "4",
   [int]$MaxInstances = 1,
   [int]$MinInstances = 0,
-  [string]$BotApiKey = $(if ($env:TRI_BACK_BOT_API_KEY) { $env:TRI_BACK_BOT_API_KEY } else { "" }),
-  [string]$ServiceAccount = "runtime-sa@$ProjectId.iam.gserviceaccount.com"
+  [string]$BotApiKeySecret = $(if ($env:TRI_BACK_BOT_API_KEY_SECRET) { $env:TRI_BACK_BOT_API_KEY_SECRET } else { "TRI_BACK_BOT_API_KEY" }),
+  [string]$ServiceAccount = $(if ($env:TRI_BACK_RUNTIME_SA) { $env:TRI_BACK_RUNTIME_SA } else { "" })
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $ProjectId) { throw "Set TRI_BACK_GCP_PROJECT." }
+if (-not $Bucket) { throw "Set TRI_BACK_GCS_BUCKET." }
+if (-not $ServiceAccount) { throw "Set TRI_BACK_RUNTIME_SA (runtime service account email)." }
+if (-not $env:TRI_BACK_BOT_API_KEY -and -not $env:TRI_BACK_BOT_API_KEY_SECRET) {
+  throw "Set TRI_BACK_BOT_API_KEY (or TRI_BACK_BOT_API_KEY_SECRET naming an existing Secret Manager secret)."
+}
 
 if (-not $Image) {
   $Image = "$Region-docker.pkg.dev/$ProjectId/tri-back/tri-back-bot:latest"
@@ -55,10 +64,6 @@ $envVars = @(
   "TRI_BACK_LOAD_SAT_SPLITTER=1"
 ) -join ","
 
-if ($BotApiKey) {
-  $envVars = "$envVars,TRI_BACK_BOT_API_KEY=$BotApiKey"
-}
-
 $deployArgs = @(
   "run", "deploy", $Service,
   "--project=$ProjectId",
@@ -73,11 +78,13 @@ $deployArgs = @(
   "--service-account=$ServiceAccount",
   "--add-volume=name=tri-back-gcs,type=cloud-storage,bucket=$Bucket",
   "--add-volume-mount=volume=tri-back-gcs,mount-path=/mnt/tri-back",
-  "--set-env-vars=$envVars"
+  "--set-env-vars=$envVars",
+  "--set-secrets=TRI_BACK_BOT_API_KEY=${BotApiKeySecret}:latest"
 )
 
 & gcloud @deployArgs
 if ($LASTEXITCODE -ne 0) { throw "gcloud run deploy failed" }
 
 Write-Host "Deployed. Grant the service runtime SA Storage Object User on gs://$Bucket if mounts fail."
+Write-Host "Grant roles/secretmanager.secretAccessor on $BotApiKeySecret to $ServiceAccount if the container lacks the key."
 Write-Host "Session JSON will appear under gs://$Bucket/sessions/"

@@ -13,8 +13,8 @@ Other apps call it over HTTP:
 Pipeline (simplified): encode / GliNER checklist -> GraphRAG (red-flags graph) ->
 Vertex (or local) generator -> session JSON under data/sessions/.
 
-Optional: TRI_BACK_BOT_API_KEY requires
-Authorization: Bearer <key> on /api/v1/chat.
+TRI_BACK_BOT_API_KEY requires Authorization: Bearer <key> on /api/v1/chat
+and /api/v1/rephrase unless TRI_BACK_ALLOW_OPEN_API=1 (local use only).
 
 
 HOW TO RUN LOCALLY
@@ -27,6 +27,7 @@ Prerequisites: Python 3.11+, Vertex ADC if using TRI_BACK_GENERATOR_BACKEND=vert
   .\.venv\Scripts\Activate.ps1
   pip install -e ".[dev]"
   # Configure bot/.env (Vertex project, TRI_BACK_GRAPH_CSV, model dirs, etc.)
+  # For local study UI without an API key: TRI_BACK_ALLOW_OPEN_API=1
   uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
 
 Confirm:  http://127.0.0.1:8001/health

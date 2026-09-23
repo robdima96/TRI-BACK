@@ -3,8 +3,8 @@ TRI-BACK — Study prototype UI (research)
 
 WHAT IT IS
 ----------
-Reflex web app for the TRI-BACK research study. Participants
-and researchers log in here. All three experimental arms call the SAME bot
+Reflex web app for the TRI-BACK research study. Researchers
+log in here. All three experimental arms call the SAME bot
 backend; only the presentation differs (baseline text / reasoning / graph panel).
 
 Pages:  /        login
@@ -16,12 +16,15 @@ HOW TO RUN LOCALLY
 ------------------
 Two PowerShell windows. Bot first, then the study UI.
 
+Copy .env.example to .env. Set TRI_BACK_ADMIN_PASSWORD.
+In bot/.env set TRI_BACK_ALLOW_OPEN_API=1 (local chat without an API key).
+
 Do not put the bot on 8000. Reflex WebSocket must own 8000; the bot stays on 8001.
 Open http://localhost:3000 (not 3001).
 
 Terminal 1 — bot:
 
-  cd "C:\ROBS STUFF\UBC Postdoctoral Fellowship\TRI-BACK\bot"
+  cd bot
   .\.venv\Scripts\Activate.ps1
   uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
 
@@ -31,7 +34,7 @@ pick up study-app files.
 
 Terminal 2 — study UI:
 
-  cd "C:\ROBS STUFF\UBC Postdoctoral Fellowship\TRI-BACK\prototypes\tri_back_study_app"
+  cd prototypes/tri_back_study_app
   .\.venv\Scripts\Activate.ps1
   python scripts/run_local.py --kill-stale
 
@@ -48,15 +51,14 @@ Expected ports:
   Reflex WebSocket   http://127.0.0.1:8000
   Bot API            http://127.0.0.1:8001
 
-First-time only (venv + roster/login accounts), then run_local.py as above:
+First-time only (venv), then run_local.py as above:
 
-  cd "C:\ROBS STUFF\UBC Postdoctoral Fellowship\TRI-BACK\prototypes\tri_back_study_app"
+  cd prototypes/tri_back_study_app
   python -m venv .venv
   .\.venv\Scripts\Activate.ps1
   pip install -r requirements.txt
-  python scripts/generate_roster.py
-  python scripts/init_db.py
-  python scripts/seed_users.py --roster data/study_roster.csv
+
+The study app creates an empty SQLite database on first start.
 
 Optional: .env with CHATBOT_BASE_URL=http://127.0.0.1:8001
 
@@ -66,10 +68,8 @@ bot/app/services/public_host/cloud_run/scripts/entrypoint_study.sh.
 
 LOGIN
 -----
-Admin:        username admin, password TRI_BACK_ADMIN_PASSWORD
-              (local fallbacks triback / tri-back if unset and not in public mode)
-Participant:  study ID + password from data/participant_credentials.csv
-              (created when you seed; keep private)
+Admin: username admin, password TRI_BACK_ADMIN_PASSWORD
+       (required in .env for local and hosted runs)
 
 
 RELATED

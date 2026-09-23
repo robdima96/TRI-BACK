@@ -1,7 +1,7 @@
 # TRI-BACK — Cloud Run + GCS mounts (implementation plan)
 
 **Status:** implementation in `public_host/cloud_run/`; operator runbook is **[STUDY_SERVICE.md](STUDY_SERVICE.md)**  
-**GCP project:** `YOUR_GCP_PROJECT` (same billing / Vertex as LLM calls)  
+**GCP project:** set `TRI_BACK_GCP_PROJECT` (same billing / Vertex as LLM calls)  
 **Region:** Cloud Run `us-central1`; Vertex Gemini location `us` (US multi-region; not the Cloud Run region)  
 **Storage strategy:** existing GCS bucket + Cloud Run volume mounts at `/mnt/tri-back` (not bake-into-image for GliNER/graph)
 

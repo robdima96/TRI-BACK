@@ -10,11 +10,22 @@ client = TestClient(app)
 
 def test_chat_allows_when_api_key_unset(monkeypatch):
     monkeypatch.setattr(settings, "bot_api_key", None)
+    monkeypatch.setattr(settings, "allow_open_api", True)
     response = client.post(
         "/api/v1/chat",
         json={"session_id": "auth-open", "message": "I have low back pain for 2 weeks."},
     )
     assert response.status_code == 200
+
+
+def test_chat_rejects_when_key_unset_and_open_api_off(monkeypatch):
+    monkeypatch.setattr(settings, "bot_api_key", None)
+    monkeypatch.setattr(settings, "allow_open_api", False)
+    response = client.post(
+        "/api/v1/chat",
+        json={"session_id": "auth-closed", "message": "hello"},
+    )
+    assert response.status_code == 401
 
 
 def test_chat_rejects_missing_bearer_when_key_set(monkeypatch):

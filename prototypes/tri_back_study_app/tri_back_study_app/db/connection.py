@@ -12,6 +12,12 @@ def get_db_path() -> Path:
     return config.STUDY_DB_PATH
 
 
+def _schema_sql(schema_path: Path | None = None) -> str:
+    root = Path(__file__).resolve().parent
+    sql_path = schema_path or (root / "schema.sql")
+    return sql_path.read_text(encoding="utf-8")
+
+
 @contextmanager
 def db_connection(*, row_factory: bool = True):
     path = get_db_path()
@@ -20,6 +26,7 @@ def db_connection(*, row_factory: bool = True):
     if row_factory:
         conn.row_factory = sqlite3.Row
     try:
+        conn.executescript(_schema_sql())
         yield conn
         conn.commit()
     finally:
@@ -27,8 +34,8 @@ def db_connection(*, row_factory: bool = True):
 
 
 def init_schema(schema_path: Path | None = None) -> None:
-    root = Path(__file__).resolve().parent
-    sql_path = schema_path or (root / "schema.sql")
-    sql = sql_path.read_text(encoding="utf-8")
+    """Create an empty study database (tables only; no participant rows)."""
+    path = get_db_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
     with db_connection() as conn:
-        conn.executescript(sql)
+        conn.executescript(_schema_sql(schema_path))

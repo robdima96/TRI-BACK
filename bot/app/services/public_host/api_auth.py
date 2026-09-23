@@ -14,10 +14,12 @@ from app.config import settings
 def require_bot_api_key(
     authorization: str | None = Header(default=None),
 ) -> None:
-    """Reject chat calls when ``TRI_BACK_BOT_API_KEY`` is set and Bearer does not match."""
+    """Require a matching Bearer key unless ``TRI_BACK_ALLOW_OPEN_API=1``."""
     expected = (settings.bot_api_key or "").strip()
     if not expected:
-        return
+        if settings.allow_open_api:
+            return
+        raise HTTPException(status_code=401, detail="Bearer token required")
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Bearer token required")
     token = authorization[7:].strip()

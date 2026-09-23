@@ -6,10 +6,10 @@ GitHub: `robdima96/TRI-BACK`. Cloud Build triggers `tri-back-bot-deploy` and `tr
 
 | Role | Cloud Run | URL |
 |------|-----------|-----|
-| Bot (private) | `tri-back` | `https://tri-back-PLACEHOLDER.us-central1.run.app` |
-| Study (public) | `tri-back-study` | `https://tri-back-study-PLACEHOLDER.us-central1.run.app` |
+| Bot (private) | `tri-back` | Cloud Run URL for the bot service |
+| Study (public) | `tri-back-study` | Cloud Run URL for the study service |
 | Artifact Registry | `tri-back` | `tri-back-bot`, `tri-back-study` images |
-| GCS bucket | `digimsk-cloudrun-YOUR_GCP_PROJECT` | cannot rename; mounted at `/mnt/tri-back` |
+| GCS bucket | `$TRI_BACK_GCS_BUCKET` | mounted at `/mnt/tri-back` |
 
 Env vars are `TRI_BACK_*`. Deploy scripts write those names.
 
@@ -42,10 +42,10 @@ Confirm `CHATBOT_BASE_URL` is the bot URL and the study SA has `roles/run.invoke
 
 ## Prove the public link
 
-1. Open `https://tri-back-study-PLACEHOLDER.us-central1.run.app`
+1. Open the study Cloud Run URL
 2. Login page over HTTPS; DevTools: `wss://…/_event` stays up
 3. Admin login → one chat turn
-4. New file under `gs://digimsk-cloudrun-YOUR_GCP_PROJECT/sessions/`
+4. New file under `gs://$TRI_BACK_GCS_BUCKET/sessions/`
 
 ## Related files
 

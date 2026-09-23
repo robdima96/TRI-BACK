@@ -16,3 +16,13 @@ def test_ready_response_shape():
         assert name in checks
         assert "ok" in checks[name] and isinstance(checks[name]["ok"], bool)
         assert "detail" in checks[name]
+
+
+def test_ready_hides_exception_text_when_open_api_off(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "allow_open_api", False)
+    r = client.get("/ready")
+    assert r.status_code in (200, 503)
+    for check in r.json().get("checks", {}).values():
+        assert check.get("detail") in ("ok", "error")

@@ -6,9 +6,7 @@ The **bucket name cannot be renamed**. Keep:
 digimsk-cloudrun-<PROJECT_ID>
 ```
 
-Example: `digimsk-cloudrun-YOUR_GCP_PROJECT`
-
-Override with `TRI_BACK_GCS_BUCKET`.
+Set the real name with `TRI_BACK_GCS_BUCKET`.
 
 Services mount the **entire bucket** at:
 

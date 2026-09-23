@@ -48,10 +48,16 @@ bot/app/services/public_host/cloud_run/.env.cloud
 # Local research / non-chatbot trees (keep on disk, not on Git)
 /Reports/
 /Project/
+/Plans/
 /plan_2026.9.1/
 /patient_agent/
 /Graphs/
 /Uncanny Valley/
+
+# Chat logs and local vector store (not for Git)
+data/sessions/
+data/chroma/
+prototypes/sessions/*.json
 
 # Checkpoints, Neo4j notes, WAL/SHM
 **/langgraph_checkpoints.sqlite

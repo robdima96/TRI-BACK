@@ -2,10 +2,13 @@
 
 import reflex as rx
 
+from tri_back_study_app.db.connection import init_schema
 from tri_back_study_app.pages.admin import admin_page
 from tri_back_study_app.pages.chat import chat_page
 from tri_back_study_app.pages.login import login_page
 from tri_back_study_app.state.chat_state import ChatState
+
+init_schema()
 
 app = rx.App(
     stylesheets=["/theme.css"],

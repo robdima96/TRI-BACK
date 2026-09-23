@@ -45,6 +45,13 @@ def probe_encoder() -> tuple[bool, str]:
     return False, detail
 
 
+def _public_detail(ok: bool, detail: str) -> str:
+    """Omit exception text when the open-API flag is off."""
+    if settings.allow_open_api:
+        return detail
+    return "ok" if ok else "error"
+
+
 def readiness_payload() -> dict:
     rag_ok, rag_detail = probe_rag()
     cp_ok, cp_detail = probe_checkpointer()
@@ -54,9 +61,9 @@ def readiness_payload() -> dict:
     return {
         "status": "ready" if all_ok else "not_ready",
         "checks": {
-            "rag": {"ok": rag_ok, "detail": rag_detail},
-            "checkpointer": {"ok": cp_ok, "detail": cp_detail},
-            "generator": {"ok": gen_ok, "detail": gen_detail},
-            "encoder": {"ok": enc_ok, "detail": enc_detail},
+            "rag": {"ok": rag_ok, "detail": _public_detail(rag_ok, rag_detail)},
+            "checkpointer": {"ok": cp_ok, "detail": _public_detail(cp_ok, cp_detail)},
+            "generator": {"ok": gen_ok, "detail": _public_detail(gen_ok, gen_detail)},
+            "encoder": {"ok": enc_ok, "detail": _public_detail(enc_ok, enc_detail)},
         },
     }

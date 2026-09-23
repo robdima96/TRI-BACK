@@ -188,8 +188,10 @@ class Settings(BaseModel):
     session_store_dir: str = "data/sessions"
     # LangGraph SqliteSaver; thread_id maps to chat session_id.
     checkpoint_sqlite_path: str = "data/langgraph_checkpoints.sqlite"
-    # Shared secret for study UI → bot chat calls. Empty = no auth (local default).
+    # Shared secret for study UI → bot chat calls.
     bot_api_key: str | None = None
+    # When True, an empty bot_api_key is allowed (local and tests only).
+    allow_open_api: bool = False
     # Sliding-window limits for POST /api/v1/chat (0 disables).
     chat_rate_limit: int = 60
     chat_rate_window_sec: int = 60
@@ -264,6 +266,7 @@ settings = Settings(
     )
     or "data/langgraph_checkpoints.sqlite",
     bot_api_key=_env_str("TRI_BACK_BOT_API_KEY"),
+    allow_open_api=_env_bool("TRI_BACK_ALLOW_OPEN_API", False),
     chat_rate_limit=_env_int("TRI_BACK_CHAT_RATE_LIMIT", 60),
     chat_rate_window_sec=_env_int("TRI_BACK_CHAT_RATE_WINDOW_SEC", 60),
 )

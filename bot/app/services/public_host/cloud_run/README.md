@@ -34,8 +34,8 @@ Traditional Chroma RAG is **off** on the hosted bot (`TRI_BACK_RAG=0`); GraphRAG
 
 From the TRI-BACK monorepo root:
 
-1. `gcloud auth login` / `gcloud config set project YOUR_GCP_PROJECT`  
-2. Set `TRI_BACK_BOT_API_KEY` (and optional `TRI_BACK_GCS_BUCKET`).  
+1. `gcloud auth login` / `gcloud config set project $env:TRI_BACK_GCP_PROJECT`  
+2. Set `TRI_BACK_GCP_PROJECT`, `TRI_BACK_GCS_BUCKET`, `TRI_BACK_RUNTIME_SA`. Create Secret Manager secrets `TRI_BACK_BOT_API_KEY` (and for the study service, `TRI_BACK_ADMIN_PASSWORD`).  
 3. `.\bot\app\services\public_host\cloud_run\scripts\upload_gcs_assets.ps1 -GliNERDir "…"`.  
 4. Build/push `Dockerfile.bot` → Artifact Registry `tri-back/tri-back-bot`.  
 5. `.\bot\app\services\public_host\cloud_run\scripts\deploy_bot.ps1` (**max-instances=1**).  
