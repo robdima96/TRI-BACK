@@ -2,6 +2,8 @@
 
 The public link is the **study** Cloud Run URL. The bot stays private; the study UI calls it with a Bearer key.
 
+Do not write the live Cloud Run hostnames into this repo. Look them up locally with `gcloud run services describe` when you need the URL.
+
 GitHub: `robdima96/TRI-BACK`. Cloud Build triggers `tri-back-bot-deploy` and `tri-back-study-deploy` deploy image-only updates on push to `main`.
 
 | Role | Cloud Run | URL |
