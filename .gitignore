@@ -29,8 +29,11 @@ prototypes/tri_back_study_app/data/participant_credentials.csv
 prototypes/tri_back_study_app/data/study_roster.csv
 prototypes/tri_back_study_app/.venv/
 
-# Scratch / binaries (ask before forcing PDFs into git)
+# Scratch / binaries (ask before forcing PDFs or decks into git)
 **/*.pdf
+**/*.ppt
+**/*.pptx
+Panel Presentation.pptx
 **/*.bak
 **/*.tmp
 **/node_modules/
