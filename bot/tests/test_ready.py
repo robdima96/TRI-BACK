@@ -12,7 +12,7 @@ def test_ready_response_shape():
     data = r.json()
     assert data.get("status") in ("ready", "not_ready")
     checks = data.get("checks", {})
-    for name in ("rag", "checkpointer", "generator", "encoder"):
+    for name in ("rag", "checkpointer", "generator", "encoder", "graph"):
         assert name in checks
         assert "ok" in checks[name] and isinstance(checks[name]["ok"], bool)
         assert "detail" in checks[name]

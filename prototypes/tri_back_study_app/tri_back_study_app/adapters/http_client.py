@@ -99,7 +99,8 @@ async def call_chat_api(session_id: str, message: str) -> ChatTurnResult:
             json={"session_id": session_id, "message": message},
             headers=headers,
         )
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            raise RuntimeError(rephrase_error_message(resp))
         data: dict[str, Any] = resp.json()
     elapsed_ms = (time.perf_counter() - started) * 1000.0
 
@@ -134,6 +135,20 @@ async def call_chat_api(session_id: str, message: str) -> ChatTurnResult:
     )
 
 
+def rephrase_error_message(response: httpx.Response) -> str:
+    """API ``detail`` for a failed chat or rephrase call, or the status code."""
+    detail: Any = None
+    try:
+        body = response.json()
+    except Exception:  # noqa: BLE001 — non-JSON bodies fall back to the status
+        body = None
+    if isinstance(body, dict):
+        detail = body.get("detail")
+    if isinstance(detail, str) and detail.strip():
+        return detail.strip()
+    return str(response.status_code)
+
+
 async def call_rephrase_api(session_id: str, message_id: str) -> ChatTurnResult:
     url = f"{CHATBOT_BASE_URL}/api/v1/rephrase"
     headers = _bot_headers()
@@ -144,7 +159,8 @@ async def call_rephrase_api(session_id: str, message_id: str) -> ChatTurnResult:
             json={"session_id": session_id, "message_id": message_id},
             headers=headers,
         )
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            raise RuntimeError(rephrase_error_message(resp))
         data: dict[str, Any] = resp.json()
     elapsed_ms = (time.perf_counter() - started) * 1000.0
     return ChatTurnResult(

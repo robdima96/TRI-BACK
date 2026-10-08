@@ -57,3 +57,41 @@ def test_bot_save_preserves_study_feedback(tmp_path, monkeypatch):
     assert data["messages"][1]["message_id"] == "msg_001"
     assert data["engagement"]["feedback_up_count"] == 1
     assert data["engagement"]["session_duration_sec"] == 12.5
+
+
+def test_save_session_retries_stale_write(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.config.settings.session_store_dir", tmp_path)
+    monkeypatch.setattr("app.session_store.settings.session_store_dir", tmp_path)
+    real_write = Path.write_text
+    calls = {"n": 0}
+
+    def flaky(self, data, encoding=None, errors=None, newline=None):
+        if self.suffix == ".tmp":
+            calls["n"] += 1
+            if calls["n"] == 1:
+                err = OSError(116, "Stale file handle")
+                raise err
+        return real_write(self, data, encoding=encoding, errors=errors, newline=newline)
+
+    monkeypatch.setattr(Path, "write_text", flaky)
+    save_session("admin_3", messages=[{"role": "user", "content": "hi"}])
+    assert calls["n"] >= 2
+    loaded = load_session("admin_3")
+    assert loaded is not None
+    assert loaded["messages"][0]["content"] == "hi"
+
+
+def test_save_session_refuses_to_clobber_unreadable_file(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.config.settings.session_store_dir", tmp_path)
+    monkeypatch.setattr("app.session_store.settings.session_store_dir", tmp_path)
+    path = tmp_path / "admin_7.json"
+    path.write_text('{"session_id": "admin_7", "keep": true}', encoding="utf-8")
+    monkeypatch.setattr("app.session_store.load_session", lambda _sid: None)
+    try:
+        save_session("admin_7", messages=[{"role": "user", "content": "x"}])
+        raised = False
+    except OSError as exc:
+        raised = True
+        assert "refusing to overwrite" in str(exc)
+    assert raised
+    assert json.loads(path.read_text(encoding="utf-8"))["keep"] is True

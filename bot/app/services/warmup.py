@@ -29,6 +29,7 @@ def warmup_runtime() -> None:
     _warmup_rag_embedding()
     _warmup_lexical_index()
     _warmup_generator()
+    _warmup_graph()
     _log.info("runtime warmup finished in %.2fs", time.perf_counter() - t0)
 
 
@@ -127,6 +128,23 @@ def _warmup_lexical_index() -> None:
         _log.info("warmup: lexical Chroma index ready (%d docs)", n)
     except Exception as exc:  # noqa: BLE001
         _log.warning("warmup: lexical Chroma index error: %s", exc)
+
+
+def _warmup_graph() -> None:
+    """Load the v4 pack at process start so the first chat turn is not the first open."""
+    if not settings.graphrag_load:
+        _log.info("warmup: graph skipped (TRI_BACK_GRAPH_RAG=0)")
+        return
+    try:
+        from app.readiness import probe_graph
+
+        ok, detail = probe_graph()
+        if ok:
+            _log.info("warmup: graph ready (%s)", detail)
+        else:
+            _log.warning("warmup: graph not ready: %s", detail)
+    except Exception as exc:  # noqa: BLE001 — warm-up must not raise
+        _log.warning("warmup: graph error: %s", exc)
 
 
 def _warmup_generator() -> None:

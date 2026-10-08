@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -6,7 +7,7 @@ from langchain_core.messages import HumanMessage
 
 from app.config import settings
 from app.config import validate_retrieval_paths
-from app.readiness import readiness_payload
+from app.readiness import probe_graph, readiness_payload
 from app.orchestrator.checkpointing import close_checkpointer, get_checkpointer
 from app.orchestrator.graph import build_chat_graph
 from app.orchestrator.messages import transcript_from_messages, user_message_count
@@ -24,6 +25,16 @@ from app.services.public_host.api_auth import (
     enforce_chat_rate_limit,
     require_bot_api_key,
 )
+
+_log = logging.getLogger(__name__)
+_CHAT_FAILURE_DETAIL_MAX = 400
+
+
+def _chat_failure_detail(message: str) -> str:
+    text = " ".join((message or "").split())
+    if len(text) <= _CHAT_FAILURE_DETAIL_MAX:
+        return text
+    return text[: _CHAT_FAILURE_DETAIL_MAX - 3].rstrip() + "..."
 
 
 @asynccontextmanager
@@ -51,7 +62,7 @@ def health() -> dict[str, str]:
 
 @app.get("/ready")
 def ready() -> JSONResponse:
-    """Readiness: RAG (if enabled), checkpointer, generator weights, encoder config path."""
+    """Readiness: RAG (if enabled), graph pack, checkpointer, generator, encoder."""
     body = readiness_payload()
     code = 200 if body["status"] == "ready" else 503
     return JSONResponse(content=body, status_code=code)
@@ -69,18 +80,34 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
 
     sid = req.session_id.strip()
     enforce_chat_rate_limit(request, sid)
-    config = {"configurable": {"thread_id": sid}} # LangGraph thread_id maps to chat session_id
-    maybe_resume_from_session(chat_graph, config, sid)
+    graph_ok, graph_detail = probe_graph()
+    if not graph_ok:
+        _log.error("chat refused session=%s graph not ready: %s", sid, graph_detail)
+        raise HTTPException(
+            status_code=503,
+            detail=_chat_failure_detail(f"graph not ready: {graph_detail}"),
+        )
 
-    state = chat_graph.invoke( # invoke the chat graph with the session_id and the user message
-                               # all other vars restored from SQLite checkpoint using thread_id
-        {
-            "session_id": req.session_id,
-            "messages": [HumanMessage(content=req.message)],
-            "requested_triage_profile_id": (req.triage_profile_id or "").strip(),
-        },
-        config,
-    )
+    config = {"configurable": {"thread_id": sid}} # LangGraph thread_id maps to chat session_id
+    try:
+        maybe_resume_from_session(chat_graph, config, sid)
+        state = chat_graph.invoke( # invoke the chat graph with the session_id and the user message
+                                   # all other vars restored from SQLite checkpoint using thread_id
+            {
+                "session_id": req.session_id,
+                "messages": [HumanMessage(content=req.message)],
+                "requested_triage_profile_id": (req.triage_profile_id or "").strip(),
+            },
+            config,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _log.exception("chat failed session=%s", sid)
+        raise HTTPException(
+            status_code=503,
+            detail=_chat_failure_detail(f"{type(exc).__name__}: {exc}"),
+        ) from exc
 
     # JSON snapshot for logging / auditing (in addition to LangGraph checkpoints).
     extraction_history = list(state.get("extraction_history") or [])
@@ -111,7 +138,14 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
         save_kwargs["disposition"] = disposition
     if intake is not None:
         save_kwargs["intake"] = intake
-    save_session(sid, **save_kwargs)
+    try:
+        save_session(sid, **save_kwargs)
+    except Exception as exc:
+        _log.exception("chat session save failed session=%s", sid)
+        raise HTTPException(
+            status_code=503,
+            detail=_chat_failure_detail(f"{type(exc).__name__}: {exc}"),
+        ) from exc
 
     coverage = state.get("coverage") or {}
     return ChatResponse(

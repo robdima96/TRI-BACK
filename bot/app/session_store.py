@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,11 @@ from app.session_enrichment import (
 _log = logging.getLogger(__name__)
 
 _MAX_STORED_MESSAGES = 40  # cap transcript size (user + assistant turns)
+_STALE_RETRIES = 10
+_STALE_DELAY_SEC = 0.1
+# load_session already retries a stale read. This outer loop only covers a
+# file that exists but still could not be parsed after those retries.
+_SAVE_LOAD_ATTEMPTS = 3
 
 # Study / admin login ids: roleOrStudyId_loginCount (e.g. admin_15, user_55, 425_1).
 _STUDY_SESSION_ID_RE = re.compile(r"^[A-Za-z0-9]+_[0-9]+$")
@@ -52,6 +58,14 @@ def _session_file_path(session_id: str) -> Path:
     return session_file_path(session_id)
 
 
+def _is_stale_handle(exc: BaseException) -> bool:
+    """True for GCS FUSE errors that clear if the read or write is repeated."""
+    if isinstance(exc, OSError) and getattr(exc, "errno", None) in {2, 11, 116}:
+        return True
+    msg = str(exc).casefold()
+    return "stale file handle" in msg or "errno 116" in msg
+
+
 def load_session(session_id: str) -> dict[str, Any] | None:
     if not session_id or not session_id.strip():
         return None
@@ -68,14 +82,25 @@ def load_session(session_id: str) -> dict[str, Any] | None:
                 return None
         else:
             return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
+    last_exc: OSError | None = None
+    for attempt in range(_STALE_RETRIES):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                return None
+            return data
+        except json.JSONDecodeError as e:
+            _log.warning("session load failed %s: %s", path, e)
             return None
-        return data
-    except (OSError, json.JSONDecodeError) as e:
-        _log.warning("session load failed %s: %s", path, e)
-        return None
+        except OSError as e:
+            last_exc = e
+            if not _is_stale_handle(e) or attempt == _STALE_RETRIES - 1:
+                _log.warning("session load failed %s: %s", path, e)
+                return None
+            time.sleep(_STALE_DELAY_SEC * (attempt + 1))
+    if last_exc is not None:
+        _log.warning("session load failed %s: %s", path, last_exc)
+    return None
 
 
 def _append_by_turn_index(
@@ -174,6 +199,50 @@ def merge_messages_preserving_study(
     return prefix + new
 
 
+def _message_id_empty(msg: dict[str, Any]) -> bool:
+    return not str(msg.get("message_id") or "").strip()
+
+
+def fill_missing_turn_ids(
+    messages: list[dict[str, Any]] | None,
+    *,
+    question_mode: bool | None = None,
+) -> list[dict[str, Any]]:
+    """Assign study-style ids on rows that still have none.
+
+    User turn ``i`` (0-based, intro excluded) is ``msg_{i:03d}_u``. The assistant
+    that follows that user is ``msg_{i:03d}``. A leading assistant with no
+    preceding user is the canned intro and is left unlabeled. Existing ids,
+    including ``msg_intro``, are kept.
+
+    When ``question_mode`` is provided, the newest paired assistant with an
+    empty ``question_mode`` receives it.
+    """
+    rows = [dict(m) for m in (messages or []) if isinstance(m, dict)]
+    user_i = -1
+    awaiting_assistant = False
+    newest_assistant: int | None = None
+    for idx, msg in enumerate(rows):
+        role = msg.get("role")
+        if role == "user":
+            user_i += 1
+            awaiting_assistant = True
+            if _message_id_empty(msg):
+                msg["message_id"] = f"msg_{user_i:03d}_u"
+            continue
+        if role != "assistant" or user_i < 0 or not awaiting_assistant:
+            continue
+        awaiting_assistant = False
+        newest_assistant = idx
+        if _message_id_empty(msg):
+            msg["message_id"] = f"msg_{user_i:03d}"
+    if question_mode is not None and newest_assistant is not None:
+        latest = rows[newest_assistant]
+        if latest.get("question_mode") in (None, ""):
+            latest["question_mode"] = bool(question_mode)
+    return rows
+
+
 def _merge_turn_histories(
     existing: list[dict[str, Any]] | None,
     incoming: list[dict[str, Any]] | None,
@@ -223,9 +292,15 @@ def merge_session_fields(existing: dict[str, Any], fields: dict[str, Any]) -> di
     intake = incoming.pop("intake", None)
 
     if "messages" in incoming:
-        incoming["messages"] = merge_messages_preserving_study(
-            merged.get("messages"),
-            incoming.get("messages"),
+        question_mode = None
+        if isinstance(orchestrator, dict) and "question_mode" in orchestrator:
+            question_mode = bool(orchestrator.get("question_mode"))
+        incoming["messages"] = fill_missing_turn_ids(
+            merge_messages_preserving_study(
+                merged.get("messages"),
+                incoming.get("messages"),
+            ),
+            question_mode=question_mode,
         )
 
     if "factor_states" in incoming and isinstance(incoming.get("factor_states"), dict):
@@ -296,7 +371,7 @@ def save_session(session_id: str, **fields: Any) -> None:
     fields.pop("session_id", None)
     path = _session_file_path(sid)
     path.parent.mkdir(parents=True, exist_ok=True)
-    existing = load_session(sid) or default_session_fields(sid)
+    existing = _load_existing_for_save(sid, path)
     existing = merge_session_fields(existing, fields)
     existing["session_id"] = sid
 
@@ -309,18 +384,53 @@ def save_session(session_id: str, **fields: Any) -> None:
             existing=existing.get("engagement"),
         )
 
-    tmp = path.with_suffix(".json.tmp")
     data = json.dumps(existing, ensure_ascii=False, indent=2)
-    tmp.write_text(data, encoding="utf-8")
-    try:
-        tmp.replace(path)
-    except OSError:
-        # GCS FUSE often cannot rename; write in place instead.
-        path.write_text(data, encoding="utf-8")
+    _write_session_file(path, data)
+
+
+def _load_existing_for_save(session_id: str, path: Path) -> dict[str, Any]:
+    """Read the current snapshot, retrying stale FUSE handles.
+
+    A file that exists but cannot be read is left untouched. Replacing it with
+    defaults would wipe the study overlay the other service just wrote.
+    """
+    existing: dict[str, Any] | None = None
+    for attempt in range(_SAVE_LOAD_ATTEMPTS):
+        existing = load_session(session_id)
+        if existing is not None:
+            return existing
+        if path.is_file() and attempt < _SAVE_LOAD_ATTEMPTS - 1:
+            time.sleep(_STALE_DELAY_SEC * (attempt + 1))
+            continue
+        break
+    if path.is_file():
+        raise OSError(f"session load failed; refusing to overwrite {path.name}")
+    return default_session_fields(session_id)
+
+
+def _write_session_file(path: Path, data: str) -> None:
+    """Write session JSON, falling back when GCS FUSE cannot rename."""
+    tmp = path.with_suffix(".json.tmp")
+    last_exc: OSError | None = None
+    for attempt in range(_STALE_RETRIES):
         try:
-            tmp.unlink(missing_ok=True)
-        except OSError:
-            pass
+            tmp.write_text(data, encoding="utf-8")
+            try:
+                tmp.replace(path)
+            except OSError:
+                path.write_text(data, encoding="utf-8")
+                try:
+                    tmp.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            return
+        except OSError as exc:
+            last_exc = exc
+            if not _is_stale_handle(exc) or attempt == _STALE_RETRIES - 1:
+                raise
+            time.sleep(_STALE_DELAY_SEC * (attempt + 1))
+    if last_exc is not None:
+        raise last_exc
 
 
 def list_session_files(*, root: Path | None = None) -> list[dict[str, Any]]:
